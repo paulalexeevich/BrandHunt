@@ -130,11 +130,22 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   };
 
   const handleSearchFoodGraph = async () => {
-    if (!selectedDetection) return;
+    console.log('handleSearchFoodGraph called');
+    
+    if (!selectedDetection) {
+      console.log('No detection selected');
+      return;
+    }
 
     const detection = detections.find(d => d.id === selectedDetection);
-    if (!detection?.brand_name) return;
+    console.log('Found detection:', detection);
+    
+    if (!detection?.brand_name) {
+      console.log('No brand name found');
+      return;
+    }
 
+    console.log('Searching FoodGraph for:', detection.brand_name);
     setLoading(true);
     setError(null);
 
@@ -148,14 +159,21 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         }),
       });
 
+      console.log('FoodGraph API response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('FoodGraph API error:', errorData);
         throw new Error(errorData.details || 'FoodGraph search failed');
       }
 
       const data = await response.json();
-      setFoodgraphResults(data.products);
+      console.log('FoodGraph API response:', data);
+      console.log('Products found:', data.products?.length || 0);
+      
+      setFoodgraphResults(data.products || []);
     } catch (err) {
+      console.error('FoodGraph search error:', err);
       setError(err instanceof Error ? err.message : 'FoodGraph search failed');
     } finally {
       setLoading(false);
@@ -375,11 +393,26 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   </button>
                 )}
 
+                {/* Loading State */}
+                {loading && currentStep === 'foodgraph' && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    <p className="text-sm text-blue-700">Searching FoodGraph...</p>
+                  </div>
+                )}
+
+                {/* No Results Message */}
+                {!loading && foodgraphResults.length === 0 && selectedDetection && currentStep === 'foodgraph' && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Click "Search FoodGraph" button to find matching products</p>
+                  </div>
+                )}
+
                 {/* FoodGraph Results - Visual Comparison */}
                 {foodgraphResults.length > 0 && (
                   <div className="mt-6">
                     <h3 className="font-semibold text-gray-900 mb-3">
-                      Top 5 FoodGraph Matches
+                      Top 5 FoodGraph Matches ({foodgraphResults.length} found)
                     </h3>
                     <div className="grid grid-cols-5 gap-2">
                       {foodgraphResults.slice(0, 5).map((result, index) => (
