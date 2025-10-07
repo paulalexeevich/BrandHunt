@@ -35,13 +35,12 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    // Update detection with brand name, category, and SKU
+    // Update detection with brand name and category
     const { data: updatedDetection, error: updateError } = await supabase
       .from('branghunt_detections')
       .update({
         brand_name: productInfo.brand,
         category: productInfo.category,
-        sku: productInfo.sku,
         brand_extraction_prompt: `Product info extraction for detection ${detectionId}`,
         brand_extraction_response: JSON.stringify(productInfo),
       })
@@ -58,7 +57,6 @@ export async function POST(request: NextRequest) {
       success: true,
       brandName: productInfo.brand,
       category: productInfo.category,
-      sku: productInfo.sku,
       detection: updatedDetection,
       message: 'Product info extracted successfully' 
     });
