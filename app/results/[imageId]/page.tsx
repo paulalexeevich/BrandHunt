@@ -113,11 +113,12 @@ export default function ResultsPage({ params }: { params: Promise<{ imageId: str
                 {showBoundingBoxes ? 'Hide' : 'Show'} Boxes
               </button>
             </div>
-            <div className="relative">
+            <div className="relative inline-block max-w-full">
               <img
                 src={`data:image/jpeg;base64,${image.file_path}`}
                 alt={image.original_filename}
-                className="w-full rounded-lg"
+                className="max-w-full h-auto rounded-lg"
+                style={{ display: 'block' }}
               />
               {showBoundingBoxes && detections.map((detection, index) => {
                 const box = detection.bounding_box;
