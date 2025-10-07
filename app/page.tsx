@@ -1,11 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, XCircle, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
 
+type UploadMode = 'file' | 'url';
+
 export default function Home() {
+  const [uploadMode, setUploadMode] = useState<UploadMode>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string>('');
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -30,8 +34,28 @@ export default function Home() {
     }
   };
 
+  const handleUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setImageUrl(event.target.value);
+    setError(null);
+    setSuccess(false);
+    setUploadedImageId(null);
+  };
+
+  const handleUrlPreview = () => {
+    if (imageUrl) {
+      setPreview(imageUrl);
+    }
+  };
+
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (uploadMode === 'file' && !selectedFile) {
+      setError('Please select a file');
+      return;
+    }
+    if (uploadMode === 'url' && !imageUrl) {
+      setError('Please enter an image URL');
+      return;
+    }
 
     setUploading(true);
     setError(null);
@@ -39,7 +63,12 @@ export default function Home() {
     try {
       // Upload image
       const formData = new FormData();
-      formData.append('image', selectedFile);
+      
+      if (uploadMode === 'file') {
+        formData.append('image', selectedFile!);
+      } else {
+        formData.append('imageUrl', imageUrl);
+      }
 
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
@@ -47,7 +76,8 @@ export default function Home() {
       });
 
       if (!uploadResponse.ok) {
-        throw new Error('Upload failed');
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
 
       const uploadData = await uploadResponse.json();
@@ -67,7 +97,8 @@ export default function Home() {
       });
 
       if (!processResponse.ok) {
-        throw new Error('Processing failed');
+        const errorData = await processResponse.json();
+        throw new Error(errorData.details || 'Processing failed');
       }
 
       const processData = await processResponse.json();
@@ -84,6 +115,7 @@ export default function Home() {
 
   const handleReset = () => {
     setSelectedFile(null);
+    setImageUrl('');
     setPreview(null);
     setUploadedImageId(null);
     setError(null);
@@ -106,24 +138,78 @@ export default function Home() {
         {/* Main Upload Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
           {!preview ? (
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-500 transition-colors">
-              <Upload className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                Upload Product Image
-              </h3>
-              <p className="text-gray-500 mb-4">
-                Select an image to detect products and find brand information
-              </p>
-              <label className="cursor-pointer inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-                Choose Image
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </label>
-            </div>
+            <>
+              {/* Upload Mode Selector */}
+              <div className="flex gap-2 mb-6 justify-center">
+                <button
+                  onClick={() => setUploadMode('file')}
+                  className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                    uploadMode === 'file'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  <Upload className="w-4 h-4 inline mr-2" />
+                  Upload File
+                </button>
+                <button
+                  onClick={() => setUploadMode('url')}
+                  className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                    uploadMode === 'url'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  <LinkIcon className="w-4 h-4 inline mr-2" />
+                  S3 URL
+                </button>
+              </div>
+
+              {uploadMode === 'file' ? (
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-500 transition-colors">
+                  <Upload className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                    Upload Product Image
+                  </h3>
+                  <p className="text-gray-500 mb-4">
+                    Select an image to detect products and find brand information
+                  </p>
+                  <label className="cursor-pointer inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                    Choose Image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-500 transition-colors">
+                  <LinkIcon className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                    Enter S3 Image URL
+                  </h3>
+                  <p className="text-gray-500 mb-4">
+                    Paste the S3 URL of a product image
+                  </p>
+                  <input
+                    type="text"
+                    value={imageUrl}
+                    onChange={handleUrlChange}
+                    placeholder="https://traxus.s3.amazonaws.com/..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={handleUrlPreview}
+                    disabled={!imageUrl}
+                    className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    Preview & Process
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <div>
               {/* Image Preview */}
