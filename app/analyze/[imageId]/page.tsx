@@ -45,6 +45,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [currentStep, setCurrentStep] = useState<Step>('detect');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<{ request?: string; response?: string; error?: string } | null>(null);
 
   useEffect(() => {
     fetchImage();
@@ -149,14 +150,19 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     setLoading(true);
     setError(null);
 
+    const requestBody = { 
+      detectionId: selectedDetection,
+      brandName: detection.brand_name 
+    };
+
+    // Store request for debugging
+    setDebugInfo({ request: JSON.stringify(requestBody, null, 2) });
+
     try {
       const response = await fetch('/api/search-foodgraph', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          detectionId: selectedDetection,
-          brandName: detection.brand_name 
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       console.log('FoodGraph API response status:', response.status);
@@ -164,6 +170,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       if (!response.ok) {
         const errorData = await response.json();
         console.error('FoodGraph API error:', errorData);
+        setDebugInfo(prev => ({ ...prev, error: JSON.stringify(errorData, null, 2) }));
         throw new Error(errorData.details || 'FoodGraph search failed');
       }
 
@@ -171,10 +178,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       console.log('FoodGraph API response:', data);
       console.log('Products found:', data.products?.length || 0);
       
+      // Store response for debugging
+      setDebugInfo(prev => ({ ...prev, response: JSON.stringify(data, null, 2) }));
+      
       setFoodgraphResults(data.products || []);
     } catch (err) {
       console.error('FoodGraph search error:', err);
-      setError(err instanceof Error ? err.message : 'FoodGraph search failed');
+      const errorMessage = err instanceof Error ? err.message : 'FoodGraph search failed';
+      setError(errorMessage);
+      setDebugInfo(prev => ({ ...prev, error: errorMessage }));
     } finally {
       setLoading(false);
     }
@@ -405,6 +417,40 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 {!loading && foodgraphResults.length === 0 && selectedDetection && currentStep === 'foodgraph' && (
                   <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                     <p className="text-sm text-gray-600">Click "Search FoodGraph" button to find matching products</p>
+                  </div>
+                )}
+
+                {/* Debug Panel */}
+                {debugInfo && (
+                  <div className="mt-6 p-4 bg-gray-900 rounded-lg text-white font-mono text-xs overflow-auto max-h-96">
+                    <h4 className="font-bold text-green-400 mb-2">🔍 Debug Information</h4>
+                    
+                    {debugInfo.request && (
+                      <div className="mb-4">
+                        <p className="text-yellow-400 font-semibold mb-1">📤 Request to /api/search-foodgraph:</p>
+                        <pre className="bg-gray-800 p-2 rounded overflow-x-auto text-green-300">
+                          {debugInfo.request}
+                        </pre>
+                      </div>
+                    )}
+                    
+                    {debugInfo.response && (
+                      <div className="mb-4">
+                        <p className="text-blue-400 font-semibold mb-1">📥 Response from FoodGraph API:</p>
+                        <pre className="bg-gray-800 p-2 rounded overflow-x-auto text-blue-300">
+                          {debugInfo.response}
+                        </pre>
+                      </div>
+                    )}
+                    
+                    {debugInfo.error && (
+                      <div>
+                        <p className="text-red-400 font-semibold mb-1">❌ Error:</p>
+                        <pre className="bg-red-900 p-2 rounded overflow-x-auto text-red-200">
+                          {debugInfo.error}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 )}
 
