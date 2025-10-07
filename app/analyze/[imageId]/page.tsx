@@ -122,7 +122,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         d.id === detectionId ? { ...d, brand_name: data.brandName, category: data.category } : d
       ));
       
-      setCurrentStep('foodgraph');
+      // Don't auto-advance to foodgraph - let user extract more brands if needed
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Brand extraction failed');
     } finally {
@@ -325,7 +325,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     <span>Extracting brand...</span>
                   </div>
                 )}
-                <div className="space-y-2">
+                <div className="space-y-2 mb-4">
                   {detections.map((detection, index) => (
                     <div
                       key={detection.id}
@@ -356,15 +356,33 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </div>
                   ))}
                 </div>
+                
+                {/* Continue to FoodGraph button */}
+                {detections.some(d => d.brand_name) && !loading && (
+                  <button
+                    onClick={() => setCurrentStep('foodgraph')}
+                    className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold flex items-center justify-center gap-2"
+                  >
+                    Continue to FoodGraph Search →
+                  </button>
+                )}
               </div>
             )}
 
             {/* Step 3: FoodGraph Search */}
             {currentStep === 'foodgraph' && (
               <div>
-                <p className="text-gray-600 mb-4">
-                  Select a product with extracted brand to search FoodGraph catalog.
-                </p>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-gray-600">
+                    Select a product with extracted brand to search FoodGraph catalog.
+                  </p>
+                  <button
+                    onClick={() => setCurrentStep('brand')}
+                    className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold"
+                  >
+                    ← Back to Extract
+                  </button>
+                </div>
                 <div className="space-y-2 mb-4">
                   {detections.filter(d => d.brand_name).map((detection, index) => (
                     <button
