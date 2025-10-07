@@ -15,16 +15,21 @@ export async function detectProducts(imageBase64: string, mimeType: string): Pro
   const model = genAI.getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
-      temperature: 0.1,
+      temperature: 0,  // Set to 0 for more deterministic bounding boxes
+      responseMimeType: 'application/json',
     }
   });
 
   const prompt = `
-Detect all products in this image. For each product, provide:
-1. A 2D bounding box in normalized coordinates [y0, x0, y1, x1] where values are between 0 and 1000
-2. A brief label describing the product
+Detect all visible products/items in this retail image. For each distinct product, provide:
+1. A 2D bounding box with normalized coordinates [y0, x0, y1, x1] where:
+   - y0: top edge (0 = image top, 1000 = image bottom)
+   - x0: left edge (0 = image left, 1000 = image right)
+   - y1: bottom edge (0 = image top, 1000 = image bottom)
+   - x1: right edge (0 = image left, 1000 = image right)
+2. A descriptive label for the product
 
-Return a JSON array with the following structure:
+Return a JSON array with this exact structure:
 [
   {
     "box_2d": [y0, x0, y1, x1],
@@ -32,7 +37,7 @@ Return a JSON array with the following structure:
   }
 ]
 
-Only return the JSON array, no additional text or markdown formatting.
+Ensure bounding boxes tightly fit each product. Only return the JSON array.
 `;
 
   const imagePart = {
