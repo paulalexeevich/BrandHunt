@@ -45,9 +45,14 @@ export async function POST(request: NextRequest) {
 
     console.log(`Detected ${detections.length} products`);
 
+    // Limit to first 5 products for processing
+    const maxProducts = 5;
+    const productsToProcess = detections.slice(0, maxProducts);
+    console.log(`Processing first ${productsToProcess.length} products (limit: ${maxProducts})`);
+
     // Process each detection
-    for (let i = 0; i < detections.length; i++) {
-      const detection = detections[i];
+    for (let i = 0; i < productsToProcess.length; i++) {
+      const detection = productsToProcess[i];
       
       // Convert normalized coordinates to bounding box object
       const boundingBox = {
@@ -132,8 +137,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true,
-      detectionsCount: detections.length,
-      message: 'Image processed successfully' 
+      detectionsCount: productsToProcess.length,
+      totalDetected: detections.length,
+      message: `Image processed successfully (${productsToProcess.length} of ${detections.length} products processed)` 
     });
   } catch (error) {
     console.error('Processing error:', error);

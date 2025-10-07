@@ -23,7 +23,7 @@ interface FoodGraphProduct {
   [key: string]: unknown;
 }
 
-interface FoodGraphSearchResponse {
+interface FoodGraphQueryResponse {
   products: FoodGraphProduct[];
   totalCount: number;
 }
@@ -68,20 +68,35 @@ async function authenticate(): Promise<string> {
 }
 
 /**
- * Search FoodGraph catalog for products matching a search term
+ * Search FoodGraph catalog for products using query endpoint
  * Returns top 50 results
  */
 export async function searchProducts(searchTerm: string): Promise<FoodGraphProduct[]> {
   const token = await authenticate();
 
+  const requestBody = {
+    updatedAtFrom: "2024-07-01T00:00:00Z",
+    productFilter: "CORE_FIELDS",
+    search: searchTerm,
+    searchIn: {
+      or: [
+        "title",
+        "companyBrand"
+      ]
+    },
+    fuzzyMatch: false,
+    limit: 50
+  };
+
   const response = await fetch(
-    `https://api.foodgraph.com/api/v1/catalog/products/search/terms?searchTerm=${encodeURIComponent(searchTerm)}&limit=50`,
+    'https://api.foodgraph.com/api/v1/catalog/products/search/query',
     {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify(requestBody),
     }
   );
 
@@ -89,7 +104,7 @@ export async function searchProducts(searchTerm: string): Promise<FoodGraphProdu
     throw new Error(`FoodGraph search failed: ${response.statusText}`);
   }
 
-  const data = await response.json() as FoodGraphSearchResponse;
+  const data = await response.json() as FoodGraphQueryResponse;
   return data.products || [];
 }
 
@@ -115,4 +130,3 @@ export function getFrontImageUrl(product: FoodGraphProduct): string | null {
 
   return null;
 }
-
