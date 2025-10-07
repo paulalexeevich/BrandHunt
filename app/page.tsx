@@ -1,103 +1,219 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import { Upload, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [uploadedImageId, setUploadedImageId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setError(null);
+      setSuccess(false);
+      setUploadedImageId(null);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      // Upload image
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const uploadData = await uploadResponse.json();
+      const imageId = uploadData.imageId;
+      setUploadedImageId(imageId);
+      setUploading(false);
+
+      // Start processing
+      setProcessing(true);
+
+      const processResponse = await fetch('/api/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageId }),
+      });
+
+      if (!processResponse.ok) {
+        throw new Error('Processing failed');
+      }
+
+      const processData = await processResponse.json();
+      setProcessing(false);
+      setSuccess(true);
+      
+      console.log('Processing completed:', processData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      setUploading(false);
+      setProcessing(false);
+    }
+  };
+
+  const handleReset = () => {
+    setSelectedFile(null);
+    setPreview(null);
+    setUploadedImageId(null);
+    setError(null);
+    setSuccess(false);
+    setUploading(false);
+    setProcessing(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">BrangHunt</h1>
+          <p className="text-lg text-gray-600">
+            AI-powered product detection and brand recognition
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Main Upload Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+          {!preview ? (
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-500 transition-colors">
+              <Upload className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                Upload Product Image
+              </h3>
+              <p className="text-gray-500 mb-4">
+                Select an image to detect products and find brand information
+              </p>
+              <label className="cursor-pointer inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                Choose Image
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          ) : (
+            <div>
+              {/* Image Preview */}
+              <div className="mb-6">
+                <img
+                  src={preview}
+                  alt="Preview"
+                  className="max-w-full max-h-96 mx-auto rounded-lg shadow-md"
+                />
+              </div>
+
+              {/* Status Messages */}
+              {uploading && (
+                <div className="flex items-center justify-center gap-2 text-blue-600 mb-4">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Uploading image...</span>
+                </div>
+              )}
+
+              {processing && (
+                <div className="flex items-center justify-center gap-2 text-indigo-600 mb-4">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Processing image (detecting products, extracting brands, searching FoodGraph)...</span>
+                </div>
+              )}
+
+              {error && (
+                <div className="flex items-center justify-center gap-2 text-red-600 mb-4">
+                  <XCircle className="w-5 h-5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {success && uploadedImageId && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 text-green-700 mb-2">
+                    <CheckCircle className="w-5 h-5" />
+                    <span className="font-semibold">Processing completed!</span>
+                  </div>
+                  <Link
+                    href={`/results/${uploadedImageId}`}
+                    className="inline-block px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    View Results
+                  </Link>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 justify-center">
+                {!uploading && !processing && !success && (
+                  <>
+                    <button
+                      onClick={handleUpload}
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
+                    >
+                      Process Image
+                    </button>
+                    <button
+                      onClick={handleReset}
+                      className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors font-semibold"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+
+                {success && (
+                  <button
+                    onClick={handleReset}
+                    className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
+                  >
+                    Process Another Image
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Recent Images Link */}
+        <div className="text-center">
+          <Link
+            href="/gallery"
+            className="text-indigo-600 hover:text-indigo-800 font-semibold"
+          >
+            View All Processed Images →
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
