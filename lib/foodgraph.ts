@@ -4,8 +4,8 @@
  */
 
 interface FoodGraphAuthResponse {
-  token: string;
-  expiresIn: number;
+  accessToken: string;
+  refreshToken?: string;
 }
 
 interface FoodGraphProduct {
@@ -47,12 +47,16 @@ async function authenticate(): Promise<string> {
     throw new Error('FoodGraph credentials not configured');
   }
 
-  const response = await fetch('https://api.foodgraph.com/api/v1/auth/login', {
+  const response = await fetch('https://api.foodgraph.com/v1/auth/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ 
+      email, 
+      password,
+      includeRefreshToken: true 
+    }),
   });
 
   if (!response.ok) {
@@ -60,9 +64,9 @@ async function authenticate(): Promise<string> {
   }
 
   const data = await response.json() as FoodGraphAuthResponse;
-  cachedToken = data.token;
-  // Set expiry to 50 minutes (token typically expires in 60 minutes)
-  tokenExpiry = Date.now() + (50 * 60 * 1000);
+  cachedToken = data.accessToken;
+  // JWT tokens typically expire in 24 hours, set expiry to 23 hours for safety
+  tokenExpiry = Date.now() + (23 * 60 * 60 * 1000);
 
   return cachedToken;
 }
