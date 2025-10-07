@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Found ${products.length} products for "${brandName}"`);
 
-    // Save top 50 results
+    // Save top 5 results
     const foodgraphResults = [];
     for (let rank = 0; rank < products.length; rank++) {
       const product = products[rank];
@@ -33,10 +33,10 @@ export async function POST(request: NextRequest) {
           detection_id: detectionId,
           search_term: brandName,
           result_rank: rank + 1,
-          product_gtin: product.gtin || null,
-          product_name: product.name || null,
-          brand_name: product.brand || null,
-          category: product.category || null,
+          product_gtin: product.keys?.GTIN14 || product.key || null,
+          product_name: product.title || null,
+          brand_name: product.companyBrand || null,
+          category: Array.isArray(product.category) ? product.category.join(', ') : null,
           front_image_url: frontImageUrl,
           full_data: product,
         })

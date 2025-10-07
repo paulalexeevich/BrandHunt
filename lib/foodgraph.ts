@@ -9,23 +9,47 @@ interface FoodGraphAuthResponse {
 }
 
 interface FoodGraphProduct {
-  gtin?: string;
-  name?: string;
-  brand?: string;
-  category?: string;
+  key: string;
+  keys?: {
+    FDC_ID?: string;
+    AMAZON_ASIN?: string;
+    GTIN14?: string;
+    [key: string]: string | undefined;
+  };
+  title: string;
+  category?: string[];
+  measures?: string;
+  sourcePdpUrls?: string[];
+  ingredients?: string;
+  companyBrand?: string;
+  companyManufacturer?: string;
   images?: Array<{
-    urls?: {
-      mobile?: string;
+    id: string;
+    type: string;
+    urls: {
+      original?: string;
       desktop?: string;
+      mobile?: string;
     };
-    perspective?: string;
   }>;
+  _createdAt?: number;
+  _updatedAt?: number;
+  _score?: number;
   [key: string]: unknown;
 }
 
 interface FoodGraphQueryResponse {
-  products: FoodGraphProduct[];
-  totalCount: number;
+  success: boolean;
+  pagination?: {
+    currentPage: number;
+    totalRetrieved: number;
+    maxResults: number;
+    currentPageSize: number;
+    total: number;
+    traceId?: string;
+    nextPageUrl?: string;
+  };
+  results: FoodGraphProduct[];
 }
 
 let cachedToken: string | null = null;
@@ -118,12 +142,13 @@ export async function searchProducts(searchTerm: string): Promise<FoodGraphProdu
 
   const data = await response.json() as FoodGraphQueryResponse;
   console.log('FoodGraph Success:', {
-    productsFound: data.products?.length || 0,
-    totalCount: data.totalCount
+    productsFound: data.results?.length || 0,
+    totalRetrieved: data.pagination?.totalRetrieved,
+    total: data.pagination?.total
   });
   
   // Return only first 5 products
-  return (data.products || []).slice(0, 5);
+  return (data.results || []).slice(0, 5);
 }
 
 /**
@@ -134,8 +159,8 @@ export function getFrontImageUrl(product: FoodGraphProduct): string | null {
     return null;
   }
 
-  // Look for front perspective image first
-  const frontImage = product.images.find(img => img.perspective === 'front');
+  // Look for FRONT type image first
+  const frontImage = product.images.find(img => img.type === 'FRONT');
   if (frontImage?.urls?.desktop || frontImage?.urls?.mobile) {
     return frontImage.urls.desktop || frontImage.urls.mobile || null;
   }
