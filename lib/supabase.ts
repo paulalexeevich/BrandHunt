@@ -34,6 +34,7 @@ export interface BranghuntDetection {
   confidence_score: number | null;
   brand_name: string | null;
   category: string | null;
+  sku: string | null;
   brand_extraction_prompt: string | null;
   brand_extraction_response: string | null;
   created_at: string;

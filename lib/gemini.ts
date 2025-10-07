@@ -10,6 +10,7 @@ export interface DetectedProduct {
 export interface ProductInfo {
   brand: string;
   category: string;
+  sku: string;
 }
 
 /**
@@ -100,15 +101,18 @@ Focus on the product within the bounding box region (y0=${boundingBox.y0}, x0=${
 Extract the following information about this product:
 1. Brand name (the manufacturer/brand of the product)
 2. Category (e.g., "Frozen Food", "Dairy", "Snacks", "Beverages", "Bakery", "Pasta", "Canned Goods", etc.)
+3. SKU (Stock Keeping Unit - any product identifier, barcode, UPC, or product code visible on the package)
 
 Return a JSON object with this exact structure:
 {
   "brand": "brand name here",
-  "category": "category name here"
+  "category": "category name here",
+  "sku": "product SKU/code here"
 }
 
 If you cannot determine the brand, use "Unknown" for brand.
 If you cannot determine the category, use "Unknown" for category.
+If you cannot determine the SKU, use "Unknown" for sku.
 Only return the JSON object, nothing else.
 `;
 
@@ -143,7 +147,8 @@ Only return the JSON object, nothing else.
     // Fallback to simple extraction
     return {
       brand: 'Unknown',
-      category: 'Unknown'
+      category: 'Unknown',
+      sku: 'Unknown'
     };
   }
 }

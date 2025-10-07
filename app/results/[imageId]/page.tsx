@@ -27,6 +27,7 @@ interface Detection {
   bounding_box: BoundingBox;
   brand_name: string | null;
   category: string | null;
+  sku: string | null;
   foodgraph_results: FoodGraphResult[];
 }
 
@@ -192,6 +193,14 @@ export default function ResultsPage({ params }: { params: Promise<{ imageId: str
                         <span className="text-sm text-gray-600">Category: </span>
                         <span className="text-base text-gray-700">
                           {detections[selectedDetection].category}
+                        </span>
+                      </div>
+                    )}
+                    {detections[selectedDetection].sku && detections[selectedDetection].sku !== 'Unknown' && (
+                      <div>
+                        <span className="text-sm text-gray-600">SKU: </span>
+                        <span className="text-base text-blue-600 font-semibold">
+                          {detections[selectedDetection].sku}
                         </span>
                       </div>
                     )}

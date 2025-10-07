@@ -60,7 +60,7 @@ branghunt/
    - One record per detected product
    - Linked to parent image via `image_id`
    - Stores bounding box coordinates (normalized 0-1000)
-   - Fields: id, image_id, detection_index, bounding_box, confidence_score, brand_name, brand_extraction_prompt, brand_extraction_response
+   - Fields: id, image_id, detection_index, bounding_box, confidence_score, brand_name, category, sku, brand_extraction_prompt, brand_extraction_response
 
 3. **branghunt_foodgraph_results**
    - Stores FoodGraph search results (TOP 50)
@@ -86,8 +86,8 @@ branghunt/
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. BRAND EXTRACTION (Gemini 2.5 Flash)                     │
-│    For each detection → Extract brand name → Store result  │
+│ 3. PRODUCT INFO EXTRACTION (Gemini 2.5 Flash)              │
+│    For each detection → Extract brand/category/SKU → Store │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
