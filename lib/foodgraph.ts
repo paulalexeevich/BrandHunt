@@ -73,7 +73,7 @@ async function authenticate(): Promise<string> {
 
 /**
  * Search FoodGraph catalog for products using query endpoint
- * Returns top 5 results with fuzzy matching enabled
+ * Returns first 5 results with fuzzy matching enabled
  */
 export async function searchProducts(searchTerm: string): Promise<FoodGraphProduct[]> {
   const token = await authenticate();
@@ -87,8 +87,7 @@ export async function searchProducts(searchTerm: string): Promise<FoodGraphProdu
         "title"
       ]
     },
-    fuzzyMatch: true,
-    limit: 5
+    fuzzyMatch: true
   };
 
   console.log('FoodGraph Request:', {
@@ -123,7 +122,8 @@ export async function searchProducts(searchTerm: string): Promise<FoodGraphProdu
     totalCount: data.totalCount
   });
   
-  return data.products || [];
+  // Return only first 5 products
+  return (data.products || []).slice(0, 5);
 }
 
 /**
