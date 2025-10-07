@@ -375,40 +375,46 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   </button>
                 )}
 
-                {/* FoodGraph Results */}
+                {/* FoodGraph Results - Visual Comparison */}
                 {foodgraphResults.length > 0 && (
                   <div className="mt-6">
                     <h3 className="font-semibold text-gray-900 mb-3">
-                      FoodGraph Results ({foodgraphResults.length})
+                      Top 5 FoodGraph Matches
                     </h3>
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {foodgraphResults.slice(0, 20).map((result) => (
-                        <div key={result.id} className="bg-gray-50 rounded-lg p-3 flex gap-3">
+                    <div className="grid grid-cols-5 gap-2">
+                      {foodgraphResults.slice(0, 5).map((result, index) => (
+                        <div key={result.id} className="bg-white rounded-lg border-2 border-gray-200 hover:border-indigo-400 transition-colors overflow-hidden">
                           {result.front_image_url ? (
                             <img
                               src={result.front_image_url}
                               alt={result.product_name || 'Product'}
-                              className="w-16 h-16 object-cover rounded"
+                              className="w-full h-32 object-contain bg-gray-50"
+                              title={`${result.product_name || 'Unnamed'} - ${result.brand_name || 'Unknown Brand'}`}
                             />
                           ) : (
-                            <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-                              <Package className="w-6 h-6 text-gray-400" />
+                            <div className="w-full h-32 bg-gray-100 flex items-center justify-center">
+                              <Package className="w-8 h-8 text-gray-400" />
                             </div>
                           )}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm text-gray-900 truncate">
+                          <div className="p-2 bg-gray-50">
+                            <p className="text-xs font-semibold text-gray-900 truncate" title={result.product_name || 'Unnamed Product'}>
                               {result.product_name || 'Unnamed Product'}
                             </p>
-                            <p className="text-xs text-gray-600">
+                            <p className="text-xs text-gray-600 truncate">
                               {result.brand_name || 'Unknown Brand'}
                             </p>
-                            <p className="text-xs text-indigo-600 font-semibold">
-                              Rank #{result.result_rank}
+                            <p className="text-xs text-indigo-600 font-semibold mt-1">
+                              #{index + 1}
                             </p>
                           </div>
                         </div>
                       ))}
                     </div>
+                    {foodgraphResults.length > 5 && (
+                      <p className="text-sm text-gray-500 text-center mt-3">
+                        + {foodgraphResults.length - 5} more results available
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -419,4 +425,3 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     </div>
   );
 }
-
