@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
       confidence_score: null,
       brand_name: null,
       category: null,
-      sku: null,
       brand_extraction_prompt: null,
       brand_extraction_response: null,
     }));
