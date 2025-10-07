@@ -73,27 +73,26 @@ async function authenticate(): Promise<string> {
 
 /**
  * Search FoodGraph catalog for products using query endpoint
- * Returns top 50 results
+ * Returns top 5 results with fuzzy matching enabled
  */
 export async function searchProducts(searchTerm: string): Promise<FoodGraphProduct[]> {
   const token = await authenticate();
 
   const requestBody = {
-    updatedAtFrom: "2024-07-01T00:00:00Z",
+    updatedAtFrom: "2025-07-01T00:00:00Z",
     productFilter: "CORE_FIELDS",
     search: searchTerm,
     searchIn: {
       or: [
-        "title",
-        "companyBrand"
+        "title"
       ]
     },
-    fuzzyMatch: false,
-    limit: 50
+    fuzzyMatch: true,
+    limit: 5
   };
 
   const response = await fetch(
-    'https://api.foodgraph.com/api/v1/catalog/products/search/query',
+    'https://api.foodgraph.com/v1/catalog/products/search/query',
     {
       method: 'POST',
       headers: {
@@ -105,6 +104,8 @@ export async function searchProducts(searchTerm: string): Promise<FoodGraphProdu
   );
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error('FoodGraph API Error:', errorText);
     throw new Error(`FoodGraph search failed: ${response.statusText}`);
   }
 
