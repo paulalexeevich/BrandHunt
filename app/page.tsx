@@ -84,28 +84,7 @@ export default function Home() {
       const imageId = uploadData.imageId;
       setUploadedImageId(imageId);
       setUploading(false);
-
-      // Start processing
-      setProcessing(true);
-
-      const processResponse = await fetch('/api/process', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ imageId }),
-      });
-
-      if (!processResponse.ok) {
-        const errorData = await processResponse.json();
-        throw new Error(errorData.details || 'Processing failed');
-      }
-
-      const processData = await processResponse.json();
-      setProcessing(false);
       setSuccess(true);
-      
-      console.log('Processing completed:', processData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setUploading(false);
@@ -229,13 +208,6 @@ export default function Home() {
                 </div>
               )}
 
-              {processing && (
-                <div className="flex items-center justify-center gap-2 text-indigo-600 mb-4">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Processing image (detecting products, extracting brands, searching FoodGraph)...</span>
-                </div>
-              )}
-
               {error && (
                 <div className="flex items-center justify-center gap-2 text-red-600 mb-4">
                   <XCircle className="w-5 h-5" />
@@ -247,26 +219,29 @@ export default function Home() {
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
                   <div className="flex items-center gap-2 text-green-700 mb-2">
                     <CheckCircle className="w-5 h-5" />
-                    <span className="font-semibold">Processing completed!</span>
+                    <span className="font-semibold">Upload completed!</span>
                   </div>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Your image is ready for analysis. Click below to start the step-by-step product detection.
+                  </p>
                   <Link
-                    href={`/results/${uploadedImageId}`}
+                    href={`/analyze/${uploadedImageId}`}
                     className="inline-block px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    View Results
+                    Start Analysis
                   </Link>
                 </div>
               )}
 
               {/* Action Buttons */}
               <div className="flex gap-4 justify-center">
-                {!uploading && !processing && !success && (
+                {!uploading && !success && (
                   <>
                     <button
                       onClick={handleUpload}
                       className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
                     >
-                      Process Image
+                      Upload Image
                     </button>
                     <button
                       onClick={handleReset}
@@ -282,7 +257,7 @@ export default function Home() {
                     onClick={handleReset}
                     className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
                   >
-                    Process Another Image
+                    Upload Another Image
                   </button>
                 )}
               </div>
