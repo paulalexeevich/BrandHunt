@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { extractBrandName } from '@/lib/gemini';
+import { extractProductInfo } from '@/lib/gemini';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,22 +26,23 @@ export async function POST(request: NextRequest) {
     const mimeType = image.mime_type || 'image/jpeg';
     const boundingBox = detection.bounding_box;
 
-    // Extract brand name using Gemini
-    let brandName;
+    // Extract brand name and category using Gemini
+    let productInfo;
     try {
-      brandName = await extractBrandName(imageBase64, mimeType, boundingBox);
+      productInfo = await extractProductInfo(imageBase64, mimeType, boundingBox);
     } catch (error) {
-      console.error(`Failed to extract brand:`, error);
+      console.error(`Failed to extract product info:`, error);
       throw error;
     }
 
-    // Update detection with brand name
+    // Update detection with brand name and category
     const { data: updatedDetection, error: updateError } = await supabase
       .from('branghunt_detections')
       .update({
-        brand_name: brandName,
-        brand_extraction_prompt: `Brand extraction for detection ${detectionId}`,
-        brand_extraction_response: brandName,
+        brand_name: productInfo.brand,
+        category: productInfo.category,
+        brand_extraction_prompt: `Product info extraction for detection ${detectionId}`,
+        brand_extraction_response: JSON.stringify(productInfo),
       })
       .eq('id', detectionId)
       .select()
@@ -54,9 +55,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true,
-      brandName,
+      brandName: productInfo.brand,
+      category: productInfo.category,
       detection: updatedDetection,
-      message: 'Brand extracted successfully' 
+      message: 'Product info extracted successfully' 
     });
   } catch (error) {
     console.error('Brand extraction error:', error);

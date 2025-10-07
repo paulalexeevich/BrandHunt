@@ -16,6 +16,7 @@ interface Detection {
   detection_index: number;
   bounding_box: BoundingBox;
   brand_name: string | null;
+  category: string | null;
 }
 
 interface FoodGraphResult {
@@ -117,7 +118,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       
       // Update detection in state
       setDetections(prev => prev.map(d => 
-        d.id === detectionId ? { ...d, brand_name: data.brandName } : d
+        d.id === detectionId ? { ...d, brand_name: data.brandName, category: data.category } : d
       ));
       
       setCurrentStep('foodgraph');
@@ -242,8 +243,14 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     }}
                   >
                     <div className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${isSelected ? 'bg-indigo-600' : detection.brand_name ? 'bg-green-600' : 'bg-yellow-600'}`}>
-                      #{index + 1} {detection.brand_name || ''}
+                      #{index + 1}
                     </div>
+                    {detection.brand_name && (
+                      <div className="absolute -bottom-8 left-0 right-0 px-2 py-1 text-xs font-semibold bg-white border-2 border-green-600 rounded text-center truncate">
+                        {detection.brand_name}
+                        {detection.category && <span className="text-gray-500"> • {detection.category}</span>}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -297,17 +304,22 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       <div className="flex items-center justify-between">
                         <span className="font-semibold">Product #{index + 1}</span>
                         {detection.brand_name ? (
-                          <span className="text-green-600 flex items-center gap-1">
-                            <CheckCircle className="w-4 h-4" />
-                            {detection.brand_name}
-                          </span>
+                          <div className="flex flex-col items-end">
+                            <span className="text-green-600 flex items-center gap-1">
+                              <CheckCircle className="w-4 h-4" />
+                              {detection.brand_name}
+                            </span>
+                            {detection.category && (
+                              <span className="text-xs text-gray-500">{detection.category}</span>
+                            )}
+                          </div>
                         ) : (
                           <button
                             onClick={() => handleExtractBrand(detection.id)}
                             disabled={loading}
                             className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm disabled:bg-gray-400"
                           >
-                            Extract Brand
+                            Extract Info
                           </button>
                         )}
                       </div>
@@ -335,7 +347,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold">Product #{detection.detection_index + 1}</span>
+                        <div>
+                          <span className="font-semibold">Product #{detection.detection_index + 1}</span>
+                          {detection.category && (
+                            <span className="ml-2 text-xs text-gray-500">({detection.category})</span>
+                          )}
+                        </div>
                         <span className="text-indigo-600">{detection.brand_name}</span>
                       </div>
                     </button>

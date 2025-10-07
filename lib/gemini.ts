@@ -7,6 +7,11 @@ export interface DetectedProduct {
   label: string;
 }
 
+export interface ProductInfo {
+  brand: string;
+  category: string;
+}
+
 /**
  * Detect products in an image using Gemini 2.5 Flash
  * Returns bounding boxes and labels for detected products
@@ -73,27 +78,38 @@ Ensure bounding boxes tightly fit each product. Only return the JSON array.
 }
 
 /**
- * Extract brand name from a product detection
- * Takes an image and bounding box, returns brand name
+ * Extract brand name and category from a product detection
+ * Takes an image and bounding box, returns brand and category
  */
-export async function extractBrandName(
+export async function extractProductInfo(
   imageBase64: string, 
   mimeType: string,
   boundingBox: { y0: number; x0: number; y1: number; x1: number }
-): Promise<string> {
+): Promise<ProductInfo> {
   const model = genAI.getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
-      temperature: 0.1,
+      temperature: 0,
+      responseMimeType: 'application/json',
     }
   });
 
   const prompt = `
 Focus on the product within the bounding box region (y0=${boundingBox.y0}, x0=${boundingBox.x0}, y1=${boundingBox.y1}, x1=${boundingBox.x1}, normalized 0-1000).
 
-What is the brand name of this product? 
+Extract the following information about this product:
+1. Brand name (the manufacturer/brand of the product)
+2. Category (e.g., "Frozen Food", "Dairy", "Snacks", "Beverages", "Bakery", "Pasta", "Canned Goods", etc.)
 
-Return ONLY the brand name as plain text, nothing else. If you cannot determine the brand, return "Unknown".
+Return a JSON object with this exact structure:
+{
+  "brand": "brand name here",
+  "category": "category name here"
+}
+
+If you cannot determine the brand, use "Unknown" for brand.
+If you cannot determine the category, use "Unknown" for category.
+Only return the JSON object, nothing else.
 `;
 
   const imagePart = {
@@ -105,8 +121,39 @@ Return ONLY the brand name as plain text, nothing else. If you cannot determine 
 
   const result = await model.generateContent([prompt, imagePart]);
   const response = await result.response;
-  const brandName = response.text().trim();
+  const text = response.text();
 
-  return brandName || 'Unknown';
+  // Clean up the response
+  let cleanedText = text.trim();
+  if (cleanedText.startsWith('```json')) {
+    cleanedText = cleanedText.substring(7);
+  } else if (cleanedText.startsWith('```')) {
+    cleanedText = cleanedText.substring(3);
+  }
+  if (cleanedText.endsWith('```')) {
+    cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+  }
+  cleanedText = cleanedText.trim();
+
+  try {
+    const productInfo = JSON.parse(cleanedText) as ProductInfo;
+    return productInfo;
+  } catch (error) {
+    console.error('Failed to parse Gemini response:', cleanedText);
+    // Fallback to simple extraction
+    return {
+      brand: 'Unknown',
+      category: 'Unknown'
+    };
+  }
 }
 
+// Legacy function for backward compatibility
+export async function extractBrandName(
+  imageBase64: string, 
+  mimeType: string,
+  boundingBox: { y0: number; x0: number; y1: number; x1: number }
+): Promise<string> {
+  const info = await extractProductInfo(imageBase64, mimeType, boundingBox);
+  return info.brand;
+}

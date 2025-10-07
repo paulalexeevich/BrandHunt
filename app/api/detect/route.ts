@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Detected ${detections.length} products`);
 
-    // Save detections to database (without brand names yet)
+    // Save detections to database (without brand names or categories yet)
     const detectionsToSave = detections.map((detection, i) => ({
       image_id: imageId,
       detection_index: i,
@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       },
       confidence_score: null,
       brand_name: null,
+      category: null,
       brand_extraction_prompt: null,
       brand_extraction_response: null,
     }));
