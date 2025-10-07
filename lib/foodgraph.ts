@@ -91,6 +91,11 @@ export async function searchProducts(searchTerm: string): Promise<FoodGraphProdu
     limit: 5
   };
 
+  console.log('FoodGraph Request:', {
+    url: 'https://api.foodgraph.com/v1/catalog/products/search/query',
+    body: requestBody
+  });
+
   const response = await fetch(
     'https://api.foodgraph.com/v1/catalog/products/search/query',
     {
@@ -103,13 +108,21 @@ export async function searchProducts(searchTerm: string): Promise<FoodGraphProdu
     }
   );
 
+  console.log('FoodGraph Response Status:', response.status, response.statusText);
+
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('FoodGraph API Error:', errorText);
-    throw new Error(`FoodGraph search failed: ${response.statusText}`);
+    console.error('FoodGraph API Error Response:', errorText);
+    console.error('Request Body was:', JSON.stringify(requestBody, null, 2));
+    throw new Error(`FoodGraph search failed: ${response.statusText} - ${errorText}`);
   }
 
   const data = await response.json() as FoodGraphQueryResponse;
+  console.log('FoodGraph Success:', {
+    productsFound: data.products?.length || 0,
+    totalCount: data.totalCount
+  });
+  
   return data.products || [];
 }
 
