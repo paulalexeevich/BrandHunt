@@ -26,6 +26,7 @@ interface Detection {
   detection_index: number;
   bounding_box: BoundingBox;
   brand_name: string | null;
+  category: string | null;
   foodgraph_results: FoodGraphResult[];
 }
 
@@ -177,12 +178,25 @@ export default function ResultsPage({ params }: { params: Promise<{ imageId: str
                 {/* Selected Detection Info */}
                 {detections[selectedDetection] && (
                   <div>
-                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                      <h3 className="font-semibold text-gray-900 mb-2">Detected Brand</h3>
-                      <p className="text-lg text-indigo-600 font-semibold">
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">Product Information</h3>
+                  <div className="space-y-1">
+                    <div>
+                      <span className="text-sm text-gray-600">Brand: </span>
+                      <span className="text-lg text-indigo-600 font-semibold">
                         {detections[selectedDetection].brand_name || 'Unknown'}
-                      </p>
+                      </span>
                     </div>
+                    {detections[selectedDetection].category && (
+                      <div>
+                        <span className="text-sm text-gray-600">Category: </span>
+                        <span className="text-base text-gray-700">
+                          {detections[selectedDetection].category}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                     {/* FoodGraph Results */}
                     <div>
