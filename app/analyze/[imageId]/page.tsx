@@ -222,7 +222,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   };
 
   const handleFilterResults = async () => {
-    if (!selectedDetection) return;
+    if (!selectedDetection || !image) return;
 
     const detection = detections.find(d => d.id === selectedDetection);
     if (!detection) return;
@@ -504,31 +504,31 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     <div className="space-y-2">
                       <div>
                         <span className="text-yellow-400">Brand Name:</span>{' '}
-                        <span className="text-green-300">{extractionDebug.response.brandName || 'null'}</span>
+                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).brandName || 'null'}</span>
                       </div>
                       <div>
                         <span className="text-yellow-400">Product Name:</span>{' '}
-                        <span className="text-green-300">{extractionDebug.response.productName || 'null'}</span>
+                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).productName || 'null'}</span>
                       </div>
                       <div>
                         <span className="text-yellow-400">Category:</span>{' '}
-                        <span className="text-green-300">{extractionDebug.response.category || 'null'}</span>
+                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).category || 'null'}</span>
                       </div>
                       <div>
                         <span className="text-yellow-400">Flavor:</span>{' '}
-                        <span className="text-green-300">{extractionDebug.response.flavor || 'null'}</span>
+                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).flavor || 'null'}</span>
                       </div>
                       <div>
                         <span className="text-yellow-400">Size:</span>{' '}
-                        <span className="text-green-300">{extractionDebug.response.size || 'null'}</span>
+                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).size || 'null'}</span>
                       </div>
                       <div>
                         <span className="text-yellow-400">Description:</span>{' '}
-                        <span className="text-green-300">{extractionDebug.response.description || 'null'}</span>
+                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).description || 'null'}</span>
                       </div>
                       <div>
                         <span className="text-yellow-400">SKU:</span>{' '}
-                        <span className="text-green-300">{extractionDebug.response.sku || 'null'}</span>
+                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).sku || 'null'}</span>
                       </div>
                     </div>
                   </div>
