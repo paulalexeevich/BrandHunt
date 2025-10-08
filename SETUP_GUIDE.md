@@ -292,3 +292,4 @@ For issues or questions, check the documentation files:
 - `DEVELOPMENT_NOTES.md` - Technical details
 - This file - Setup instructions
 
+

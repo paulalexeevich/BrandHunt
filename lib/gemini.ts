@@ -11,6 +11,10 @@ export interface ProductInfo {
   brand: string;
   category: string;
   sku: string;
+  productName: string;
+  description: string;
+  flavor: string;
+  size: string;
 }
 
 /**
@@ -96,23 +100,44 @@ export async function extractProductInfo(
   });
 
   const prompt = `
-Focus on the product within the bounding box region (y0=${boundingBox.y0}, x0=${boundingBox.x0}, y1=${boundingBox.y1}, x1=${boundingBox.x1}, normalized 0-1000).
+CRITICAL: This image contains MULTIPLE products. You MUST extract information from ONLY THE SPECIFIC PRODUCT within the bounding box coordinates provided below. IGNORE all other products in the image.
 
-Extract the following information about this product:
-1. Brand name (the manufacturer/brand of the product)
-2. Category (e.g., "Frozen Food", "Dairy", "Snacks", "Beverages", "Bakery", "Pasta", "Canned Goods", etc.)
-3. SKU (Stock Keeping Unit - any product identifier, barcode, UPC, or product code visible on the package)
+TARGET PRODUCT BOUNDING BOX (normalized 0-1000 scale):
+- Top edge (y0): ${boundingBox.y0}
+- Left edge (x0): ${boundingBox.x0}
+- Bottom edge (y1): ${boundingBox.y1}
+- Right edge (x1): ${boundingBox.x1}
+
+INSTRUCTIONS:
+1. Locate the product within these exact coordinates
+2. Read ONLY the text/branding visible on THIS SPECIFIC PRODUCT
+3. Extract ALL visible information from THIS PRODUCT only
+
+Extract the following information about THIS SPECIFIC PRODUCT:
+1. Brand name (manufacturer/brand, e.g., "Tru Fru", "Reese's", "bettergoods")
+2. Product name (full product name as written on package, e.g., "Frozen Fruit Strawberries", "Peanut Butter Cups")
+3. Category (e.g., "Frozen Food", "Dairy", "Snacks", "Candy")
+4. Flavor/Variant (e.g., "Strawberry", "Raspberry", "Chocolate", "Original")
+5. Size/Weight (e.g., "8 oz", "16 oz", "2 lbs", "500g")
+6. Description (brief product description from package, e.g., "Dark Chocolate Covered Strawberries")
+7. SKU/Barcode (any product code, UPC, or barcode visible)
+
+IMPORTANT: If you see "Reese's" but the target product shows "Tru Fru", extract "Tru Fru". 
+If you see "bettergoods" but the target shows "Hershey's", extract "Hershey's".
+Only extract information from within the specified bounding box region.
 
 Return a JSON object with this exact structure:
 {
-  "brand": "brand name here",
-  "category": "category name here",
-  "sku": "product SKU/code here"
+  "brand": "brand name",
+  "productName": "full product name",
+  "category": "category name",
+  "flavor": "flavor or variant",
+  "size": "size or weight",
+  "description": "product description",
+  "sku": "product code or barcode"
 }
 
-If you cannot determine the brand, use "Unknown" for brand.
-If you cannot determine the category, use "Unknown" for category.
-If you cannot determine the SKU, use "Unknown" for sku.
+If you cannot determine any field, use "Unknown" for that field.
 Only return the JSON object, nothing else.
 `;
 
@@ -141,6 +166,7 @@ Only return the JSON object, nothing else.
 
   try {
     const productInfo = JSON.parse(cleanedText) as ProductInfo;
+    console.log('✅ Gemini extractProductInfo returned:', JSON.stringify(productInfo, null, 2));
     return productInfo;
   } catch (error) {
     console.error('Failed to parse Gemini response:', cleanedText);
@@ -148,7 +174,11 @@ Only return the JSON object, nothing else.
     return {
       brand: 'Unknown',
       category: 'Unknown',
-      sku: 'Unknown'
+      sku: 'Unknown',
+      productName: 'Unknown',
+      description: 'Unknown',
+      flavor: 'Unknown',
+      size: 'Unknown'
     };
   }
 }

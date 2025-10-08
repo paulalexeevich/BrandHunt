@@ -25,9 +25,14 @@ interface Detection {
   id: string;
   detection_index: number;
   bounding_box: BoundingBox;
+  label: string | null;
   brand_name: string | null;
   category: string | null;
   sku: string | null;
+  product_name: string | null;
+  flavor: string | null;
+  size: string | null;
+  description: string | null;
   foodgraph_results: FoodGraphResult[];
 }
 
@@ -180,14 +185,31 @@ export default function ResultsPage({ params }: { params: Promise<{ imageId: str
                 {detections[selectedDetection] && (
                   <div>
                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <h3 className="font-semibold text-gray-900 mb-2">Product Information</h3>
-                  <div className="space-y-1">
+                  <h3 className="font-semibold text-gray-900 mb-3">Product Information</h3>
+                  <div className="space-y-2">
+                    {detections[selectedDetection].label && !detections[selectedDetection].brand_name && (
+                      <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
+                        <span className="text-xs text-yellow-700 font-semibold">Detected as: </span>
+                        <span className="text-sm text-yellow-900">{detections[selectedDetection].label}</span>
+                      </div>
+                    )}
+                    
+                    {detections[selectedDetection].product_name && (
+                      <div>
+                        <span className="text-sm text-gray-600">Product Name: </span>
+                        <span className="text-lg text-indigo-600 font-semibold">
+                          {detections[selectedDetection].product_name}
+                        </span>
+                      </div>
+                    )}
+                    
                     <div>
                       <span className="text-sm text-gray-600">Brand: </span>
-                      <span className="text-lg text-indigo-600 font-semibold">
+                      <span className="text-base text-gray-900 font-semibold">
                         {detections[selectedDetection].brand_name || 'Unknown'}
                       </span>
                     </div>
+                    
                     {detections[selectedDetection].category && (
                       <div>
                         <span className="text-sm text-gray-600">Category: </span>
@@ -196,12 +218,40 @@ export default function ResultsPage({ params }: { params: Promise<{ imageId: str
                         </span>
                       </div>
                     )}
+                    
+                    {detections[selectedDetection].flavor && detections[selectedDetection].flavor !== 'Unknown' && (
+                      <div>
+                        <span className="text-sm text-gray-600">Flavor: </span>
+                        <span className="text-base text-purple-600 font-medium">
+                          {detections[selectedDetection].flavor}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {detections[selectedDetection].size && detections[selectedDetection].size !== 'Unknown' && (
+                      <div>
+                        <span className="text-sm text-gray-600">Size: </span>
+                        <span className="text-base text-blue-600 font-medium">
+                          {detections[selectedDetection].size}
+                        </span>
+                      </div>
+                    )}
+                    
                     {detections[selectedDetection].sku && detections[selectedDetection].sku !== 'Unknown' && (
                       <div>
                         <span className="text-sm text-gray-600">SKU: </span>
-                        <span className="text-base text-blue-600 font-semibold">
+                        <span className="text-base text-green-600 font-mono text-sm">
                           {detections[selectedDetection].sku}
                         </span>
+                      </div>
+                    )}
+                    
+                    {detections[selectedDetection].description && detections[selectedDetection].description !== 'Unknown' && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <span className="text-sm text-gray-600 block mb-1">Description: </span>
+                        <p className="text-sm text-gray-700 italic">
+                          {detections[selectedDetection].description}
+                        </p>
                       </div>
                     )}
                   </div>

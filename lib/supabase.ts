@@ -31,10 +31,15 @@ export interface BranghuntDetection {
     y1: number;
     x1: number;
   };
+  label: string | null; // Initial detection label
   confidence_score: number | null;
   brand_name: string | null;
   category: string | null;
   sku: string | null;
+  product_name: string | null; // Full product name
+  flavor: string | null; // Flavor or variant
+  size: string | null; // Size or weight
+  description: string | null; // Product description
   brand_extraction_prompt: string | null;
   brand_extraction_response: string | null;
   created_at: string;

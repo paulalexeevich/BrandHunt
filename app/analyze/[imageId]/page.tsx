@@ -15,8 +15,14 @@ interface Detection {
   id: string;
   detection_index: number;
   bounding_box: BoundingBox;
+  label: string | null;
   brand_name: string | null;
   category: string | null;
+  sku: string | null;
+  product_name: string | null;
+  flavor: string | null;
+  size: string | null;
+  description: string | null;
 }
 
 interface FoodGraphResult {
@@ -46,6 +52,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<{ request?: string; response?: string; error?: string } | null>(null);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [extractionDebug, setExtractionDebug] = useState<any>(null);
 
   useEffect(() => {
     fetchImage();
@@ -117,9 +125,24 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
 
       const data = await response.json();
       
-      // Update detection in state
+      // Store extraction debug info
+      setExtractionDebug({
+        detectionId,
+        response: data
+      });
+      
+      // Update detection in state with all product info
       setDetections(prev => prev.map(d => 
-        d.id === detectionId ? { ...d, brand_name: data.brandName, category: data.category } : d
+        d.id === detectionId ? { 
+          ...d, 
+          brand_name: data.brandName, 
+          category: data.category,
+          sku: data.sku,
+          product_name: data.productName,
+          flavor: data.flavor,
+          size: data.size,
+          description: data.description
+        } : d
       ));
       
       // Don't auto-advance to foodgraph - let user extract more brands if needed
@@ -277,7 +300,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </div>
                     {detection.brand_name && (
                       <div className="absolute -bottom-8 left-0 right-0 px-2 py-1 text-xs font-semibold bg-white border-2 border-green-600 rounded text-center truncate">
-                        {detection.brand_name}
+                        {detection.product_name || detection.brand_name}
                         {detection.category && <span className="text-gray-500"> • {detection.category}</span>}
                       </div>
                     )}
@@ -332,16 +355,24 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       className={`p-3 border-2 rounded-lg ${detection.brand_name ? 'border-green-500 bg-green-50' : 'border-gray-300'}`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold">Product #{index + 1}</span>
+                        <div>
+                          <span className="font-semibold">Product #{index + 1}</span>
+                          {detection.label && !detection.brand_name && (
+                            <span className="ml-2 text-xs text-gray-500">({detection.label})</span>
+                          )}
+                        </div>
                         {detection.brand_name ? (
                           <div className="flex flex-col items-end">
                             <span className="text-green-600 flex items-center gap-1">
                               <CheckCircle className="w-4 h-4" />
-                              {detection.brand_name}
+                              {detection.product_name || detection.brand_name}
                             </span>
-                            {detection.category && (
-                              <span className="text-xs text-gray-500">{detection.category}</span>
-                            )}
+                            <div className="text-xs text-gray-600 text-right">
+                              <div>{detection.brand_name}</div>
+                              {detection.category && <div>{detection.category}</div>}
+                              {detection.flavor && <div className="text-purple-600">Flavor: {detection.flavor}</div>}
+                              {detection.size && <div className="text-blue-600">Size: {detection.size}</div>}
+                            </div>
                           </div>
                         ) : (
                           <button
@@ -356,6 +387,43 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </div>
                   ))}
                 </div>
+                
+                {/* Extraction Debug Info */}
+                {extractionDebug && (
+                  <div className="mt-4 p-4 bg-gray-900 rounded-lg text-white font-mono text-xs">
+                    <h4 className="font-bold text-green-400 mb-2">🔍 Last Extraction Result</h4>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="text-yellow-400">Brand Name:</span>{' '}
+                        <span className="text-green-300">{extractionDebug.response.brandName || 'null'}</span>
+                      </div>
+                      <div>
+                        <span className="text-yellow-400">Product Name:</span>{' '}
+                        <span className="text-green-300">{extractionDebug.response.productName || 'null'}</span>
+                      </div>
+                      <div>
+                        <span className="text-yellow-400">Category:</span>{' '}
+                        <span className="text-green-300">{extractionDebug.response.category || 'null'}</span>
+                      </div>
+                      <div>
+                        <span className="text-yellow-400">Flavor:</span>{' '}
+                        <span className="text-green-300">{extractionDebug.response.flavor || 'null'}</span>
+                      </div>
+                      <div>
+                        <span className="text-yellow-400">Size:</span>{' '}
+                        <span className="text-green-300">{extractionDebug.response.size || 'null'}</span>
+                      </div>
+                      <div>
+                        <span className="text-yellow-400">Description:</span>{' '}
+                        <span className="text-green-300">{extractionDebug.response.description || 'null'}</span>
+                      </div>
+                      <div>
+                        <span className="text-yellow-400">SKU:</span>{' '}
+                        <span className="text-green-300">{extractionDebug.response.sku || 'null'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Continue to FoodGraph button */}
                 {detections.some(d => d.brand_name) && !loading && (
@@ -388,20 +456,44 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     <button
                       key={detection.id}
                       onClick={() => setSelectedDetection(detection.id)}
-                      className={`w-full p-3 border-2 rounded-lg text-left ${
+                      className={`w-full p-4 border-2 rounded-lg text-left ${
                         selectedDetection === detection.id
                           ? 'border-indigo-600 bg-indigo-50'
                           : 'border-gray-300 hover:border-indigo-300'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between mb-2">
                         <div>
-                          <span className="font-semibold">Product #{detection.detection_index + 1}</span>
+                          <span className="font-semibold text-base">Product #{detection.detection_index + 1}</span>
                           {detection.category && (
                             <span className="ml-2 text-xs text-gray-500">({detection.category})</span>
                           )}
                         </div>
-                        <span className="text-indigo-600">{detection.brand_name}</span>
+                      </div>
+                      <div className="space-y-1">
+                        {detection.product_name && (
+                          <div className="text-sm">
+                            <span className="font-semibold text-indigo-600">{detection.product_name}</span>
+                          </div>
+                        )}
+                        <div className="text-sm text-gray-700">
+                          <span className="font-medium">Brand:</span> {detection.brand_name}
+                        </div>
+                        {detection.flavor && detection.flavor !== 'Unknown' && (
+                          <div className="text-xs text-purple-600">
+                            <span className="font-medium">Flavor:</span> {detection.flavor}
+                          </div>
+                        )}
+                        {detection.size && detection.size !== 'Unknown' && (
+                          <div className="text-xs text-blue-600">
+                            <span className="font-medium">Size:</span> {detection.size}
+                          </div>
+                        )}
+                        {detection.sku && detection.sku !== 'Unknown' && (
+                          <div className="text-xs text-green-600 font-mono">
+                            <span className="font-medium">SKU:</span> {detection.sku}
+                          </div>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -440,33 +532,44 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
 
                 {/* Debug Panel */}
                 {debugInfo && (
-                  <div className="mt-6 p-4 bg-gray-900 rounded-lg text-white font-mono text-xs overflow-auto max-h-96">
-                    <h4 className="font-bold text-green-400 mb-2">🔍 Debug Information</h4>
+                  <div className="mt-6">
+                    <button
+                      onClick={() => setShowDebugInfo(!showDebugInfo)}
+                      className="mb-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                    >
+                      🔍 {showDebugInfo ? 'Hide' : 'Show'} Debug Information
+                    </button>
                     
-                    {debugInfo.request && (
-                      <div className="mb-4">
-                        <p className="text-yellow-400 font-semibold mb-1">📤 Request to /api/search-foodgraph:</p>
-                        <pre className="bg-gray-800 p-2 rounded overflow-x-auto text-green-300">
-                          {debugInfo.request}
-                        </pre>
-                      </div>
-                    )}
-                    
-                    {debugInfo.response && (
-                      <div className="mb-4">
-                        <p className="text-blue-400 font-semibold mb-1">📥 Response from FoodGraph API:</p>
-                        <pre className="bg-gray-800 p-2 rounded overflow-x-auto text-blue-300">
-                          {debugInfo.response}
-                        </pre>
-                      </div>
-                    )}
-                    
-                    {debugInfo.error && (
-                      <div>
-                        <p className="text-red-400 font-semibold mb-1">❌ Error:</p>
-                        <pre className="bg-red-900 p-2 rounded overflow-x-auto text-red-200">
-                          {debugInfo.error}
-                        </pre>
+                    {showDebugInfo && (
+                      <div className="p-4 bg-gray-900 rounded-lg text-white font-mono text-xs overflow-auto max-h-96">
+                        <h4 className="font-bold text-green-400 mb-2">🔍 Debug Information</h4>
+                        
+                        {debugInfo.request && (
+                          <div className="mb-4">
+                            <p className="text-yellow-400 font-semibold mb-1">📤 Request to /api/search-foodgraph:</p>
+                            <pre className="bg-gray-800 p-2 rounded overflow-x-auto text-green-300">
+                              {debugInfo.request}
+                            </pre>
+                          </div>
+                        )}
+                        
+                        {debugInfo.response && (
+                          <div className="mb-4">
+                            <p className="text-blue-400 font-semibold mb-1">📥 Response from FoodGraph API:</p>
+                            <pre className="bg-gray-800 p-2 rounded overflow-x-auto text-blue-300">
+                              {debugInfo.response}
+                            </pre>
+                          </div>
+                        )}
+                        
+                        {debugInfo.error && (
+                          <div>
+                            <p className="text-red-400 font-semibold mb-1">❌ Error:</p>
+                            <pre className="bg-red-900 p-2 rounded overflow-x-auto text-red-200">
+                              {debugInfo.error}
+                            </pre>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

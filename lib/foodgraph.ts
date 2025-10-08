@@ -98,14 +98,35 @@ async function authenticate(): Promise<string> {
 /**
  * Search FoodGraph catalog for products using query endpoint
  * Returns first 5 results with fuzzy matching enabled
+ * 
+ * @param searchTerm - Can be a simple brand name or a more detailed product description
+ * @param options - Optional additional search parameters
  */
-export async function searchProducts(searchTerm: string): Promise<FoodGraphProduct[]> {
+export async function searchProducts(
+  searchTerm: string, 
+  options?: {
+    brand?: string;
+    productName?: string;
+    flavor?: string;
+    size?: string;
+  }
+): Promise<FoodGraphProduct[]> {
   const token = await authenticate();
+
+  // Build comprehensive search term
+  let enhancedSearchTerm = searchTerm;
+  if (options) {
+    const parts = [options.brand, options.productName, options.flavor, options.size]
+      .filter(Boolean);
+    if (parts.length > 0) {
+      enhancedSearchTerm = parts.join(' ');
+    }
+  }
 
   const requestBody = {
     updatedAtFrom: "2025-07-01T00:00:00Z",
     productFilter: "CORE_FIELDS",
-    search: searchTerm,
+    search: enhancedSearchTerm,
     searchIn: {
       or: [
         "title"
@@ -116,7 +137,8 @@ export async function searchProducts(searchTerm: string): Promise<FoodGraphProdu
 
   console.log('FoodGraph Request:', {
     url: 'https://api.foodgraph.com/v1/catalog/products/search/query',
-    body: requestBody
+    body: requestBody,
+    enhancedSearch: enhancedSearchTerm
   });
 
   const response = await fetch(
