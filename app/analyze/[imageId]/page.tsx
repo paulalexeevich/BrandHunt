@@ -616,10 +616,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 {foodgraphResults.length > 0 && (
                   <div className="mt-6">
                     <h3 className="font-semibold text-gray-900 mb-3">
-                      Top 5 FoodGraph Matches ({foodgraphResults.length} found)
+                      Top 10 FoodGraph Matches ({foodgraphResults.length} found)
                     </h3>
                     <div className="grid grid-cols-5 gap-2">
-                      {foodgraphResults.slice(0, 5).map((result, index) => (
+                      {foodgraphResults.slice(0, 10).map((result, index) => (
                         <div key={result.id} className="bg-white rounded-lg border-2 border-gray-200 hover:border-indigo-400 transition-colors overflow-hidden">
                           {result.front_image_url ? (
                             <img
@@ -647,9 +647,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         </div>
                       ))}
                     </div>
-                    {foodgraphResults.length > 5 && (
+                    {foodgraphResults.length > 10 && (
                       <p className="text-sm text-gray-500 text-center mt-3">
-                        + {foodgraphResults.length - 5} more results available
+                        + {foodgraphResults.length - 10} more results available
                       </p>
                     )}
                   </div>

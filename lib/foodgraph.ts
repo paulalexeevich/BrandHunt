@@ -169,8 +169,8 @@ export async function searchProducts(
     total: data.pagination?.total
   });
   
-  // Return only first 5 products
-  return (data.results || []).slice(0, 5);
+  // Return only first 10 products
+  return (data.results || []).slice(0, 10);
 }
 
 /**
