@@ -99,6 +99,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export const maxDuration = 60; // 1 minute for FoodGraph search
+export const maxDuration = 10; // Vercel free tier limit
 
 

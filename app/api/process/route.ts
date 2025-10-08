@@ -150,5 +150,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export const maxDuration = 300; // 5 minutes for long processing
+export const maxDuration = 10; // Vercel free tier limit
 

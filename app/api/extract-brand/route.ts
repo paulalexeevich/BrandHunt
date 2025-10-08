@@ -79,5 +79,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export const maxDuration = 60; // 60 seconds for brand extraction (Gemini + Supabase)
+// Vercel Hobby plan limit is 10s, Pro is 60s
+export const maxDuration = 10;
+export const dynamic = 'force-dynamic';
 
