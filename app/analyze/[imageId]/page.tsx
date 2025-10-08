@@ -2,7 +2,8 @@
 
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, CheckCircle, Package } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Loader2, CheckCircle, Package, Trash2 } from 'lucide-react';
 
 interface BoundingBox {
   y0: number;
@@ -44,6 +45,7 @@ type Step = 'detect' | 'brand' | 'foodgraph';
 
 export default function AnalyzePage({ params }: { params: Promise<{ imageId: string }> }) {
   const resolvedParams = use(params);
+  const router = useRouter();
   const [image, setImage] = useState<ImageData | null>(null);
   const [detections, setDetections] = useState<Detection[]>([]);
   const [selectedDetection, setSelectedDetection] = useState<string | null>(null);
@@ -54,6 +56,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [debugInfo, setDebugInfo] = useState<{ request?: string; response?: string; error?: string } | null>(null);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [extractionDebug, setExtractionDebug] = useState<any>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchImage();
@@ -215,6 +219,29 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
   };
 
+  const handleDeleteImage = async () => {
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/images/${resolvedParams.imageId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to delete image');
+      }
+
+      // Redirect to gallery after successful deletion
+      router.push('/gallery');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete image');
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   if (!image) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -228,10 +255,20 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <Link href="/gallery" className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800 mb-4">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Gallery
-          </Link>
+          <div className="flex items-center justify-between mb-4">
+            <Link href="/gallery" className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Gallery
+            </Link>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deleting}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Image
+            </button>
+          </div>
           <h1 className="text-3xl font-bold text-gray-900">{image.original_filename}</h1>
         </div>
 
@@ -621,6 +658,53 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             )}
           </div>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Delete Image?</h3>
+                  <p className="text-sm text-gray-600">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-gray-700 mb-6">
+                Are you sure you want to delete <strong>{image.original_filename}</strong>? 
+                This will permanently remove the image and all its associated detections and FoodGraph results.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteImage}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2"
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
