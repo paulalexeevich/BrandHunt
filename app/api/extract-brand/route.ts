@@ -79,5 +79,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export const maxDuration = 30; // 30 seconds for brand extraction
+export const maxDuration = 60; // 60 seconds for brand extraction (Gemini + Supabase)
 

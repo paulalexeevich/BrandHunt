@@ -127,6 +127,11 @@ export async function extractProductInfo(
   mimeType: string,
   boundingBox: { y0: number; x0: number; y1: number; x1: number }
 ): Promise<ProductInfo> {
+  if (!process.env.GOOGLE_GEMINI_API_KEY) {
+    console.error('❌ GOOGLE_GEMINI_API_KEY is not set');
+    throw new Error('Gemini API key is not configured');
+  }
+  
   // First, crop the image to just the bounding box area
   const { croppedBase64, width, height } = await cropImageToBoundingBox(imageBase64, boundingBox);
   
@@ -174,9 +179,20 @@ Only return the JSON object, nothing else.
     },
   };
 
-  const result = await model.generateContent([prompt, imagePart]);
-  const response = await result.response;
-  const text = response.text();
+  let text: string;
+  try {
+    const result = await model.generateContent([prompt, imagePart]);
+    const response = await result.response;
+    text = response.text();
+    
+    if (!text || text.trim().length === 0) {
+      console.error('❌ Gemini returned empty response');
+      throw new Error('Gemini returned empty response');
+    }
+  } catch (error) {
+    console.error('❌ Gemini API error:', error);
+    throw new Error(`Gemini API failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 
   // Clean up the response
   let cleanedText = text.trim();

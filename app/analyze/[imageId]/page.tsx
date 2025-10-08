@@ -125,8 +125,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || 'Brand extraction failed');
+        let errorMessage = 'Brand extraction failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.details || errorData.error || errorMessage;
+        } catch (e) {
+          // Response is not JSON, use status text
+          errorMessage = `${errorMessage}: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
