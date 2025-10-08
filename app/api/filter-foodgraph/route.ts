@@ -66,11 +66,15 @@ export async function POST(request: NextRequest) {
       .filter(({ isMatch }) => isMatch)
       .map(({ result }) => result);
 
-    console.log(`✅ Image filtering complete: ${matchingResults.length}/${foodgraphResults.length} products matched`);
+    // De-duplicate: Keep only the first result (highest rank) since FoodGraph returns duplicates
+    // If multiple products match, they're likely the same product with duplicate entries
+    const uniqueResults = matchingResults.length > 0 ? [matchingResults[0]] : [];
+
+    console.log(`✅ Image filtering complete: ${matchingResults.length}/${foodgraphResults.length} products matched, ${uniqueResults.length} unique shown`);
 
     return NextResponse.json({
-      filteredResults: matchingResults,
-      totalFiltered: matchingResults.length,
+      filteredResults: uniqueResults,
+      totalFiltered: uniqueResults.length,
       totalOriginal: foodgraphResults.length
     });
 
