@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import sharp from 'sharp';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
 
@@ -83,14 +84,54 @@ Ensure bounding boxes tightly fit each product. Only return the JSON array.
 }
 
 /**
+ * Crop image to bounding box region
+ * Converts normalized coordinates (0-1000) to pixel coordinates and crops
+ */
+async function cropImageToBoundingBox(
+  imageBase64: string,
+  boundingBox: { y0: number; x0: number; y1: number; x1: number }
+): Promise<{ croppedBase64: string; width: number; height: number }> {
+  // Decode base64 to buffer
+  const imageBuffer = Buffer.from(imageBase64, 'base64');
+  
+  // Get image metadata to find actual dimensions
+  const metadata = await sharp(imageBuffer).metadata();
+  const imageWidth = metadata.width!;
+  const imageHeight = metadata.height!;
+  
+  // Convert normalized coordinates (0-1000) to pixel coordinates
+  const left = Math.round((boundingBox.x0 / 1000) * imageWidth);
+  const top = Math.round((boundingBox.y0 / 1000) * imageHeight);
+  const width = Math.round(((boundingBox.x1 - boundingBox.x0) / 1000) * imageWidth);
+  const height = Math.round(((boundingBox.y1 - boundingBox.y0) / 1000) * imageHeight);
+  
+  console.log(`🔍 Cropping image: Original ${imageWidth}x${imageHeight}, Box [${left}, ${top}, ${width}, ${height}]`);
+  
+  // Crop the image to the bounding box
+  const croppedBuffer = await sharp(imageBuffer)
+    .extract({ left, top, width, height })
+    .toBuffer();
+  
+  // Convert back to base64
+  const croppedBase64 = croppedBuffer.toString('base64');
+  
+  return { croppedBase64, width, height };
+}
+
+/**
  * Extract brand name and category from a product detection
- * Takes an image and bounding box, returns brand and category
+ * Takes an image and bounding box, crops to the specific product, returns brand and category
  */
 export async function extractProductInfo(
   imageBase64: string, 
   mimeType: string,
   boundingBox: { y0: number; x0: number; y1: number; x1: number }
 ): Promise<ProductInfo> {
+  // First, crop the image to just the bounding box area
+  const { croppedBase64, width, height } = await cropImageToBoundingBox(imageBase64, boundingBox);
+  
+  console.log(`✂️ Cropped image to ${width}x${height}px for product extraction`);
+  
   const model = genAI.getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
@@ -100,20 +141,9 @@ export async function extractProductInfo(
   });
 
   const prompt = `
-CRITICAL: This image contains MULTIPLE products. You MUST extract information from ONLY THE SPECIFIC PRODUCT within the bounding box coordinates provided below. IGNORE all other products in the image.
+Analyze this product image and extract ALL visible information.
 
-TARGET PRODUCT BOUNDING BOX (normalized 0-1000 scale):
-- Top edge (y0): ${boundingBox.y0}
-- Left edge (x0): ${boundingBox.x0}
-- Bottom edge (y1): ${boundingBox.y1}
-- Right edge (x1): ${boundingBox.x1}
-
-INSTRUCTIONS:
-1. Locate the product within these exact coordinates
-2. Read ONLY the text/branding visible on THIS SPECIFIC PRODUCT
-3. Extract ALL visible information from THIS PRODUCT only
-
-Extract the following information about THIS SPECIFIC PRODUCT:
+Extract the following information:
 1. Brand name (manufacturer/brand, e.g., "Tru Fru", "Reese's", "bettergoods")
 2. Product name (full product name as written on package, e.g., "Frozen Fruit Strawberries", "Peanut Butter Cups")
 3. Category (e.g., "Frozen Food", "Dairy", "Snacks", "Candy")
@@ -121,10 +151,6 @@ Extract the following information about THIS SPECIFIC PRODUCT:
 5. Size/Weight (e.g., "8 oz", "16 oz", "2 lbs", "500g")
 6. Description (brief product description from package, e.g., "Dark Chocolate Covered Strawberries")
 7. SKU/Barcode (any product code, UPC, or barcode visible)
-
-IMPORTANT: If you see "Reese's" but the target product shows "Tru Fru", extract "Tru Fru". 
-If you see "bettergoods" but the target shows "Hershey's", extract "Hershey's".
-Only extract information from within the specified bounding box region.
 
 Return a JSON object with this exact structure:
 {
@@ -143,7 +169,7 @@ Only return the JSON object, nothing else.
 
   const imagePart = {
     inlineData: {
-      data: imageBase64,
+      data: croppedBase64,  // Use cropped image instead of full image
       mimeType: mimeType,
     },
   };

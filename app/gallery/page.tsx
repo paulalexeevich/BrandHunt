@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, Image as ImageIcon, Loader2, Trash2 } from 'lucide-react';
 
 interface Image {
   id: string;
@@ -16,6 +16,8 @@ interface Image {
 export default function Gallery() {
   const [images, setImages] = useState<Image[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; filename: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchImages();
@@ -48,6 +50,32 @@ export default function Gallery() {
         {badge.text}
       </span>
     );
+  };
+
+  const handleDeleteImage = async () => {
+    if (!deleteConfirm) return;
+
+    setDeleting(true);
+
+    try {
+      const response = await fetch(`/api/images/${deleteConfirm.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to delete image');
+      }
+
+      // Remove image from state
+      setImages(prev => prev.filter(img => img.id !== deleteConfirm.id));
+      setDeleteConfirm(null);
+    } catch (error) {
+      console.error('Failed to delete image:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete image');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -91,31 +119,90 @@ export default function Gallery() {
         {!loading && images.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {images.map((image) => (
-              <Link
+              <div
                 key={image.id}
-                href={`/analyze/${image.id}`}
-                className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow"
+                className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow relative group"
               >
-                <div className="aspect-square bg-gray-200 relative">
-                  <img
-                    src={`data:image/jpeg;base64,${image.file_path}`}
-                    alt={image.original_filename}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-2 right-2">
-                    {getStatusBadge(image.processing_status)}
+                <Link href={`/analyze/${image.id}`}>
+                  <div className="aspect-square bg-gray-200 relative">
+                    <img
+                      src={`data:image/jpeg;base64,${image.file_path}`}
+                      alt={image.original_filename}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-2 right-2">
+                      {getStatusBadge(image.processing_status)}
+                    </div>
                   </div>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 truncate mb-1">
-                    {image.original_filename}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {new Date(image.uploaded_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </Link>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-900 truncate mb-1">
+                      {image.original_filename}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {new Date(image.uploaded_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </Link>
+                {/* Delete Button - always visible */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setDeleteConfirm({ id: image.id, filename: image.original_filename });
+                  }}
+                  className="absolute top-2 left-2 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 z-10 shadow-lg"
+                  title="Delete image"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             ))}
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Delete Image?</h3>
+                  <p className="text-sm text-gray-600">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-gray-700 mb-6">
+                Are you sure you want to delete <strong>{deleteConfirm.filename}</strong>? 
+                This will permanently remove the image and all its associated detections and FoodGraph results.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteImage}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2"
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
