@@ -87,5 +87,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export const maxDuration = 60; // 60 seconds for image comparisons
+export const maxDuration = 10; // Vercel free tier limit
 

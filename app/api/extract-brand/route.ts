@@ -81,5 +81,4 @@ export async function POST(request: NextRequest) {
 
 // Vercel Hobby plan limit is 10s, Pro is 60s
 export const maxDuration = 10;
-export const dynamic = 'force-dynamic';
 
