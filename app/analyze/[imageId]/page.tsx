@@ -55,11 +55,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<{ request?: string; response?: string; error?: string } | null>(null);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
-  const [extractionDebug, setExtractionDebug] = useState<any>(null);
+  const [extractionDebug, setExtractionDebug] = useState<{detectionId: string; response: unknown} | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [filtering, setFiltering] = useState(false);
-  const [showAllResults, setShowAllResults] = useState(false);
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -636,7 +635,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 {/* No Results Message */}
                 {!loading && foodgraphResults.length === 0 && selectedDetection && currentStep === 'foodgraph' && (
                   <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Click "Search FoodGraph" button to find matching products</p>
+                    <p className="text-sm text-gray-600">Click &quot;Search FoodGraph&quot; button to find matching products</p>
                   </div>
                 )}
 
@@ -690,10 +689,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   <div className="mt-6">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-semibold text-gray-900">
-                        Top 10 FoodGraph Matches ({foodgraphResults.length} found)
-                        {filteredCount !== null && filteredCount < 10 && (
+                        Top 50 FoodGraph Matches ({foodgraphResults.length} found)
+                        {filteredCount !== null && (
                           <span className="ml-2 text-sm text-green-600">
-                            - AI Filtered to {filteredCount} matches
+                            - AI Filtered to {filteredCount} match{filteredCount !== 1 ? 'es' : ''}
                           </span>
                         )}
                       </h3>
@@ -715,7 +714,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       </button>
                     </div>
                     <div className="grid grid-cols-5 gap-2">
-                      {foodgraphResults.slice(0, 10).map((result, index) => (
+                      {foodgraphResults.slice(0, 50).map((result, index) => (
                         <div key={result.id} className="bg-white rounded-lg border-2 border-gray-200 hover:border-indigo-400 transition-colors overflow-hidden">
                           {result.front_image_url ? (
                             <img
@@ -743,9 +742,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         </div>
                       ))}
                     </div>
-                    {foodgraphResults.length > 10 && (
+                    {foodgraphResults.length > 50 && (
                       <p className="text-sm text-gray-500 text-center mt-3">
-                        + {foodgraphResults.length - 10} more results available
+                        + {foodgraphResults.length - 50} more results available
                       </p>
                     )}
                   </div>
