@@ -218,3 +218,92 @@ export async function extractBrandName(
   const info = await extractProductInfo(imageBase64, mimeType, boundingBox);
   return info.brand;
 }
+
+/**
+ * Compare two product images to determine if they are the same product
+ * Returns true if the products are visually identical/similar, false otherwise
+ */
+export async function compareProductImages(
+  originalImageBase64: string,
+  foodgraphImageUrl: string
+): Promise<boolean> {
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      temperature: 0,
+      responseMimeType: 'application/json',
+    }
+  });
+
+  const prompt = `
+Compare these two product images and determine if they show the SAME product.
+
+Consider these factors:
+1. Brand name and logo
+2. Product name and type
+3. Packaging design and colors
+4. Flavor/variant information
+5. Overall visual appearance
+
+Return a JSON object with this structure:
+{
+  "isMatch": true or false,
+  "confidence": 0.0 to 1.0,
+  "reason": "Brief explanation of why they match or don't match"
+}
+
+Important: Only return true if you are confident these are the SAME product (same brand, same product, same variant). Different flavors or sizes of the same brand should return false.
+`;
+
+  try {
+    // Fetch the FoodGraph image
+    const imageResponse = await fetch(foodgraphImageUrl);
+    if (!imageResponse.ok) {
+      console.error(`Failed to fetch FoodGraph image: ${foodgraphImageUrl}`);
+      return false;
+    }
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const foodgraphImageBase64 = Buffer.from(imageBuffer).toString('base64');
+    
+    const imageParts = [
+      {
+        inlineData: {
+          data: originalImageBase64,
+          mimeType: 'image/jpeg',
+        },
+      },
+      {
+        inlineData: {
+          data: foodgraphImageBase64,
+          mimeType: 'image/jpeg',
+        },
+      },
+    ];
+
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const response = await result.response;
+    const text = response.text();
+
+    // Clean up the response
+    let cleanedText = text.trim();
+    if (cleanedText.startsWith('```json')) {
+      cleanedText = cleanedText.substring(7);
+    } else if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.substring(3);
+    }
+    if (cleanedText.endsWith('```')) {
+      cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+    }
+    cleanedText = cleanedText.trim();
+
+    const comparison = JSON.parse(cleanedText) as { isMatch: boolean; confidence: number; reason: string };
+    console.log(`🔍 Image comparison: ${comparison.isMatch ? 'MATCH' : 'NO MATCH'} (confidence: ${comparison.confidence}) - ${comparison.reason}`);
+    
+    // Return true if it's a match with high confidence (>= 0.7)
+    return comparison.isMatch && comparison.confidence >= 0.7;
+  } catch (error) {
+    console.error('Failed to compare images:', error);
+    // On error, don't filter out the product
+    return true;
+  }
+}

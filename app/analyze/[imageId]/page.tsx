@@ -58,6 +58,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [extractionDebug, setExtractionDebug] = useState<any>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [filtering, setFiltering] = useState(false);
+  const [showAllResults, setShowAllResults] = useState(false);
+  const [filteredCount, setFilteredCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetchImage();
@@ -216,6 +219,76 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       setDebugInfo(prev => ({ ...prev, error: errorMessage }));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFilterResults = async () => {
+    if (!selectedDetection) return;
+
+    const detection = detections.find(d => d.id === selectedDetection);
+    if (!detection) return;
+
+    setFiltering(true);
+    setError(null);
+
+    try {
+      // Get the cropped image data
+      // We need to crop the image again for comparison
+      const imageBase64 = image.file_path;
+      const boundingBox = detection.bounding_box;
+
+      // Crop the image using Canvas API
+      const img = new Image();
+      img.src = `data:image/jpeg;base64,${imageBase64}`;
+      
+      await new Promise((resolve) => {
+        img.onload = resolve;
+      });
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      
+      const imageWidth = img.width;
+      const imageHeight = img.height;
+      
+      const left = Math.round((boundingBox.x0 / 1000) * imageWidth);
+      const top = Math.round((boundingBox.y0 / 1000) * imageHeight);
+      const width = Math.round(((boundingBox.x1 - boundingBox.x0) / 1000) * imageWidth);
+      const height = Math.round(((boundingBox.y1 - boundingBox.y0) / 1000) * imageHeight);
+      
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(img, left, top, width, height, 0, 0, width, height);
+      
+      const croppedImageBase64 = canvas.toDataURL('image/jpeg').split(',')[1];
+
+      // Call the filter API
+      const response = await fetch('/api/filter-foodgraph', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          detectionId: selectedDetection,
+          croppedImageBase64
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to filter results');
+      }
+
+      const data = await response.json();
+      console.log('Filter results:', data);
+      
+      // Update the results with filtered ones
+      setFoodgraphResults(data.filteredResults || []);
+      setFilteredCount(data.totalFiltered);
+      
+    } catch (err) {
+      console.error('Filter error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to filter results');
+    } finally {
+      setFiltering(false);
     }
   };
 
@@ -615,9 +688,32 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 {/* FoodGraph Results - Visual Comparison */}
                 {foodgraphResults.length > 0 && (
                   <div className="mt-6">
-                    <h3 className="font-semibold text-gray-900 mb-3">
-                      Top 10 FoodGraph Matches ({foodgraphResults.length} found)
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-gray-900">
+                        Top 10 FoodGraph Matches ({foodgraphResults.length} found)
+                        {filteredCount !== null && filteredCount < 10 && (
+                          <span className="ml-2 text-sm text-green-600">
+                            - AI Filtered to {filteredCount} matches
+                          </span>
+                        )}
+                      </h3>
+                      <button
+                        onClick={handleFilterResults}
+                        disabled={filtering}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400 flex items-center gap-2 text-sm"
+                      >
+                        {filtering ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            AI Filtering...
+                          </>
+                        ) : (
+                          <>
+                            🤖 Filter with AI
+                          </>
+                        )}
+                      </button>
+                    </div>
                     <div className="grid grid-cols-5 gap-2">
                       {foodgraphResults.slice(0, 10).map((result, index) => (
                         <div key={result.id} className="bg-white rounded-lg border-2 border-gray-200 hover:border-indigo-400 transition-colors overflow-hidden">

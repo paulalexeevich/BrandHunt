@@ -12,13 +12,13 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Fetch only top 10 FoodGraph results for this detection (matching what's displayed)
+    // Fetch only top 50 FoodGraph results for this detection (matching what's displayed)
     const { data: foodgraphResults, error: fetchError } = await supabase
       .from('branghunt_foodgraph_results')
       .select('*')
       .eq('detection_id', detectionId)
       .order('result_rank')
-      .limit(10);
+      .limit(50);
 
     if (fetchError) {
       console.error('Error fetching FoodGraph results:', fetchError);
