@@ -62,33 +62,48 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
   const [showCoordinateDebug, setShowCoordinateDebug] = useState(true); // Start with debug on
   const imageRef = useRef<HTMLImageElement>(null);
-  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [imageDimensions, setImageDimensions] = useState<{ 
+    natural: { width: number; height: number };
+    displayed: { width: number; height: number };
+  } | null>(null);
 
   useEffect(() => {
     fetchImage();
   }, [resolvedParams.imageId]);
 
-  // Track actual displayed image dimensions
+  // Track both natural and displayed image dimensions
   useEffect(() => {
-    if (imageRef.current) {
+    if (imageRef.current && image) {
       const updateDimensions = () => {
         if (imageRef.current) {
+          const img = imageRef.current;
           setImageDimensions({
-            width: imageRef.current.clientWidth,
-            height: imageRef.current.clientHeight,
+            natural: {
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+            },
+            displayed: {
+              width: img.clientWidth,
+              height: img.clientHeight,
+            },
           });
         }
       };
       
       // Update on load
-      imageRef.current.addEventListener('load', updateDimensions);
+      const img = imageRef.current;
+      if (img.complete) {
+        updateDimensions();
+      } else {
+        img.addEventListener('load', updateDimensions);
+      }
+      
       // Update on resize
       window.addEventListener('resize', updateDimensions);
-      // Initial update
-      updateDimensions();
       
       return () => {
         window.removeEventListener('resize', updateDimensions);
+        img.removeEventListener('load', updateDimensions);
       };
     }
   }, [image]);
@@ -428,7 +443,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             {showCoordinateDebug && imageDimensions && (
               <div className="mb-4 p-3 bg-gray-900 rounded text-white font-mono text-xs">
                 <div className="font-bold text-yellow-400 mb-1">📐 Image Dimensions</div>
-                <div>Displayed: {imageDimensions.width}x{imageDimensions.height}px</div>
+                <div>Natural: {imageDimensions.natural.width}x{imageDimensions.natural.height}px</div>
+                <div>Displayed: {imageDimensions.displayed.width}x{imageDimensions.displayed.height}px</div>
+                <div className="mt-1 text-blue-400">
+                  Aspect: {(imageDimensions.natural.width / imageDimensions.natural.height).toFixed(3)} 
+                  (W/H)
+                </div>
                 <div className="mt-2 font-bold text-green-400">Detections: {detections.length}</div>
               </div>
             )}
@@ -444,10 +464,26 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               {detections.map((detection, index) => {
                 const box = detection.bounding_box;
                 const isSelected = detection.id === selectedDetection;
-                const leftPercent = (box.x0 / 1000) * 100;
-                const topPercent = (box.y0 / 1000) * 100;
-                const widthPercent = ((box.x1 - box.x0) / 1000) * 100;
-                const heightPercent = ((box.y1 - box.y0) / 1000) * 100;
+                
+                // Calculate position using pixel values if image dimensions are available
+                // Gemini coordinates are normalized 0-1000 for both width and height
+                let leftPx, topPx, widthPx, heightPx;
+                
+                if (imageDimensions) {
+                  const imgWidth = imageDimensions.displayed.width;
+                  const imgHeight = imageDimensions.displayed.height;
+                  
+                  leftPx = (box.x0 / 1000) * imgWidth;
+                  topPx = (box.y0 / 1000) * imgHeight;
+                  widthPx = ((box.x1 - box.x0) / 1000) * imgWidth;
+                  heightPx = ((box.y1 - box.y0) / 1000) * imgHeight;
+                } else {
+                  // Fallback to percentage if dimensions not loaded yet
+                  leftPx = 0;
+                  topPx = 0;
+                  widthPx = 0;
+                  heightPx = 0;
+                }
                 
                 return (
                   <div
@@ -455,12 +491,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     onClick={() => currentStep === 'brand' && handleExtractBrand(detection.id)}
                     className={`absolute cursor-pointer ${currentStep === 'brand' ? 'hover:border-yellow-500' : ''}`}
                     style={{
-                      left: `${leftPercent}%`,
-                      top: `${topPercent}%`,
-                      width: `${widthPercent}%`,
-                      height: `${heightPercent}%`,
+                      left: `${leftPx}px`,
+                      top: `${topPx}px`,
+                      width: `${widthPx}px`,
+                      height: `${heightPx}px`,
                       border: `3px solid ${isSelected ? '#4F46E5' : detection.brand_name ? '#10B981' : '#F59E0B'}`,
                       backgroundColor: isSelected ? 'rgba(79, 70, 229, 0.1)' : 'rgba(16, 185, 129, 0.05)',
+                      display: imageDimensions ? 'block' : 'none', // Hide until dimensions loaded
                     }}
                   >
                     <div className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${isSelected ? 'bg-indigo-600' : detection.brand_name ? 'bg-green-600' : 'bg-yellow-600'}`}>
@@ -472,7 +509,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         <div className="text-yellow-300">x0:{box.x0} y0:{box.y0}</div>
                         <div className="text-green-300">x1:{box.x1} y1:{box.y1}</div>
                         <div className="text-blue-300">w:{box.x1-box.x0} h:{box.y1-box.y0}</div>
-                        <div className="text-purple-300 text-[8px]">{detection.label}</div>
+                        {imageDimensions && (
+                          <div className="text-cyan-300 text-[9px]">
+                            {Math.round(widthPx)}x{Math.round(heightPx)}px
+                          </div>
+                        )}
+                        <div className="text-purple-300 text-[8px] truncate max-w-[120px]">{detection.label}</div>
                       </div>
                     )}
                     {detection.brand_name && (

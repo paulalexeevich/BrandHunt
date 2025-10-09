@@ -110,15 +110,54 @@ height: ((y1 - y0) / 1000) * 100%
 ## Next Steps
 1. ✅ Added debug logging to backend
 2. ✅ Added coordinate display to frontend
-3. ⏳ Test with current image and examine coordinates
-4. ⏳ Compare expected vs actual positions
-5. ⏳ Identify root cause
-6. ⏳ Implement fix
+3. ✅ Test with current image and examine coordinates
+4. ✅ Compare expected vs actual positions
+5. ✅ Identify root cause: **Percentage positioning doesn't work correctly**
+6. ✅ Implement fix: **Use pixel-based positioning**
 7. ⏳ Test with multiple images to verify
+
+## Root Cause Identified
+
+**The Issue**: Using CSS percentage positioning (`left: X%`, `top: Y%`, etc.) for bounding boxes doesn't account for the image's aspect ratio correctly when the image is scaled with `max-w-full h-auto`.
+
+**Why It Fails**:
+- The image container (`inline-block`) can have different dimensions than the image itself
+- Percentages are relative to the container, not the image
+- When the image scales down, the percentages become incorrect
+
+## The Fix
+
+Changed from **percentage-based positioning** to **pixel-based positioning**:
+
+### Before (Wrong):
+```javascript
+left: `${(box.x0 / 1000) * 100}%`
+top: `${(box.y0 / 1000) * 100}%`
+width: `${((box.x1 - box.x0) / 1000) * 100}%`
+height: `${((box.y1 - box.y0) / 1000) * 100}%`
+```
+
+### After (Correct):
+```javascript
+const imgWidth = imageDimensions.displayed.width;
+const imgHeight = imageDimensions.displayed.height;
+
+left: `${(box.x0 / 1000) * imgWidth}px`
+top: `${(box.y0 / 1000) * imgHeight}px`
+width: `${((box.x1 - box.x0) / 1000) * imgWidth}px`
+height: `${((box.y1 - box.y0) / 1000) * imgHeight}px`
+```
+
+### Changes Made:
+1. **Track Image Dimensions**: Added `useRef` and `useState` to track both natural and displayed image dimensions
+2. **Calculate Pixel Positions**: Convert normalized coordinates (0-1000) to actual pixel values based on displayed image size
+3. **Dynamic Updates**: Listen to image load and window resize events to update dimensions
+4. **Enhanced Debug Info**: Show both natural and displayed dimensions, plus pixel calculations
 
 ## Test Image
 Currently testing with image ID: `9ed52c03-207f-405b-a900-ec639a3762e7`
 - Shows refrigerated shelf with multiple frozen pies
 - Products are arranged in clear rows
 - Good test case for coordinate accuracy
+- Natural dimensions show aspect ratio (width/height ratio displayed in debug panel)
 
