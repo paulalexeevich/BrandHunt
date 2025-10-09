@@ -76,6 +76,13 @@ Ensure bounding boxes tightly fit each product. Only return the JSON array.
 
   try {
     const detections = JSON.parse(cleanedText) as DetectedProduct[];
+    
+    // Debug: Log the raw format to verify coordinate order
+    if (detections.length > 0) {
+      console.log('🔍 Raw Gemini detection format:', JSON.stringify(detections[0], null, 2));
+      console.log(`📊 box_2d[0]=${detections[0].box_2d[0]}, [1]=${detections[0].box_2d[1]}, [2]=${detections[0].box_2d[2]}, [3]=${detections[0].box_2d[3]}`);
+    }
+    
     return detections;
   } catch (error) {
     console.error('Failed to parse Gemini response:', cleanedText);

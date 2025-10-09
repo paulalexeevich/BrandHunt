@@ -67,6 +67,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     displayed: { width: number; height: number };
   } | null>(null);
   const [useAspectRatioCorrection, setUseAspectRatioCorrection] = useState(false);
+  const [swapXY, setSwapXY] = useState(false); // Test if coordinates are swapped
 
   useEffect(() => {
     fetchImage();
@@ -438,6 +439,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               <h2 className="text-xl font-semibold text-gray-900">Image</h2>
               <div className="flex gap-2">
                 <button
+                  onClick={() => setSwapXY(!swapXY)}
+                  className={`px-3 py-1 text-xs ${swapXY ? 'bg-purple-600' : 'bg-gray-600'} text-white rounded hover:opacity-80`}
+                >
+                  🔄 {swapXY ? 'Swap: ON' : 'Swap: OFF'}
+                </button>
+                <button
                   onClick={() => setUseAspectRatioCorrection(!useAspectRatioCorrection)}
                   className={`px-3 py-1 text-xs ${useAspectRatioCorrection ? 'bg-blue-600' : 'bg-gray-600'} text-white rounded hover:opacity-80`}
                 >
@@ -466,12 +473,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 {detections[0] && (
                   <div className="mt-2 border-t border-gray-700 pt-2">
                     <div className="font-bold text-cyan-400 mb-1">🔍 Sample Box #1</div>
-                    <div className="text-yellow-300">Coords: [{detections[0].bounding_box.x0}, {detections[0].bounding_box.y0}, {detections[0].bounding_box.x1}, {detections[0].bounding_box.y1}]</div>
+                    <div className="text-red-300 text-[10px] mb-1">
+                      🔄 Swap={swapXY ? 'ON (treats x0,y0,x1,y1 as y0,x0,y1,x1)' : 'OFF (x0,y0,x1,y1)'}
+                    </div>
+                    <div className="text-yellow-300">DB Coords (x0,y0,x1,y1): [{detections[0].bounding_box.x0}, {detections[0].bounding_box.y0}, {detections[0].bounding_box.x1}, {detections[0].bounding_box.y1}]</div>
                     <div className="text-green-300">
-                      Calculated px: [{Math.round((detections[0].bounding_box.x0/1000)*imageDimensions.displayed.width)}, 
-                      {Math.round((detections[0].bounding_box.y0/1000)*imageDimensions.displayed.height)}, 
-                      {Math.round((detections[0].bounding_box.x1/1000)*imageDimensions.displayed.width)}, 
-                      {Math.round((detections[0].bounding_box.y1/1000)*imageDimensions.displayed.height)}]
+                      As % (left,top,right,bottom): [{(detections[0].bounding_box.x0/1000*100).toFixed(1)}%, 
+                      {(detections[0].bounding_box.y0/1000*100).toFixed(1)}%, 
+                      {(detections[0].bounding_box.x1/1000*100).toFixed(1)}%, 
+                      {(detections[0].bounding_box.y1/1000*100).toFixed(1)}%]
                     </div>
                     <div className="text-purple-300">Label: {detections[0].label}</div>
                   </div>
@@ -500,6 +510,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   const imgHeight = imageDimensions.displayed.height;
                   const aspectRatio = imageDimensions.natural.width / imageDimensions.natural.height;
                   
+                  // Get coordinates - swap if needed for testing
+                  const x0 = swapXY ? box.y0 : box.x0;
+                  const y0 = swapXY ? box.x0 : box.y0;
+                  const x1 = swapXY ? box.y1 : box.x1;
+                  const y1 = swapXY ? box.x1 : box.y1;
+                  
                   if (useAspectRatioCorrection) {
                     // Aspect ratio correction: Gemini uses 1000x1000 square space
                     // For portrait images (aspect < 1), scale X coordinates
@@ -507,29 +523,29 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     if (aspectRatio < 1) {
                       // Portrait: X dimension needs to be stretched
                       const scale = 1 / aspectRatio;
-                      leftPx = ((box.x0 - (1000 - 1000 * aspectRatio) / 2) * scale / 1000) * imgWidth;
-                      widthPx = (((box.x1 - box.x0) * scale) / 1000) * imgWidth;
-                      topPx = (box.y0 / 1000) * imgHeight;
-                      heightPx = ((box.y1 - box.y0) / 1000) * imgHeight;
+                      leftPx = ((x0 - (1000 - 1000 * aspectRatio) / 2) * scale / 1000) * imgWidth;
+                      widthPx = (((x1 - x0) * scale) / 1000) * imgWidth;
+                      topPx = (y0 / 1000) * imgHeight;
+                      heightPx = ((y1 - y0) / 1000) * imgHeight;
                     } else {
                       // Landscape: Y dimension needs to be stretched
                       const scale = aspectRatio;
-                      leftPx = (box.x0 / 1000) * imgWidth;
-                      widthPx = ((box.x1 - box.x0) / 1000) * imgWidth;
-                      topPx = ((box.y0 - (1000 - 1000 / aspectRatio) / 2) * scale / 1000) * imgHeight;
-                      heightPx = (((box.y1 - box.y0) * scale) / 1000) * imgHeight;
+                      leftPx = (x0 / 1000) * imgWidth;
+                      widthPx = ((x1 - x0) / 1000) * imgWidth;
+                      topPx = ((y0 - (1000 - 1000 / aspectRatio) / 2) * scale / 1000) * imgHeight;
+                      heightPx = (((y1 - y0) * scale) / 1000) * imgHeight;
                     }
                   } else {
                     // Simple conversion without aspect ratio correction
-                    leftPx = (box.x0 / 1000) * imgWidth;
-                    topPx = (box.y0 / 1000) * imgHeight;
-                    widthPx = ((box.x1 - box.x0) / 1000) * imgWidth;
-                    heightPx = ((box.y1 - box.y0) / 1000) * imgHeight;
+                    leftPx = (x0 / 1000) * imgWidth;
+                    topPx = (y0 / 1000) * imgHeight;
+                    widthPx = ((x1 - x0) / 1000) * imgWidth;
+                    heightPx = ((y1 - y0) / 1000) * imgHeight;
                   }
                   
                   // Log first box for debugging
                   if (index === 0) {
-                    console.log(`🎯 Box #1 (${useAspectRatioCorrection ? 'WITH' : 'WITHOUT'} aspect): coords[${box.x0},${box.y0},${box.x1},${box.y1}] -> pixels[${leftPx.toFixed(0)},${topPx.toFixed(0)},${widthPx.toFixed(0)}x${heightPx.toFixed(0)}], aspect=${aspectRatio.toFixed(3)}`);
+                    console.log(`🎯 Box #1 (Swap:${swapXY}, Aspect:${useAspectRatioCorrection}): coords[${x0},${y0},${x1},${y1}] -> pixels[${leftPx.toFixed(0)},${topPx.toFixed(0)},${widthPx.toFixed(0)}x${heightPx.toFixed(0)}], aspect=${aspectRatio.toFixed(3)}`);
                   }
                 } else {
                   // Fallback to percentage if dimensions not loaded yet
