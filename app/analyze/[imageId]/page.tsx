@@ -66,6 +66,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     natural: { width: number; height: number };
     displayed: { width: number; height: number };
   } | null>(null);
+  const [useAspectRatioCorrection, setUseAspectRatioCorrection] = useState(false);
 
   useEffect(() => {
     fetchImage();
@@ -77,7 +78,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       const updateDimensions = () => {
         if (imageRef.current) {
           const img = imageRef.current;
-          setImageDimensions({
+          const dims = {
             natural: {
               width: img.naturalWidth,
               height: img.naturalHeight,
@@ -86,15 +87,19 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               width: img.clientWidth,
               height: img.clientHeight,
             },
-          });
+          };
+          console.log('📐 Image dimensions updated:', dims);
+          setImageDimensions(dims);
         }
       };
       
       // Update on load
       const img = imageRef.current;
-      if (img.complete) {
+      if (img.complete && img.naturalWidth > 0) {
+        console.log('✅ Image already loaded, updating dimensions immediately');
         updateDimensions();
       } else {
+        console.log('⏳ Waiting for image to load...');
         img.addEventListener('load', updateDimensions);
       }
       
@@ -431,25 +436,46 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Image</h2>
-              <button
-                onClick={() => setShowCoordinateDebug(!showCoordinateDebug)}
-                className="px-3 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-700"
-              >
-                {showCoordinateDebug ? '🔍 Hide' : '🔍 Show'} Coords
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setUseAspectRatioCorrection(!useAspectRatioCorrection)}
+                  className={`px-3 py-1 text-xs ${useAspectRatioCorrection ? 'bg-blue-600' : 'bg-gray-600'} text-white rounded hover:opacity-80`}
+                >
+                  📏 {useAspectRatioCorrection ? 'Aspect: ON' : 'Aspect: OFF'}
+                </button>
+                <button
+                  onClick={() => setShowCoordinateDebug(!showCoordinateDebug)}
+                  className="px-3 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-700"
+                >
+                  {showCoordinateDebug ? '🔍 Hide' : '🔍 Show'} Coords
+                </button>
+              </div>
             </div>
             
             {/* Debug panel showing actual image dimensions */}
-            {showCoordinateDebug && imageDimensions && (
+            {showCoordinateDebug && imageDimensions && detections.length > 0 && (
               <div className="mb-4 p-3 bg-gray-900 rounded text-white font-mono text-xs">
                 <div className="font-bold text-yellow-400 mb-1">📐 Image Dimensions</div>
                 <div>Natural: {imageDimensions.natural.width}x{imageDimensions.natural.height}px</div>
                 <div>Displayed: {imageDimensions.displayed.width}x{imageDimensions.displayed.height}px</div>
                 <div className="mt-1 text-blue-400">
                   Aspect: {(imageDimensions.natural.width / imageDimensions.natural.height).toFixed(3)} 
-                  (W/H)
+                  (W/H) = {imageDimensions.natural.width / imageDimensions.natural.height < 1 ? 'Portrait' : 'Landscape'}
                 </div>
                 <div className="mt-2 font-bold text-green-400">Detections: {detections.length}</div>
+                {detections[0] && (
+                  <div className="mt-2 border-t border-gray-700 pt-2">
+                    <div className="font-bold text-cyan-400 mb-1">🔍 Sample Box #1</div>
+                    <div className="text-yellow-300">Coords: [{detections[0].bounding_box.x0}, {detections[0].bounding_box.y0}, {detections[0].bounding_box.x1}, {detections[0].bounding_box.y1}]</div>
+                    <div className="text-green-300">
+                      Calculated px: [{Math.round((detections[0].bounding_box.x0/1000)*imageDimensions.displayed.width)}, 
+                      {Math.round((detections[0].bounding_box.y0/1000)*imageDimensions.displayed.height)}, 
+                      {Math.round((detections[0].bounding_box.x1/1000)*imageDimensions.displayed.width)}, 
+                      {Math.round((detections[0].bounding_box.y1/1000)*imageDimensions.displayed.height)}]
+                    </div>
+                    <div className="text-purple-300">Label: {detections[0].label}</div>
+                  </div>
+                )}
               </div>
             )}
             
@@ -472,17 +498,49 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 if (imageDimensions) {
                   const imgWidth = imageDimensions.displayed.width;
                   const imgHeight = imageDimensions.displayed.height;
+                  const aspectRatio = imageDimensions.natural.width / imageDimensions.natural.height;
                   
-                  leftPx = (box.x0 / 1000) * imgWidth;
-                  topPx = (box.y0 / 1000) * imgHeight;
-                  widthPx = ((box.x1 - box.x0) / 1000) * imgWidth;
-                  heightPx = ((box.y1 - box.y0) / 1000) * imgHeight;
+                  if (useAspectRatioCorrection) {
+                    // Aspect ratio correction: Gemini uses 1000x1000 square space
+                    // For portrait images (aspect < 1), scale X coordinates
+                    // For landscape images (aspect > 1), scale Y coordinates
+                    if (aspectRatio < 1) {
+                      // Portrait: X dimension needs to be stretched
+                      const scale = 1 / aspectRatio;
+                      leftPx = ((box.x0 - (1000 - 1000 * aspectRatio) / 2) * scale / 1000) * imgWidth;
+                      widthPx = (((box.x1 - box.x0) * scale) / 1000) * imgWidth;
+                      topPx = (box.y0 / 1000) * imgHeight;
+                      heightPx = ((box.y1 - box.y0) / 1000) * imgHeight;
+                    } else {
+                      // Landscape: Y dimension needs to be stretched
+                      const scale = aspectRatio;
+                      leftPx = (box.x0 / 1000) * imgWidth;
+                      widthPx = ((box.x1 - box.x0) / 1000) * imgWidth;
+                      topPx = ((box.y0 - (1000 - 1000 / aspectRatio) / 2) * scale / 1000) * imgHeight;
+                      heightPx = (((box.y1 - box.y0) * scale) / 1000) * imgHeight;
+                    }
+                  } else {
+                    // Simple conversion without aspect ratio correction
+                    leftPx = (box.x0 / 1000) * imgWidth;
+                    topPx = (box.y0 / 1000) * imgHeight;
+                    widthPx = ((box.x1 - box.x0) / 1000) * imgWidth;
+                    heightPx = ((box.y1 - box.y0) / 1000) * imgHeight;
+                  }
+                  
+                  // Log first box for debugging
+                  if (index === 0) {
+                    console.log(`🎯 Box #1 (${useAspectRatioCorrection ? 'WITH' : 'WITHOUT'} aspect): coords[${box.x0},${box.y0},${box.x1},${box.y1}] -> pixels[${leftPx.toFixed(0)},${topPx.toFixed(0)},${widthPx.toFixed(0)}x${heightPx.toFixed(0)}], aspect=${aspectRatio.toFixed(3)}`);
+                  }
                 } else {
                   // Fallback to percentage if dimensions not loaded yet
                   leftPx = 0;
                   topPx = 0;
                   widthPx = 0;
                   heightPx = 0;
+                  
+                  if (index === 0) {
+                    console.log('⚠️ Image dimensions not loaded yet, boxes hidden');
+                  }
                 }
                 
                 return (
