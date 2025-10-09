@@ -79,6 +79,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Vercel Hobby plan limit is 10s, Pro is 60s
-export const maxDuration = 10;
+// Increase timeout for Gemini API calls (brand extraction + image cropping)
+export const maxDuration = 60; // 60 seconds for Gemini processing
 

@@ -150,5 +150,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export const maxDuration = 10; // Vercel free tier limit
+// Increase timeout for processing multiple detections
+export const maxDuration = 60; // 60 seconds for batch processing
 

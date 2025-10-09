@@ -87,5 +87,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export const maxDuration = 10; // Vercel free tier limit
+// Increase timeout for AI image filtering (multiple Gemini API calls)
+export const maxDuration = 60; // 60 seconds for processing up to 50 products
 
