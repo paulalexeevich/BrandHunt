@@ -60,14 +60,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [deleting, setDeleting] = useState(false);
   const [filtering, setFiltering] = useState(false);
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
-  const [showCoordinateDebug, setShowCoordinateDebug] = useState(true); // Start with debug on
+  const [showCoordinateDebug, setShowCoordinateDebug] = useState(false); // Debug off by default
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
     natural: { width: number; height: number };
     displayed: { width: number; height: number };
   } | null>(null);
-  const [useAspectRatioCorrection, setUseAspectRatioCorrection] = useState(false);
-  const [swapXY, setSwapXY] = useState(false); // Test if coordinates are swapped
 
   useEffect(() => {
     fetchImage();
@@ -437,53 +435,37 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Image</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSwapXY(!swapXY)}
-                  className={`px-3 py-1 text-xs ${swapXY ? 'bg-purple-600' : 'bg-gray-600'} text-white rounded hover:opacity-80`}
-                >
-                  🔄 {swapXY ? 'Swap: ON' : 'Swap: OFF'}
-                </button>
-                <button
-                  onClick={() => setUseAspectRatioCorrection(!useAspectRatioCorrection)}
-                  className={`px-3 py-1 text-xs ${useAspectRatioCorrection ? 'bg-blue-600' : 'bg-gray-600'} text-white rounded hover:opacity-80`}
-                >
-                  📏 {useAspectRatioCorrection ? 'Aspect: ON' : 'Aspect: OFF'}
-                </button>
-                <button
-                  onClick={() => setShowCoordinateDebug(!showCoordinateDebug)}
-                  className="px-3 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-700"
-                >
-                  {showCoordinateDebug ? '🔍 Hide' : '🔍 Show'} Coords
-                </button>
-              </div>
+              <button
+                onClick={() => setShowCoordinateDebug(!showCoordinateDebug)}
+                className="px-3 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-700"
+              >
+                {showCoordinateDebug ? '🔍 Hide' : '🔍 Show'} Debug
+              </button>
             </div>
             
-            {/* Debug panel showing actual image dimensions */}
+            {/* Debug panel - Google's official method: divide by 1000, multiply by dimension */}
             {showCoordinateDebug && imageDimensions && detections.length > 0 && (
               <div className="mb-4 p-3 bg-gray-900 rounded text-white font-mono text-xs">
+                <div className="font-bold text-green-400 mb-1">✅ Using Google&apos;s Official Coordinate Method</div>
+                <div className="text-gray-300 text-[10px] mb-2">Format: [ymin, xmin, ymax, xmax] normalized 0-1000</div>
                 <div className="font-bold text-yellow-400 mb-1">📐 Image Dimensions</div>
                 <div>Natural: {imageDimensions.natural.width}x{imageDimensions.natural.height}px</div>
                 <div>Displayed: {imageDimensions.displayed.width}x{imageDimensions.displayed.height}px</div>
                 <div className="mt-1 text-blue-400">
                   Aspect: {(imageDimensions.natural.width / imageDimensions.natural.height).toFixed(3)} 
-                  (W/H) = {imageDimensions.natural.width / imageDimensions.natural.height < 1 ? 'Portrait' : 'Landscape'}
+                  ({imageDimensions.natural.width / imageDimensions.natural.height < 1 ? 'Portrait' : 'Landscape'})
                 </div>
                 <div className="mt-2 font-bold text-green-400">Detections: {detections.length}</div>
                 {detections[0] && (
                   <div className="mt-2 border-t border-gray-700 pt-2">
-                    <div className="font-bold text-cyan-400 mb-1">🔍 Sample Box #1</div>
-                    <div className="text-red-300 text-[10px] mb-1">
-                      🔄 Swap={swapXY ? 'ON (treats x0,y0,x1,y1 as y0,x0,y1,x1)' : 'OFF (x0,y0,x1,y1)'}
-                    </div>
-                    <div className="text-yellow-300">DB Coords (x0,y0,x1,y1): [{detections[0].bounding_box.x0}, {detections[0].bounding_box.y0}, {detections[0].bounding_box.x1}, {detections[0].bounding_box.y1}]</div>
+                    <div className="font-bold text-cyan-400 mb-1">🔍 Sample Box #1: {detections[0].label}</div>
+                    <div className="text-yellow-300">Stored: x0={detections[0].bounding_box.x0}, y0={detections[0].bounding_box.y0}, x1={detections[0].bounding_box.x1}, y1={detections[0].bounding_box.y1}</div>
                     <div className="text-green-300">
-                      As % (left,top,right,bottom): [{(detections[0].bounding_box.x0/1000*100).toFixed(1)}%, 
-                      {(detections[0].bounding_box.y0/1000*100).toFixed(1)}%, 
-                      {(detections[0].bounding_box.x1/1000*100).toFixed(1)}%, 
-                      {(detections[0].bounding_box.y1/1000*100).toFixed(1)}%]
+                      Converted: left={(detections[0].bounding_box.x0/1000*imageDimensions.displayed.width).toFixed(0)}px, 
+                      top={(detections[0].bounding_box.y0/1000*imageDimensions.displayed.height).toFixed(0)}px, 
+                      {((detections[0].bounding_box.x1-detections[0].bounding_box.x0)/1000*imageDimensions.displayed.width).toFixed(0)}x
+                      {((detections[0].bounding_box.y1-detections[0].bounding_box.y0)/1000*imageDimensions.displayed.height).toFixed(0)}px
                     </div>
-                    <div className="text-purple-300">Label: {detections[0].label}</div>
                   </div>
                 )}
               </div>
@@ -501,54 +483,27 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 const box = detection.bounding_box;
                 const isSelected = detection.id === selectedDetection;
                 
-                // Calculate position using pixel values if image dimensions are available
-                // Gemini coordinates are normalized 0-1000 for both width and height
+                // Google's official coordinate conversion method:
+                // Gemini returns [ymin, xmin, ymax, xmax] normalized 0-1000
+                // Convert to pixels: coordinate / 1000 * dimension
                 let leftPx, topPx, widthPx, heightPx;
                 
                 if (imageDimensions) {
                   const imgWidth = imageDimensions.displayed.width;
                   const imgHeight = imageDimensions.displayed.height;
-                  const aspectRatio = imageDimensions.natural.width / imageDimensions.natural.height;
                   
-                  // Get coordinates - swap if needed for testing
-                  const x0 = swapXY ? box.y0 : box.x0;
-                  const y0 = swapXY ? box.x0 : box.y0;
-                  const x1 = swapXY ? box.y1 : box.x1;
-                  const y1 = swapXY ? box.x1 : box.y1;
-                  
-                  if (useAspectRatioCorrection) {
-                    // Aspect ratio correction: Gemini uses 1000x1000 square space
-                    // For portrait images (aspect < 1), scale X coordinates
-                    // For landscape images (aspect > 1), scale Y coordinates
-                    if (aspectRatio < 1) {
-                      // Portrait: X dimension needs to be stretched
-                      const scale = 1 / aspectRatio;
-                      leftPx = ((x0 - (1000 - 1000 * aspectRatio) / 2) * scale / 1000) * imgWidth;
-                      widthPx = (((x1 - x0) * scale) / 1000) * imgWidth;
-                      topPx = (y0 / 1000) * imgHeight;
-                      heightPx = ((y1 - y0) / 1000) * imgHeight;
-                    } else {
-                      // Landscape: Y dimension needs to be stretched
-                      const scale = aspectRatio;
-                      leftPx = (x0 / 1000) * imgWidth;
-                      widthPx = ((x1 - x0) / 1000) * imgWidth;
-                      topPx = ((y0 - (1000 - 1000 / aspectRatio) / 2) * scale / 1000) * imgHeight;
-                      heightPx = (((y1 - y0) * scale) / 1000) * imgHeight;
-                    }
-                  } else {
-                    // Simple conversion without aspect ratio correction
-                    leftPx = (x0 / 1000) * imgWidth;
-                    topPx = (y0 / 1000) * imgHeight;
-                    widthPx = ((x1 - x0) / 1000) * imgWidth;
-                    heightPx = ((y1 - y0) / 1000) * imgHeight;
-                  }
+                  // Simple conversion (Google's official method)
+                  leftPx = (box.x0 / 1000) * imgWidth;
+                  topPx = (box.y0 / 1000) * imgHeight;
+                  widthPx = ((box.x1 - box.x0) / 1000) * imgWidth;
+                  heightPx = ((box.y1 - box.y0) / 1000) * imgHeight;
                   
                   // Log first box for debugging
-                  if (index === 0) {
-                    console.log(`🎯 Box #1 (Swap:${swapXY}, Aspect:${useAspectRatioCorrection}): coords[${x0},${y0},${x1},${y1}] -> pixels[${leftPx.toFixed(0)},${topPx.toFixed(0)},${widthPx.toFixed(0)}x${heightPx.toFixed(0)}], aspect=${aspectRatio.toFixed(3)}`);
+                  if (index === 0 && showCoordinateDebug) {
+                    console.log(`✅ Box #1 Google Method: [${box.x0},${box.y0},${box.x1},${box.y1}] -> [${leftPx.toFixed(0)}px,${topPx.toFixed(0)}px,${widthPx.toFixed(0)}x${heightPx.toFixed(0)}px]`);
                   }
                 } else {
-                  // Fallback to percentage if dimensions not loaded yet
+                  // Hide boxes until dimensions are loaded
                   leftPx = 0;
                   topPx = 0;
                   widthPx = 0;
@@ -578,16 +533,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       #{index + 1}
                     </div>
                     {/* Debug coordinates overlay */}
-                    {showCoordinateDebug && (
+                    {showCoordinateDebug && imageDimensions && (
                       <div className="absolute top-0 left-0 px-2 py-1 text-[10px] bg-black bg-opacity-90 text-white font-mono rounded-br leading-tight">
-                        <div className="text-yellow-300">x0:{box.x0} y0:{box.y0}</div>
-                        <div className="text-green-300">x1:{box.x1} y1:{box.y1}</div>
-                        <div className="text-blue-300">w:{box.x1-box.x0} h:{box.y1-box.y0}</div>
-                        {imageDimensions && (
-                          <div className="text-cyan-300 text-[9px]">
-                            {Math.round(widthPx)}x{Math.round(heightPx)}px
-                          </div>
-                        )}
+                        <div className="text-yellow-300">#{index + 1} [{box.x0},{box.y0},{box.x1},{box.y1}]</div>
+                        <div className="text-cyan-300">
+                          {Math.round(leftPx)},{Math.round(topPx)} {Math.round(widthPx)}x{Math.round(heightPx)}px
+                        </div>
                         <div className="text-purple-300 text-[8px] truncate max-w-[120px]">{detection.label}</div>
                       </div>
                     )}
