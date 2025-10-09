@@ -48,8 +48,8 @@ export default function TestDetectionPage() {
       const imageBuffer = await imageResponse.arrayBuffer();
       const base64Image = Buffer.from(imageBuffer).toString('base64');
 
-      // Call the detect API
-      const detectResponse = await fetch('/api/detect', {
+      // Call the test detect API
+      const detectResponse = await fetch('/api/test-detect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
