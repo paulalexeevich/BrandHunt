@@ -43,19 +43,25 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`Detected ${detections.length} products`);
+    
+    // Debug: Log first few detections to verify coordinates
+    console.log('🔍 Sample detections:', JSON.stringify(detections.slice(0, 3), null, 2));
 
     // Save detections to database (without brand names, categories, or SKUs yet)
-    const detectionsToSave = detections.map((detection, i) => ({
-      image_id: imageId,
-      detection_index: i,
-      bounding_box: {
+    const detectionsToSave = detections.map((detection, i) => {
+      const bbox = {
         y0: detection.box_2d[0],
         x0: detection.box_2d[1],
         y1: detection.box_2d[2],
         x1: detection.box_2d[3],
-      },
-      label: detection.label || null,
-      confidence_score: null,
+      };
+      console.log(`Detection ${i}: [${detection.box_2d}] -> ${JSON.stringify(bbox)}`);
+      return {
+        image_id: imageId,
+        detection_index: i,
+        bounding_box: bbox,
+        label: detection.label || null,
+        confidence_score: null,
       brand_name: null,
       category: null,
       sku: null,
@@ -65,7 +71,8 @@ export async function POST(request: NextRequest) {
       description: null,
       brand_extraction_prompt: null,
       brand_extraction_response: null,
-    }));
+      };
+    });
 
     const { data: savedDetections, error: detectionError } = await supabase
       .from('branghunt_detections')

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, CheckCircle, Package, Trash2 } from 'lucide-react';
@@ -60,10 +60,38 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [deleting, setDeleting] = useState(false);
   const [filtering, setFiltering] = useState(false);
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
+  const [showCoordinateDebug, setShowCoordinateDebug] = useState(true); // Start with debug on
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
     fetchImage();
   }, [resolvedParams.imageId]);
+
+  // Track actual displayed image dimensions
+  useEffect(() => {
+    if (imageRef.current) {
+      const updateDimensions = () => {
+        if (imageRef.current) {
+          setImageDimensions({
+            width: imageRef.current.clientWidth,
+            height: imageRef.current.clientHeight,
+          });
+        }
+      };
+      
+      // Update on load
+      imageRef.current.addEventListener('load', updateDimensions);
+      // Update on resize
+      window.addEventListener('resize', updateDimensions);
+      // Initial update
+      updateDimensions();
+      
+      return () => {
+        window.removeEventListener('resize', updateDimensions);
+      };
+    }
+  }, [image]);
 
   const fetchImage = async () => {
     try {
@@ -386,9 +414,28 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left: Image with Bounding Boxes */}
           <div className="bg-white rounded-xl shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Image</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Image</h2>
+              <button
+                onClick={() => setShowCoordinateDebug(!showCoordinateDebug)}
+                className="px-3 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-700"
+              >
+                {showCoordinateDebug ? '🔍 Hide' : '🔍 Show'} Coords
+              </button>
+            </div>
+            
+            {/* Debug panel showing actual image dimensions */}
+            {showCoordinateDebug && imageDimensions && (
+              <div className="mb-4 p-3 bg-gray-900 rounded text-white font-mono text-xs">
+                <div className="font-bold text-yellow-400 mb-1">📐 Image Dimensions</div>
+                <div>Displayed: {imageDimensions.width}x{imageDimensions.height}px</div>
+                <div className="mt-2 font-bold text-green-400">Detections: {detections.length}</div>
+              </div>
+            )}
+            
             <div className="relative inline-block max-w-full">
               <img
+                ref={imageRef}
                 src={`data:image/jpeg;base64,${image.file_path}`}
                 alt={image.original_filename}
                 className="max-w-full h-auto rounded-lg"
@@ -397,16 +444,21 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               {detections.map((detection, index) => {
                 const box = detection.bounding_box;
                 const isSelected = detection.id === selectedDetection;
+                const leftPercent = (box.x0 / 1000) * 100;
+                const topPercent = (box.y0 / 1000) * 100;
+                const widthPercent = ((box.x1 - box.x0) / 1000) * 100;
+                const heightPercent = ((box.y1 - box.y0) / 1000) * 100;
+                
                 return (
                   <div
                     key={detection.id}
                     onClick={() => currentStep === 'brand' && handleExtractBrand(detection.id)}
                     className={`absolute cursor-pointer ${currentStep === 'brand' ? 'hover:border-yellow-500' : ''}`}
                     style={{
-                      left: `${(box.x0 / 1000) * 100}%`,
-                      top: `${(box.y0 / 1000) * 100}%`,
-                      width: `${((box.x1 - box.x0) / 1000) * 100}%`,
-                      height: `${((box.y1 - box.y0) / 1000) * 100}%`,
+                      left: `${leftPercent}%`,
+                      top: `${topPercent}%`,
+                      width: `${widthPercent}%`,
+                      height: `${heightPercent}%`,
                       border: `3px solid ${isSelected ? '#4F46E5' : detection.brand_name ? '#10B981' : '#F59E0B'}`,
                       backgroundColor: isSelected ? 'rgba(79, 70, 229, 0.1)' : 'rgba(16, 185, 129, 0.05)',
                     }}
@@ -414,6 +466,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     <div className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${isSelected ? 'bg-indigo-600' : detection.brand_name ? 'bg-green-600' : 'bg-yellow-600'}`}>
                       #{index + 1}
                     </div>
+                    {/* Debug coordinates overlay */}
+                    {showCoordinateDebug && (
+                      <div className="absolute top-0 left-0 px-2 py-1 text-[10px] bg-black bg-opacity-90 text-white font-mono rounded-br leading-tight">
+                        <div className="text-yellow-300">x0:{box.x0} y0:{box.y0}</div>
+                        <div className="text-green-300">x1:{box.x1} y1:{box.y1}</div>
+                        <div className="text-blue-300">w:{box.x1-box.x0} h:{box.y1-box.y0}</div>
+                        <div className="text-purple-300 text-[8px]">{detection.label}</div>
+                      </div>
+                    )}
                     {detection.brand_name && (
                       <div className="absolute -bottom-8 left-0 right-0 px-2 py-1 text-xs font-semibold bg-white border-2 border-green-600 rounded text-center truncate">
                         {detection.product_name || detection.brand_name}
