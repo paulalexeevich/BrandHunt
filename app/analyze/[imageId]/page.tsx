@@ -61,6 +61,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [filtering, setFiltering] = useState(false);
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
   const [showCoordinateDebug, setShowCoordinateDebug] = useState(false); // Debug off by default
+  const [showOriginalSize, setShowOriginalSize] = useState(false); // Toggle for original vs scaled image
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
     natural: { width: number; height: number };
@@ -77,6 +78,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       const updateDimensions = () => {
         if (imageRef.current) {
           const img = imageRef.current;
+          const container = img.parentElement;
           const dims = {
             natural: {
               width: img.naturalWidth,
@@ -88,6 +90,19 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             },
           };
           console.log('📐 Image dimensions updated:', dims);
+          console.log('📦 Container dimensions:', {
+            width: container?.clientWidth,
+            height: container?.clientHeight,
+            offsetWidth: container?.offsetWidth,
+            offsetHeight: container?.offsetHeight,
+          });
+          console.log('🔍 Image element:', {
+            offsetWidth: img.offsetWidth,
+            offsetHeight: img.offsetHeight,
+            clientWidth: img.clientWidth,
+            clientHeight: img.clientHeight,
+            boundingRect: img.getBoundingClientRect(),
+          });
           setImageDimensions(dims);
         }
       };
@@ -435,12 +450,20 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Image</h2>
-              <button
-                onClick={() => setShowCoordinateDebug(!showCoordinateDebug)}
-                className="px-3 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-700"
-              >
-                {showCoordinateDebug ? '🔍 Hide' : '🔍 Show'} Debug
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowOriginalSize(!showOriginalSize)}
+                  className={`px-3 py-1 text-xs ${showOriginalSize ? 'bg-green-600' : 'bg-blue-600'} text-white rounded hover:opacity-80`}
+                >
+                  {showOriginalSize ? '🔍 Original' : '📏 Scaled'} Size
+                </button>
+                <button
+                  onClick={() => setShowCoordinateDebug(!showCoordinateDebug)}
+                  className="px-3 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-700"
+                >
+                  {showCoordinateDebug ? '🔍 Hide' : '🔍 Show'} Debug
+                </button>
+              </div>
             </div>
             
             {/* Debug panel - Google's official method: divide by 1000, multiply by dimension */}
@@ -448,36 +471,67 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               <div className="mb-4 p-3 bg-gray-900 rounded text-white font-mono text-xs">
                 <div className="font-bold text-green-400 mb-1">✅ Using Google&apos;s Official Coordinate Method</div>
                 <div className="text-gray-300 text-[10px] mb-2">Format: [ymin, xmin, ymax, xmax] normalized 0-1000</div>
-                <div className="font-bold text-yellow-400 mb-1">📐 Image Dimensions</div>
-                <div>Natural: {imageDimensions.natural.width}x{imageDimensions.natural.height}px</div>
-                <div>Displayed: {imageDimensions.displayed.width}x{imageDimensions.displayed.height}px</div>
+                <div className={`font-bold mb-1 ${showOriginalSize ? 'text-green-400' : 'text-blue-400'}`}>
+                  📐 {showOriginalSize ? 'SHOWING ORIGINAL SIZE' : 'SHOWING SCALED SIZE'}
+                </div>
+                <div className="font-bold text-yellow-400 mb-1">Image Dimensions:</div>
+                <div>Natural (sent to Gemini): {imageDimensions.natural.width}x{imageDimensions.natural.height}px</div>
+                <div>Displayed (on screen): {imageDimensions.displayed.width}x{imageDimensions.displayed.height}px</div>
                 <div className="mt-1 text-blue-400">
-                  Aspect: {(imageDimensions.natural.width / imageDimensions.natural.height).toFixed(3)} 
+                  Aspect Ratio: {(imageDimensions.natural.width / imageDimensions.natural.height).toFixed(3)} 
                   ({imageDimensions.natural.width / imageDimensions.natural.height < 1 ? 'Portrait' : 'Landscape'})
+                </div>
+                <div className="text-purple-400">
+                  Scale Factor: {(imageDimensions.displayed.width / imageDimensions.natural.width * 100).toFixed(1)}% of original
                 </div>
                 <div className="mt-2 font-bold text-green-400">Detections: {detections.length}</div>
                 {detections[0] && (
                   <div className="mt-2 border-t border-gray-700 pt-2">
                     <div className="font-bold text-cyan-400 mb-1">🔍 Sample Box #1: {detections[0].label}</div>
-                    <div className="text-yellow-300">Stored: x0={detections[0].bounding_box.x0}, y0={detections[0].bounding_box.y0}, x1={detections[0].bounding_box.x1}, y1={detections[0].bounding_box.y1}</div>
-                    <div className="text-green-300">
-                      Converted: left={(detections[0].bounding_box.x0/1000*imageDimensions.displayed.width).toFixed(0)}px, 
-                      top={(detections[0].bounding_box.y0/1000*imageDimensions.displayed.height).toFixed(0)}px, 
-                      {((detections[0].bounding_box.x1-detections[0].bounding_box.x0)/1000*imageDimensions.displayed.width).toFixed(0)}x
-                      {((detections[0].bounding_box.y1-detections[0].bounding_box.y0)/1000*imageDimensions.displayed.height).toFixed(0)}px
+                    <div className="text-yellow-300">Normalized [0-1000]: x0={detections[0].bounding_box.x0}, y0={detections[0].bounding_box.y0}, x1={detections[0].bounding_box.x1}, y1={detections[0].bounding_box.y1}</div>
+                    {showOriginalSize ? (
+                      <>
+                        <div className="text-green-300">
+                          Pixel Coords (Original): left={(detections[0].bounding_box.x0/1000*imageDimensions.natural.width).toFixed(1)}px, 
+                          top={(detections[0].bounding_box.y0/1000*imageDimensions.natural.height).toFixed(1)}px
+                        </div>
+                        <div className="text-cyan-300">
+                          Box Size (Original): {((detections[0].bounding_box.x1-detections[0].bounding_box.x0)/1000*imageDimensions.natural.width).toFixed(1)}px × 
+                          {((detections[0].bounding_box.y1-detections[0].bounding_box.y0)/1000*imageDimensions.natural.height).toFixed(1)}px
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-green-300">
+                          Pixel Coords (Scaled): left={(detections[0].bounding_box.x0/1000*imageDimensions.displayed.width).toFixed(1)}px, 
+                          top={(detections[0].bounding_box.y0/1000*imageDimensions.displayed.height).toFixed(1)}px
+                        </div>
+                        <div className="text-cyan-300">
+                          Box Size (Scaled): {((detections[0].bounding_box.x1-detections[0].bounding_box.x0)/1000*imageDimensions.displayed.width).toFixed(1)}px × 
+                          {((detections[0].bounding_box.y1-detections[0].bounding_box.y0)/1000*imageDimensions.displayed.height).toFixed(1)}px
+                        </div>
+                      </>
+                    )}
+                    <div className="text-orange-300 text-[10px] mt-1">
+                      Expected position: {((detections[0].bounding_box.x0/1000)*100).toFixed(1)}% from left, {((detections[0].bounding_box.y0/1000)*100).toFixed(1)}% from top
                     </div>
                   </div>
                 )}
               </div>
             )}
             
-            <div className="relative inline-block max-w-full">
+            <div className="relative inline-block" style={{ maxWidth: showOriginalSize ? 'none' : '100%', overflow: showOriginalSize ? 'auto' : 'visible' }}>
               <img
                 ref={imageRef}
                 src={`data:image/jpeg;base64,${image.file_path}`}
                 alt={image.original_filename}
-                className="max-w-full h-auto rounded-lg"
-                style={{ display: 'block' }}
+                className="rounded-lg"
+                style={{ 
+                  display: 'block',
+                  width: showOriginalSize ? 'auto' : '100%',
+                  height: 'auto',
+                  maxWidth: showOriginalSize ? 'none' : '100%'
+                }}
               />
               {detections.map((detection, index) => {
                 const box = detection.bounding_box;
@@ -489,8 +543,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 let leftPx, topPx, widthPx, heightPx;
                 
                 if (imageDimensions) {
-                  const imgWidth = imageDimensions.displayed.width;
-                  const imgHeight = imageDimensions.displayed.height;
+                  // Use original size dimensions when showing original, otherwise use displayed
+                  const imgWidth = showOriginalSize ? imageDimensions.natural.width : imageDimensions.displayed.width;
+                  const imgHeight = showOriginalSize ? imageDimensions.natural.height : imageDimensions.displayed.height;
                   
                   // Simple conversion (Google's official method)
                   leftPx = (box.x0 / 1000) * imgWidth;
@@ -500,7 +555,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   
                   // Log first box for debugging
                   if (index === 0 && showCoordinateDebug) {
-                    console.log(`✅ Box #1 Google Method: [${box.x0},${box.y0},${box.x1},${box.y1}] -> [${leftPx.toFixed(0)}px,${topPx.toFixed(0)}px,${widthPx.toFixed(0)}x${heightPx.toFixed(0)}px]`);
+                    console.log(`✅ Box #1 Google Method (${showOriginalSize ? 'ORIGINAL' : 'SCALED'}): [${box.x0},${box.y0},${box.x1},${box.y1}] -> [${leftPx.toFixed(0)}px,${topPx.toFixed(0)}px,${widthPx.toFixed(0)}x${heightPx.toFixed(0)}px]`);
                   }
                 } else {
                   // Hide boxes until dimensions are loaded
