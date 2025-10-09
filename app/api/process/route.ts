@@ -153,3 +153,6 @@ export async function POST(request: NextRequest) {
 // Increase timeout for processing multiple detections
 export const maxDuration = 60; // 60 seconds for batch processing
 
+// Explicitly set runtime to nodejs (required for maxDuration > 10s with Fluid Compute)
+export const runtime = 'nodejs';
+

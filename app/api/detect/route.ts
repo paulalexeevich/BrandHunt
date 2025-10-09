@@ -104,3 +104,6 @@ export async function POST(request: NextRequest) {
 // Increase timeout for Gemini API product detection
 export const maxDuration = 60; // 60 seconds for Gemini vision processing
 
+// Explicitly set runtime to nodejs (required for maxDuration > 10s with Fluid Compute)
+export const runtime = 'nodejs';
+

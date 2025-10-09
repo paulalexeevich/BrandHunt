@@ -102,4 +102,7 @@ export async function POST(request: NextRequest) {
 // Increase timeout for FoodGraph API authentication and search
 export const maxDuration = 60; // 60 seconds for FoodGraph API
 
+// Explicitly set runtime to nodejs (required for maxDuration > 10s with Fluid Compute)
+export const runtime = 'nodejs';
+
 
