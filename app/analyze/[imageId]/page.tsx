@@ -151,6 +151,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const handleDetectProducts = async () => {
     setLoading(true);
     setError(null);
+    console.log('🎯 Starting detection for image:', resolvedParams.imageId);
 
     try {
       const response = await fetch('/api/detect', {
@@ -159,16 +160,28 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         body: JSON.stringify({ imageId: resolvedParams.imageId }),
       });
 
+      console.log('📡 Detection response status:', response.status);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || 'Detection failed');
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          throw new Error(`Detection failed with status ${response.status}`);
+        }
+        console.error('❌ Detection error:', errorData);
+        throw new Error(errorData.details || errorData.error || 'Detection failed');
       }
 
       const data = await response.json();
+      console.log('✅ Detection successful:', data.detectionsCount, 'products found');
       setDetections(data.detections);
       setCurrentStep('brand');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Detection failed');
+      console.error('❌ Detection error caught:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Detection failed';
+      setError(errorMessage);
+      alert(`Detection failed: ${errorMessage}`); // Show alert for visibility
     } finally {
       setLoading(false);
     }
