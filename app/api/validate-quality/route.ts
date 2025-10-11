@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateImageQuality } from '@/lib/gemini';
-import { createClient } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 export const maxDuration = 60; // 60 seconds timeout for validation
 
@@ -18,7 +18,6 @@ export async function POST(request: NextRequest) {
     console.log(`🔍 Starting quality validation for image ${imageId}`);
 
     // Get the image from database
-    const supabase = createClient();
     const { data: image, error: imageError } = await supabase
       .from('branghunt_images')
       .select('*')
