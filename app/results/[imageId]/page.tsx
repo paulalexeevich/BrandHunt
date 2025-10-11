@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Package, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Package, Image as ImageIcon, CheckCircle } from 'lucide-react';
 
 interface BoundingBox {
   y0: number;
