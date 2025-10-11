@@ -672,11 +672,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       <span className={`px-2 py-1 rounded ${detection.price && detection.price !== 'Unknown' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
                         {detection.price && detection.price !== 'Unknown' ? '✓' : '○'} Price
                                     </span>
-                      <span className={`px-2 py-1 rounded ${foodgraphResults.length > 0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {foodgraphResults.length > 0 ? '✓' : '○'} Search
+                      <span className={`px-2 py-1 rounded ${(foodgraphResults.length > 0 || detection.fully_analyzed) ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                        {(foodgraphResults.length > 0 || detection.fully_analyzed) ? '✓' : '○'} Search
                       </span>
-                      <span className={`px-2 py-1 rounded ${filteredCount !== null ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {filteredCount !== null ? '✓' : '○'} Filter
+                      <span className={`px-2 py-1 rounded ${(filteredCount !== null || detection.fully_analyzed) ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                        {(filteredCount !== null || detection.fully_analyzed) ? '✓' : '○'} Filter
                       </span>
                                 </div>
                 </div>
@@ -780,7 +780,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       </button>
                     )}
                     
-                    {detection.brand_name && foodgraphResults.length === 0 && (
+                    {detection.brand_name && foodgraphResults.length === 0 && !detection.fully_analyzed && (
                     <button
                         onClick={handleSearchFoodGraph}
                         disabled={loading}
@@ -797,7 +797,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </button>
                     )}
                     
-                    {foodgraphResults.length > 0 && filteredCount === null && (
+                    {foodgraphResults.length > 0 && filteredCount === null && !detection.fully_analyzed && (
                       <button
                         onClick={handleFilterResults}
                         disabled={filtering}
@@ -816,7 +816,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </div>
 
                   {/* FoodGraph Results */}
-                  {foodgraphResults.length > 0 && (
+                  {foodgraphResults.length > 0 && !detection.fully_analyzed && (
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-gray-900">
