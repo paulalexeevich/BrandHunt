@@ -50,6 +50,15 @@ export interface BranghuntDetection {
   price_confidence: number | null; // Confidence score for price extraction
   brand_extraction_prompt: string | null;
   brand_extraction_response: string | null;
+  // Saved FoodGraph match columns
+  selected_foodgraph_gtin: string | null;
+  selected_foodgraph_product_name: string | null;
+  selected_foodgraph_brand_name: string | null;
+  selected_foodgraph_category: string | null;
+  selected_foodgraph_image_url: string | null;
+  selected_foodgraph_result_id: string | null;
+  fully_analyzed: boolean | null;
+  analysis_completed_at: string | null;
   created_at: string;
   updated_at: string;
 }

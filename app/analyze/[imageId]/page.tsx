@@ -27,6 +27,14 @@ interface Detection {
   price: string | null;
   price_currency: string | null;
   price_confidence: number | null;
+  selected_foodgraph_gtin: string | null;
+  selected_foodgraph_product_name: string | null;
+  selected_foodgraph_brand_name: string | null;
+  selected_foodgraph_category: string | null;
+  selected_foodgraph_image_url: string | null;
+  selected_foodgraph_result_id: string | null;
+  fully_analyzed: boolean | null;
+  analysis_completed_at: string | null;
 }
 
 interface FoodGraphResult {
@@ -67,6 +75,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [showOriginalSize, setShowOriginalSize] = useState(false); // Toggle for original vs scaled image
   const [extractingPrice, setExtractingPrice] = useState(false);
   const [showProductLabels, setShowProductLabels] = useState(true); // Toggle for product labels on image
+  const [savingResult, setSavingResult] = useState(false);
+  const [savedResultId, setSavedResultId] = useState<string | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
     natural: { width: number; height: number };
@@ -418,6 +428,59 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       setError(err instanceof Error ? err.message : 'Failed to filter results');
     } finally {
       setFiltering(false);
+    }
+  };
+
+  const handleSaveResult = async (foodgraphResultId: string) => {
+    if (!selectedDetection) return;
+
+    setSavingResult(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/save-result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          detectionId: selectedDetection,
+          foodgraphResultId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to save result');
+      }
+
+      const data = await response.json();
+      console.log('✅ Result saved successfully:', data);
+
+      // Update the detection in state
+      setDetections(prev => prev.map(d => 
+        d.id === selectedDetection ? {
+          ...d,
+          selected_foodgraph_gtin: data.savedMatch.gtin,
+          selected_foodgraph_product_name: data.savedMatch.productName,
+          selected_foodgraph_brand_name: data.savedMatch.brandName,
+          selected_foodgraph_category: data.savedMatch.category,
+          selected_foodgraph_image_url: data.savedMatch.imageUrl,
+          selected_foodgraph_result_id: foodgraphResultId,
+          fully_analyzed: true,
+          analysis_completed_at: new Date().toISOString(),
+        } : d
+      ));
+
+      setSavedResultId(foodgraphResultId);
+      
+      // Show success message
+      alert(`✅ Result saved successfully!\n\nProduct: ${data.savedMatch.productName}\nBrand: ${data.savedMatch.brandName}\n\nYou can now view this fully analyzed product in the Results page.`);
+      
+    } catch (err) {
+      console.error('❌ Failed to save result:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save result');
+      alert(`Failed to save result: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSavingResult(false);
     }
   };
 
@@ -989,34 +1052,68 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         )}
                       </button>
                     </div>
+                    
+                    {/* Show saved result indicator */}
+                    {selectedDetection && detections.find(d => d.id === selectedDetection)?.fully_analyzed && (
+                      <div className="mb-4 p-3 bg-green-50 border-2 border-green-500 rounded-lg">
+                        <p className="text-sm text-green-700 font-semibold flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4" />
+                          This product has a saved result! Scroll down to see the saved match highlighted.
+                        </p>
+                      </div>
+                    )}
+                    
                     <div className="grid grid-cols-5 gap-2">
-                      {foodgraphResults.slice(0, 50).map((result, index) => (
-                        <div key={result.id} className="bg-white rounded-lg border-2 border-gray-200 hover:border-indigo-400 transition-colors overflow-hidden">
-                          {result.front_image_url ? (
-                            <img
-                              src={result.front_image_url}
-                              alt={result.product_name || 'Product'}
-                              className="w-full h-32 object-contain bg-gray-50"
-                              title={`${result.product_name || 'Unnamed'} - ${result.brand_name || 'Unknown Brand'}`}
-                            />
-                          ) : (
-                            <div className="w-full h-32 bg-gray-100 flex items-center justify-center">
-                              <Package className="w-8 h-8 text-gray-400" />
+                      {foodgraphResults.slice(0, 50).map((result, index) => {
+                        const detection = detections.find(d => d.id === selectedDetection);
+                        const isSaved = detection?.selected_foodgraph_result_id === result.id;
+                        
+                        return (
+                          <div 
+                            key={result.id} 
+                            className={`bg-white rounded-lg border-2 ${isSaved ? 'border-green-500 ring-2 ring-green-300' : 'border-gray-200 hover:border-indigo-400'} transition-colors overflow-hidden`}
+                          >
+                            {result.front_image_url ? (
+                              <img
+                                src={result.front_image_url}
+                                alt={result.product_name || 'Product'}
+                                className="w-full h-32 object-contain bg-gray-50"
+                                title={`${result.product_name || 'Unnamed'} - ${result.brand_name || 'Unknown Brand'}`}
+                              />
+                            ) : (
+                              <div className="w-full h-32 bg-gray-100 flex items-center justify-center">
+                                <Package className="w-8 h-8 text-gray-400" />
+                              </div>
+                            )}
+                            <div className="p-2 bg-gray-50">
+                              <p className="text-xs font-semibold text-gray-900 truncate" title={result.product_name || 'Unnamed Product'}>
+                                {result.product_name || 'Unnamed Product'}
+                              </p>
+                              <p className="text-xs text-gray-600 truncate">
+                                {result.brand_name || 'Unknown Brand'}
+                              </p>
+                              <p className="text-xs text-indigo-600 font-semibold mt-1">
+                                #{index + 1}
+                              </p>
+                              {isSaved ? (
+                                <div className="mt-2 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded text-center flex items-center justify-center gap-1">
+                                  <CheckCircle className="w-3 h-3" />
+                                  Saved
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleSaveResult(result.id)}
+                                  disabled={savingResult}
+                                  className="mt-2 w-full px-2 py-1 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                                  title="Save this as the final result"
+                                >
+                                  {savingResult && savedResultId === result.id ? 'Saving...' : '💾 Save'}
+                                </button>
+                              )}
                             </div>
-                          )}
-                          <div className="p-2 bg-gray-50">
-                            <p className="text-xs font-semibold text-gray-900 truncate" title={result.product_name || 'Unnamed Product'}>
-                              {result.product_name || 'Unnamed Product'}
-                            </p>
-                            <p className="text-xs text-gray-600 truncate">
-                              {result.brand_name || 'Unknown Brand'}
-                            </p>
-                            <p className="text-xs text-indigo-600 font-semibold mt-1">
-                              #{index + 1}
-                            </p>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     {foodgraphResults.length > 50 && (
                       <p className="text-sm text-gray-500 text-center mt-3">

@@ -33,6 +33,16 @@ interface Detection {
   flavor: string | null;
   size: string | null;
   description: string | null;
+  price: string | null;
+  price_currency: string | null;
+  price_confidence: number | null;
+  selected_foodgraph_gtin: string | null;
+  selected_foodgraph_product_name: string | null;
+  selected_foodgraph_brand_name: string | null;
+  selected_foodgraph_category: string | null;
+  selected_foodgraph_image_url: string | null;
+  fully_analyzed: boolean | null;
+  analysis_completed_at: string | null;
   foodgraph_results: FoodGraphResult[];
 }
 
@@ -184,8 +194,58 @@ export default function ResultsPage({ params }: { params: Promise<{ imageId: str
                 {/* Selected Detection Info */}
                 {detections[selectedDetection] && (
                   <div>
+                {/* Fully Analyzed Badge */}
+                {detections[selectedDetection].fully_analyzed && (
+                  <div className="mb-4 p-3 bg-green-50 border-2 border-green-500 rounded-lg">
+                    <p className="text-sm text-green-700 font-semibold flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5" />
+                      ✅ Fully Analyzed Product
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      Analysis completed on {new Date(detections[selectedDetection].analysis_completed_at!).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+
+                {/* Saved FoodGraph Match - Show First if Available */}
+                {detections[selectedDetection].fully_analyzed && detections[selectedDetection].selected_foodgraph_product_name && (
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-4 mb-4 border-2 border-blue-500">
+                    <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5" />
+                      Saved FoodGraph Match
+                    </h3>
+                    <div className="flex gap-4">
+                      {detections[selectedDetection].selected_foodgraph_image_url && (
+                        <img
+                          src={detections[selectedDetection].selected_foodgraph_image_url!}
+                          alt={detections[selectedDetection].selected_foodgraph_product_name!}
+                          className="w-24 h-24 object-contain bg-white rounded-lg shadow-md"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <p className="text-lg font-bold text-blue-900">
+                          {detections[selectedDetection].selected_foodgraph_product_name}
+                        </p>
+                        <p className="text-sm text-blue-700 font-semibold">
+                          {detections[selectedDetection].selected_foodgraph_brand_name}
+                        </p>
+                        {detections[selectedDetection].selected_foodgraph_category && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            {detections[selectedDetection].selected_foodgraph_category}
+                          </p>
+                        )}
+                        {detections[selectedDetection].selected_foodgraph_gtin && (
+                          <p className="text-xs text-gray-600 font-mono mt-2">
+                            GTIN: {detections[selectedDetection].selected_foodgraph_gtin}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">Product Information</h3>
+                  <h3 className="font-semibold text-gray-900 mb-3">Product Information (From Image)</h3>
                   <div className="space-y-2">
                     {detections[selectedDetection].label && !detections[selectedDetection].brand_name && (
                       <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
@@ -243,6 +303,21 @@ export default function ResultsPage({ params }: { params: Promise<{ imageId: str
                         <span className="text-base text-green-600 font-mono text-sm">
                           {detections[selectedDetection].sku}
                         </span>
+                      </div>
+                    )}
+                    
+                    {detections[selectedDetection].price && detections[selectedDetection].price !== 'Unknown' && (
+                      <div>
+                        <span className="text-sm text-gray-600">Price: </span>
+                        <span className="text-lg text-green-700 font-bold">
+                          {detections[selectedDetection].price_currency === 'USD' ? '$' : detections[selectedDetection].price_currency}
+                          {detections[selectedDetection].price}
+                        </span>
+                        {detections[selectedDetection].price_confidence && detections[selectedDetection].price_confidence! > 0 && (
+                          <span className="text-xs text-gray-500 ml-2">
+                            ({Math.round(detections[selectedDetection].price_confidence! * 100)}% confidence)
+                          </span>
+                        )}
                       </div>
                     )}
                     
