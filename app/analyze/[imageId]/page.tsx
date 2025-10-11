@@ -52,8 +52,6 @@ interface ImageData {
   processing_status: string;
 }
 
-type Step = 'detect' | 'brand' | 'foodgraph';
-
 export default function AnalyzePage({ params }: { params: Promise<{ imageId: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
@@ -61,20 +59,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [detections, setDetections] = useState<Detection[]>([]);
   const [selectedDetection, setSelectedDetection] = useState<string | null>(null);
   const [foodgraphResults, setFoodgraphResults] = useState<FoodGraphResult[]>([]);
-  const [currentStep, setCurrentStep] = useState<Step>('detect');
+  const [productsDetected, setProductsDetected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<{ request?: string; response?: string; error?: string } | null>(null);
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
-  const [extractionDebug, setExtractionDebug] = useState<{detectionId: string; response: unknown} | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [filtering, setFiltering] = useState(false);
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
-  const [showCoordinateDebug, setShowCoordinateDebug] = useState(false); // Debug off by default
-  const [showOriginalSize, setShowOriginalSize] = useState(false); // Toggle for original vs scaled image
+  const [showProductLabels, setShowProductLabels] = useState(true);
   const [extractingPrice, setExtractingPrice] = useState(false);
-  const [showProductLabels, setShowProductLabels] = useState(true); // Toggle for product labels on image
   const [savingResult, setSavingResult] = useState(false);
   const [savedResultId, setSavedResultId] = useState<string | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -93,7 +86,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       const updateDimensions = () => {
         if (imageRef.current) {
           const img = imageRef.current;
-          const container = img.parentElement;
           const dims = {
             natural: {
               width: img.naturalWidth,
@@ -104,35 +96,17 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               height: img.clientHeight,
             },
           };
-          console.log('📐 Image dimensions updated:', dims);
-          console.log('📦 Container dimensions:', {
-            width: container?.clientWidth,
-            height: container?.clientHeight,
-            offsetWidth: container?.offsetWidth,
-            offsetHeight: container?.offsetHeight,
-          });
-          console.log('🔍 Image element:', {
-            offsetWidth: img.offsetWidth,
-            offsetHeight: img.offsetHeight,
-            clientWidth: img.clientWidth,
-            clientHeight: img.clientHeight,
-            boundingRect: img.getBoundingClientRect(),
-          });
           setImageDimensions(dims);
         }
       };
       
-      // Update on load
       const img = imageRef.current;
       if (img.complete && img.naturalWidth > 0) {
-        console.log('✅ Image already loaded, updating dimensions immediately');
         updateDimensions();
       } else {
-        console.log('⏳ Waiting for image to load...');
         img.addEventListener('load', updateDimensions);
       }
       
-      // Update on resize
       window.addEventListener('resize', updateDimensions);
       
       return () => {
@@ -150,13 +124,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       
       if (data.detections && data.detections.length > 0) {
         setDetections(data.detections);
-        // Check if any have brands
-        const hasBrands = data.detections.some((d: Detection) => d.brand_name);
-        if (hasBrands) {
-          setCurrentStep('foodgraph');
-        } else {
-          setCurrentStep('brand');
-        }
+        setProductsDetected(true);
       }
     } catch (error) {
       console.error('Failed to fetch image:', error);
@@ -166,7 +134,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const handleDetectProducts = async () => {
     setLoading(true);
     setError(null);
-    console.log('🎯 Starting detection for image:', resolvedParams.imageId);
 
     try {
       const response = await fetch('/api/detect', {
@@ -175,31 +142,27 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         body: JSON.stringify({ imageId: resolvedParams.imageId }),
       });
 
-      console.log('📡 Detection response status:', response.status);
-
       if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch {
-          throw new Error(`Detection failed with status ${response.status}`);
-        }
-        console.error('❌ Detection error:', errorData);
+        const errorData = await response.json();
         throw new Error(errorData.details || errorData.error || 'Detection failed');
       }
 
       const data = await response.json();
-      console.log('✅ Detection successful:', data.detectionsCount, 'products found');
       setDetections(data.detections);
-      setCurrentStep('brand');
+      setProductsDetected(true);
     } catch (err) {
-      console.error('❌ Detection error caught:', err);
       const errorMessage = err instanceof Error ? err.message : 'Detection failed';
       setError(errorMessage);
-      alert(`Detection failed: ${errorMessage}`); // Show alert for visibility
+      alert(`Detection failed: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
+  };
+  
+  const handleBoundingBoxClick = (detectionId: string) => {
+    setSelectedDetection(detectionId);
+    setFoodgraphResults([]); // Clear results when switching products
+    setFilteredCount(null);
   };
 
   const handleExtractBrand = async (detectionId: string) => {
@@ -537,29 +500,35 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           <h1 className="text-3xl font-bold text-gray-900">{image.original_filename}</h1>
         </div>
 
-        {/* Step Indicator */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+        {/* Status Bar */}
+        <div className="bg-white rounded-xl shadow-md p-4 mb-6">
           <div className="flex items-center justify-between">
-            <div className={`flex items-center gap-2 ${currentStep === 'detect' ? 'text-indigo-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'detect' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}>
-                1
-              </div>
-              <span className="font-semibold">Detect Products</span>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">
+                {!productsDetected ? 'Ready to analyze' : `${detections.length} products detected`}
+              </span>
+              {selectedDetection && (
+                <span className="text-sm font-semibold text-indigo-600">
+                  → Product #{detections.findIndex(d => d.id === selectedDetection) + 1} selected
+                </span>
+              )}
             </div>
-            <div className="flex-1 h-1 bg-gray-200 mx-4" />
-            <div className={`flex items-center gap-2 ${currentStep === 'brand' ? 'text-indigo-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'brand' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}>
-                2
-              </div>
-              <span className="font-semibold">Extract Brand</span>
-            </div>
-            <div className="flex-1 h-1 bg-gray-200 mx-4" />
-            <div className={`flex items-center gap-2 ${currentStep === 'foodgraph' ? 'text-indigo-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'foodgraph' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}>
-                3
-              </div>
-              <span className="font-semibold">Search Products</span>
-            </div>
+            {!productsDetected && (
+              <button
+                onClick={handleDetectProducts}
+                disabled={loading}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Detecting...
+                  </>
+                ) : (
+                  '🎯 Detect Products'
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -702,16 +671,16 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 return (
                   <div
                     key={detection.id}
-                    onClick={() => currentStep === 'brand' && handleExtractBrand(detection.id)}
-                    className={`absolute cursor-pointer ${currentStep === 'brand' ? 'hover:border-yellow-500' : ''}`}
+                    onClick={() => handleBoundingBoxClick(detection.id)}
+                    className="absolute cursor-pointer hover:opacity-80 transition-opacity"
                     style={{
                       left: `${leftPx}px`,
                       top: `${topPx}px`,
                       width: `${widthPx}px`,
                       height: `${heightPx}px`,
                       border: `3px solid ${isSelected ? '#4F46E5' : detection.brand_name ? '#10B981' : '#F59E0B'}`,
-                      backgroundColor: isSelected ? 'rgba(79, 70, 229, 0.1)' : 'rgba(16, 185, 129, 0.05)',
-                      display: imageDimensions ? 'block' : 'none', // Hide until dimensions loaded
+                      backgroundColor: isSelected ? 'rgba(79, 70, 229, 0.2)' : detection.brand_name ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                      display: imageDimensions ? 'block' : 'none',
                     }}
                   >
                     <div className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${isSelected ? 'bg-indigo-600' : detection.brand_name ? 'bg-green-600' : 'bg-yellow-600'}`}>
@@ -743,399 +712,239 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           <div className="bg-white rounded-xl shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Actions</h2>
 
-            {/* Step 1: Detect */}
-            {currentStep === 'detect' && (
-              <div>
-                <p className="text-gray-600 mb-4">Click the button below to detect products in the image.</p>
-                <button
-                  onClick={handleDetectProducts}
-                  disabled={loading}
-                  className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Detecting...
-                    </>
-                  ) : (
-                    'Detect Products'
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* Step 2: Brand Extraction */}
-            {currentStep === 'brand' && (
-              <div>
-                <p className="text-gray-600 mb-4">
-                  {detections.length} product{detections.length !== 1 ? 's' : ''} detected. 
-                  Click on a bounding box to extract the brand name.
+            {/* No Product Selected */}
+            {!selectedDetection && (
+              <div className="text-center py-12">
+                <Package className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                  {productsDetected ? 'Select a Product' : 'No Products Detected'}
+                </h3>
+                <p className="text-gray-500 text-sm">
+                  {productsDetected 
+                    ? 'Click on any bounding box in the image to analyze that product' 
+                    : 'Click "Detect Products" above to get started'}
                 </p>
-                {loading && selectedDetection && (
-                  <div className="flex items-center justify-center gap-2 text-indigo-600 py-4">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Extracting brand...</span>
-                  </div>
-                )}
-                <div className="space-y-2 mb-4">
-                  {detections.map((detection, index) => (
-                    <div
-                      key={detection.id}
-                      className={`p-3 border-2 rounded-lg ${detection.brand_name ? 'border-green-500 bg-green-50' : 'border-gray-300'}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="font-semibold">Product #{index + 1}</span>
-                          {detection.label && !detection.brand_name && (
-                            <span className="ml-2 text-xs text-gray-500">({detection.label})</span>
-                          )}
-                        </div>
-                        {detection.brand_name ? (
-                          <div className="flex flex-col items-end">
-                            <span className="text-green-600 flex items-center gap-1">
-                              <CheckCircle className="w-4 h-4" />
-                              {detection.product_name || detection.brand_name}
-                            </span>
-                            <div className="text-xs text-gray-600 text-right">
-                              <div>{detection.brand_name}</div>
-                              {detection.category && <div>{detection.category}</div>}
-                              {detection.flavor && <div className="text-purple-600">Flavor: {detection.flavor}</div>}
-                              {detection.size && <div className="text-blue-600">Size: {detection.size}</div>}
-                              {detection.price && detection.price !== 'Unknown' && (
-                                <div className="text-green-700 font-semibold mt-1">
-                                  Price: {detection.price_currency === 'USD' ? '$' : detection.price_currency}{detection.price}
-                                  {detection.price_confidence && detection.price_confidence > 0 && (
-                                    <span className="text-xs text-gray-500 ml-1">
-                                      ({Math.round(detection.price_confidence * 100)}%)
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            {!detection.price && (
-                              <button
-                                onClick={() => handleExtractPrice(detection.id)}
-                                disabled={extractingPrice}
-                                className="mt-2 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs disabled:bg-gray-400"
-                              >
-                                {extractingPrice ? '💰 Extracting...' : '💰 Extract Price'}
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleExtractBrand(detection.id)}
-                            disabled={loading}
-                            className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm disabled:bg-gray-400"
-                          >
-                            Extract Info
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Extraction Debug Info */}
-                {extractionDebug && (
-                  <div className="mt-4 p-4 bg-gray-900 rounded-lg text-white font-mono text-xs">
-                    <h4 className="font-bold text-green-400 mb-2">🔍 Last Extraction Result</h4>
-                    <div className="space-y-2">
-                      <div>
-                        <span className="text-yellow-400">Brand Name:</span>{' '}
-                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).brandName || 'null'}</span>
-                      </div>
-                      <div>
-                        <span className="text-yellow-400">Product Name:</span>{' '}
-                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).productName || 'null'}</span>
-                      </div>
-                      <div>
-                        <span className="text-yellow-400">Category:</span>{' '}
-                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).category || 'null'}</span>
-                      </div>
-                      <div>
-                        <span className="text-yellow-400">Flavor:</span>{' '}
-                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).flavor || 'null'}</span>
-                      </div>
-                      <div>
-                        <span className="text-yellow-400">Size:</span>{' '}
-                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).size || 'null'}</span>
-                      </div>
-                      <div>
-                        <span className="text-yellow-400">Description:</span>{' '}
-                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).description || 'null'}</span>
-                      </div>
-                      <div>
-                        <span className="text-yellow-400">SKU:</span>{' '}
-                        <span className="text-green-300">{(extractionDebug.response as Record<string, string>).sku || 'null'}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Continue to FoodGraph button */}
-                {detections.some(d => d.brand_name) && !loading && (
-                  <button
-                    onClick={() => setCurrentStep('foodgraph')}
-                    className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold flex items-center justify-center gap-2"
-                  >
-                    Continue to FoodGraph Search →
-                  </button>
-                )}
               </div>
             )}
 
-            {/* Step 3: FoodGraph Search */}
-            {currentStep === 'foodgraph' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-gray-600">
-                    {selectedDetection 
-                      ? 'Analyzing selected product. Click another product to switch.'
-                      : 'Select a product with extracted brand to search FoodGraph catalog.'}
-                  </p>
-                  <div className="flex gap-2">
-                    {selectedDetection && (
-                      <button
-                        onClick={() => setSelectedDetection(null)}
-                        className="text-sm text-purple-600 hover:text-purple-800 font-semibold"
-                      >
-                        ← Show All Products
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setCurrentStep('brand')}
-                      className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold"
-                    >
-                      ← Back to Extract
-                    </button>
+            {/* Product Selected - Unified Actions Panel */}
+            {selectedDetection && (() => {
+              const detection = detections.find(d => d.id === selectedDetection);
+              if (!detection) return null;
+              const detectionIndex = detections.findIndex(d => d.id === selectedDetection);
+              
+              return (
+                <div className="space-y-4">
+                  {/* Product Header */}
+                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border-2 border-indigo-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xl font-bold text-indigo-900">
+                        Product #{detectionIndex + 1}
+                      </h3>
+                      {detection.fully_analyzed && (
+                        <span className="px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded-full flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Saved
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Progress Indicators */}
+                    <div className="flex gap-2 text-xs">
+                      <span className={`px-2 py-1 rounded ${detection.brand_name ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                        {detection.brand_name ? '✓' : '○'} Info
+                      </span>
+                      <span className={`px-2 py-1 rounded ${detection.price && detection.price !== 'Unknown' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                        {detection.price && detection.price !== 'Unknown' ? '✓' : '○'} Price
+                      </span>
+                      <span className={`px-2 py-1 rounded ${foodgraphResults.length > 0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                        {foodgraphResults.length > 0 ? '✓' : '○'} Search
+                      </span>
+                      <span className={`px-2 py-1 rounded ${filteredCount !== null ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                        {filteredCount !== null ? '✓' : '○'} Filter
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2 mb-4">
-                  {detections.filter(d => d.brand_name).filter(d => !selectedDetection || d.id === selectedDetection).map((detection, index) => (
-                    <button
-                      key={detection.id}
-                      onClick={() => setSelectedDetection(detection.id)}
-                      className={`w-full p-4 border-2 rounded-lg text-left ${
-                        selectedDetection === detection.id
-                          ? 'border-indigo-600 bg-indigo-50'
-                          : 'border-gray-300 hover:border-indigo-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="font-semibold text-base">Product #{detection.detection_index + 1}</span>
-                          {detection.category && (
-                            <span className="ml-2 text-xs text-gray-500">({detection.category})</span>
-                          )}
-                        </div>
+
+                  {/* Extracted Product Information */}
+                  {detection.brand_name ? (
+                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <h4 className="font-semibold text-green-900">Extracted Information</h4>
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-2 text-sm">
                         {detection.product_name && (
-                          <div className="text-sm">
-                            <span className="font-semibold text-indigo-600">{detection.product_name}</span>
-                          </div>
+                          <div><span className="font-semibold text-gray-700">Product:</span> <span className="text-indigo-600 font-semibold">{detection.product_name}</span></div>
                         )}
-                        <div className="text-sm text-gray-700">
-                          <span className="font-medium">Brand:</span> {detection.brand_name}
-                        </div>
+                        <div><span className="font-semibold text-gray-700">Brand:</span> {detection.brand_name}</div>
+                        {detection.category && <div><span className="font-semibold text-gray-700">Category:</span> {detection.category}</div>}
                         {detection.flavor && detection.flavor !== 'Unknown' && (
-                          <div className="text-xs text-purple-600">
-                            <span className="font-medium">Flavor:</span> {detection.flavor}
-                          </div>
+                          <div><span className="font-semibold text-gray-700">Flavor:</span> <span className="text-purple-600">{detection.flavor}</span></div>
                         )}
                         {detection.size && detection.size !== 'Unknown' && (
-                          <div className="text-xs text-blue-600">
-                            <span className="font-medium">Size:</span> {detection.size}
-                          </div>
+                          <div><span className="font-semibold text-gray-700">Size:</span> <span className="text-blue-600">{detection.size}</span></div>
                         )}
-                        {detection.sku && detection.sku !== 'Unknown' && (
-                          <div className="text-xs text-green-600 font-mono">
-                            <span className="font-medium">SKU:</span> {detection.sku}
+                        {detection.price && detection.price !== 'Unknown' && (
+                          <div><span className="font-semibold text-gray-700">Price:</span> <span className="text-green-700 font-bold">{detection.price_currency === 'USD' ? '$' : detection.price_currency}{detection.price}</span>
+                          {detection.price_confidence && detection.price_confidence > 0 && (
+                            <span className="text-xs text-gray-500 ml-1">({Math.round(detection.price_confidence * 100)}%)</span>
+                          )}
                           </div>
                         )}
                       </div>
-                    </button>
-                  ))}
-                </div>
-                {selectedDetection && (
-                  <button
-                    onClick={handleSearchFoodGraph}
-                    disabled={loading}
-                    className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Searching...
-                      </>
-                    ) : (
-                      'Search FoodGraph'
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
+                      <p className="text-sm text-yellow-800">
+                        {detection.label ? `Detected as: ${detection.label}` : 'No information extracted yet'}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="space-y-2">
+                    {!detection.brand_name && (
+                      <button
+                        onClick={() => handleExtractBrand(detection.id)}
+                        disabled={loading}
+                        className="w-full px-4 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Extracting...
+                          </>
+                        ) : (
+                          '📋 Extract Brand & Info'
+                        )}
+                      </button>
                     )}
-                  </button>
-                )}
-
-                {/* Loading State */}
-                {loading && currentStep === 'foodgraph' && (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                    <p className="text-sm text-blue-700">Searching FoodGraph...</p>
-                  </div>
-                )}
-
-                {/* No Results Message */}
-                {!loading && foodgraphResults.length === 0 && selectedDetection && currentStep === 'foodgraph' && (
-                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Click &quot;Search FoodGraph&quot; button to find matching products</p>
-                  </div>
-                )}
-
-                {/* Debug Panel */}
-                {debugInfo && (
-                  <div className="mt-6">
-                    <button
-                      onClick={() => setShowDebugInfo(!showDebugInfo)}
-                      className="mb-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
-                    >
-                      🔍 {showDebugInfo ? 'Hide' : 'Show'} Debug Information
-                    </button>
                     
-                    {showDebugInfo && (
-                      <div className="p-4 bg-gray-900 rounded-lg text-white font-mono text-xs overflow-auto max-h-96">
-                        <h4 className="font-bold text-green-400 mb-2">🔍 Debug Information</h4>
-                        
-                        {debugInfo.request && (
-                          <div className="mb-4">
-                            <p className="text-yellow-400 font-semibold mb-1">📤 Request to /api/search-foodgraph:</p>
-                            <pre className="bg-gray-800 p-2 rounded overflow-x-auto text-green-300">
-                              {debugInfo.request}
-                            </pre>
-                          </div>
+                    {detection.brand_name && (!detection.price || detection.price === 'Unknown') && (
+                      <button
+                        onClick={() => handleExtractPrice(detection.id)}
+                        disabled={extractingPrice}
+                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
+                      >
+                        {extractingPrice ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Extracting Price...
+                          </>
+                        ) : (
+                          '💰 Extract Price'
                         )}
-                        
-                        {debugInfo.response && (
-                          <div className="mb-4">
-                            <p className="text-blue-400 font-semibold mb-1">📥 Response from FoodGraph API:</p>
-                            <pre className="bg-gray-800 p-2 rounded overflow-x-auto text-blue-300">
-                              {debugInfo.response}
-                            </pre>
-                          </div>
-                        )}
-                        
-                        {debugInfo.error && (
-                          <div>
-                            <p className="text-red-400 font-semibold mb-1">❌ Error:</p>
-                            <pre className="bg-red-900 p-2 rounded overflow-x-auto text-red-200">
-                              {debugInfo.error}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
+                      </button>
                     )}
-                  </div>
-                )}
-
-                {/* FoodGraph Results - Visual Comparison */}
-                {foodgraphResults.length > 0 && (
-                  <div className="mt-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-gray-900">
-                        Top 50 FoodGraph Matches ({foodgraphResults.length} found)
-                        {filteredCount !== null && (
-                          <span className="ml-2 text-sm text-green-600">
-                            - AI Filtered to {filteredCount} match{filteredCount !== 1 ? 'es' : ''}
-                          </span>
+                    
+                    {detection.brand_name && foodgraphResults.length === 0 && (
+                      <button
+                        onClick={handleSearchFoodGraph}
+                        disabled={loading}
+                        className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Searching...
+                          </>
+                        ) : (
+                          '🔍 Search FoodGraph'
                         )}
-                      </h3>
+                      </button>
+                    )}
+                    
+                    {foodgraphResults.length > 0 && filteredCount === null && (
                       <button
                         onClick={handleFilterResults}
                         disabled={filtering}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400 flex items-center gap-2 text-sm"
+                        className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
                       >
                         {filtering ? (
                           <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Loader2 className="w-5 h-5 animate-spin" />
                             AI Filtering...
                           </>
                         ) : (
-                          <>
-                            🤖 Filter with AI
-                          </>
+                          <>🤖 Filter with AI ({foodgraphResults.length} results)</>
                         )}
                       </button>
-                    </div>
-                    
-                    {/* Show saved result indicator */}
-                    {selectedDetection && detections.find(d => d.id === selectedDetection)?.fully_analyzed && (
-                      <div className="mb-4 p-3 bg-green-50 border-2 border-green-500 rounded-lg">
-                        <p className="text-sm text-green-700 font-semibold flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4" />
-                          This product has a saved result! Scroll down to see the saved match highlighted.
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div className="grid grid-cols-5 gap-2">
-                      {foodgraphResults.slice(0, 50).map((result, index) => {
-                        const detection = detections.find(d => d.id === selectedDetection);
-                        const isSaved = detection?.selected_foodgraph_result_id === result.id;
-                        
-                        return (
-                          <div 
-                            key={result.id} 
-                            className={`bg-white rounded-lg border-2 ${isSaved ? 'border-green-500 ring-2 ring-green-300' : 'border-gray-200 hover:border-indigo-400'} transition-colors overflow-hidden`}
-                          >
-                            {result.front_image_url ? (
-                              <img
-                                src={result.front_image_url}
-                                alt={result.product_name || 'Product'}
-                                className="w-full h-32 object-contain bg-gray-50"
-                                title={`${result.product_name || 'Unnamed'} - ${result.brand_name || 'Unknown Brand'}`}
-                              />
-                            ) : (
-                              <div className="w-full h-32 bg-gray-100 flex items-center justify-center">
-                                <Package className="w-8 h-8 text-gray-400" />
-                              </div>
-                            )}
-                            <div className="p-2 bg-gray-50">
-                              <p className="text-xs font-semibold text-gray-900 truncate" title={result.product_name || 'Unnamed Product'}>
-                                {result.product_name || 'Unnamed Product'}
-                              </p>
-                              <p className="text-xs text-gray-600 truncate">
-                                {result.brand_name || 'Unknown Brand'}
-                              </p>
-                              <p className="text-xs text-indigo-600 font-semibold mt-1">
-                                #{index + 1}
-                              </p>
-                              {isSaved ? (
-                                <div className="mt-2 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded text-center flex items-center justify-center gap-1">
-                                  <CheckCircle className="w-3 h-3" />
-                                  Saved
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => handleSaveResult(result.id)}
-                                  disabled={savingResult}
-                                  className="mt-2 w-full px-2 py-1 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-                                  title="Save this as the final result"
-                                >
-                                  {savingResult && savedResultId === result.id ? 'Saving...' : '💾 Save'}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {foodgraphResults.length > 50 && (
-                      <p className="text-sm text-gray-500 text-center mt-3">
-                        + {foodgraphResults.length - 50} more results available
-                      </p>
                     )}
                   </div>
-                )}
-              </div>
-            )}
+
+                  {/* FoodGraph Results */}
+                  {foodgraphResults.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-gray-900">
+                          FoodGraph Matches ({foodgraphResults.length})
+                          {filteredCount !== null && (
+                            <span className="ml-2 text-sm text-green-600">→ Filtered to {filteredCount}</span>
+                          )}
+                        </h4>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
+                        {foodgraphResults.slice(0, 50).map((result, index) => {
+                          const isSaved = detection.selected_foodgraph_result_id === result.id;
+                          
+                          return (
+                            <div 
+                              key={result.id}
+                              className={`bg-white rounded-lg border-2 ${isSaved ? 'border-green-500 ring-2 ring-green-300' : 'border-gray-200'} overflow-hidden hover:border-indigo-400 transition-colors`}
+                            >
+                              {result.front_image_url ? (
+                                <img
+                                  src={result.front_image_url}
+                                  alt={result.product_name || 'Product'}
+                                  className="w-full h-24 object-contain bg-gray-50"
+                                />
+                              ) : (
+                                <div className="w-full h-24 bg-gray-100 flex items-center justify-center">
+                                  <Package className="w-8 h-8 text-gray-400" />
+                                </div>
+                              )}
+                              <div className="p-2">
+                                <p className="text-xs font-semibold text-gray-900 truncate" title={result.product_name || 'Unnamed'}>
+                                  {result.product_name || 'Unnamed Product'}
+                                </p>
+                                <p className="text-xs text-gray-600 truncate">
+                                  {result.brand_name || 'Unknown Brand'}
+                                </p>
+                                <p className="text-xs text-indigo-600 font-semibold mt-1">
+                                  #{index + 1}
+                                </p>
+                                {isSaved ? (
+                                  <div className="mt-2 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded text-center flex items-center justify-center gap-1">
+                                    <CheckCircle className="w-3 h-3" />
+                                    Saved
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => handleSaveResult(result.id)}
+                                    disabled={savingResult}
+                                    className="mt-2 w-full px-2 py-1 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                                  >
+                                    {savingResult && savedResultId === result.id ? 'Saving...' : '💾 Save'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {foodgraphResults.length > 50 && (
+                        <p className="text-sm text-gray-500 text-center mt-3">
+                          + {foodgraphResults.length - 50} more results available
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
