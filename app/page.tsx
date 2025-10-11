@@ -1,10 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, Loader2, CheckCircle, XCircle, Link as LinkIcon } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, XCircle, Link as LinkIcon, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 type UploadMode = 'file' | 'url';
+
+interface ValidationResult {
+  isBlurry: boolean;
+  blurConfidence: number;
+  estimatedProductCount: number;
+  productCountConfidence: number;
+  warnings: string[];
+  canProcess: boolean;
+}
 
 export default function Home() {
   const [uploadMode, setUploadMode] = useState<UploadMode>('file');
@@ -12,10 +21,12 @@ export default function Home() {
   const [imageUrl, setImageUrl] = useState<string>('');
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [uploadedImageId, setUploadedImageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -59,6 +70,7 @@ export default function Home() {
 
     setUploading(true);
     setError(null);
+    setValidationResult(null);
 
     try {
       // Upload image
@@ -84,10 +96,33 @@ export default function Home() {
       const imageId = uploadData.imageId;
       setUploadedImageId(imageId);
       setUploading(false);
+
+      // Now validate image quality
+      setValidating(true);
+      const validationResponse = await fetch('/api/validate-quality', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageId }),
+      });
+
+      if (!validationResponse.ok) {
+        const errorData = await validationResponse.json();
+        console.warn('Validation failed:', errorData.error);
+        // Don't fail the whole upload if validation fails
+        setValidationResult(null);
+      } else {
+        const validationData = await validationResponse.json();
+        setValidationResult(validationData.validation);
+      }
+
+      setValidating(false);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setUploading(false);
+      setValidating(false);
       setProcessing(false);
     }
   };
@@ -100,7 +135,9 @@ export default function Home() {
     setError(null);
     setSuccess(false);
     setUploading(false);
+    setValidating(false);
     setProcessing(false);
+    setValidationResult(null);
   };
 
   return (
@@ -208,6 +245,13 @@ export default function Home() {
                 </div>
               )}
 
+              {validating && (
+                <div className="flex items-center justify-center gap-2 text-blue-600 mb-4">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Validating image quality...</span>
+                </div>
+              )}
+
               {error && (
                 <div className="flex items-center justify-center gap-2 text-red-600 mb-4">
                   <XCircle className="w-5 h-5" />
@@ -215,21 +259,70 @@ export default function Home() {
                 </div>
               )}
 
-              {success && uploadedImageId && (
+              {/* Validation Warnings */}
+              {validationResult && validationResult.warnings.length > 0 && (
+                <div className={`border rounded-lg p-4 mb-4 ${
+                  validationResult.canProcess 
+                    ? 'bg-yellow-50 border-yellow-300' 
+                    : 'bg-red-50 border-red-300'
+                }`}>
+                  <div className="flex items-start gap-2 mb-2">
+                    <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                      validationResult.canProcess ? 'text-yellow-600' : 'text-red-600'
+                    }`} />
+                    <div className="flex-1">
+                      <h4 className={`font-semibold mb-2 ${
+                        validationResult.canProcess ? 'text-yellow-800' : 'text-red-800'
+                      }`}>
+                        {validationResult.canProcess ? 'Image Quality Warnings' : 'Cannot Process Image'}
+                      </h4>
+                      <ul className={`text-sm space-y-1 ${
+                        validationResult.canProcess ? 'text-yellow-700' : 'text-red-700'
+                      }`}>
+                        {validationResult.warnings.map((warning, index) => (
+                          <li key={index}>{warning}</li>
+                        ))}
+                      </ul>
+                      {validationResult.isBlurry && (
+                        <p className="text-sm mt-2 text-gray-600">
+                          💡 Tip: Try taking a clearer photo with better lighting and focus.
+                        </p>
+                      )}
+                      {!validationResult.canProcess && (
+                        <p className="text-sm mt-2 text-gray-600">
+                          💡 Tip: Try uploading an image with fewer products (under 50 works best).
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {success && uploadedImageId && !validating && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
                   <div className="flex items-center gap-2 text-green-700 mb-2">
                     <CheckCircle className="w-5 h-5" />
                     <span className="font-semibold">Upload completed!</span>
                   </div>
+                  {validationResult && (
+                    <div className="text-sm text-gray-600 mb-2">
+                      📊 Detected approximately {validationResult.estimatedProductCount} products
+                      {validationResult.isBlurry && ' (image quality may affect results)'}
+                    </div>
+                  )}
                   <p className="text-sm text-gray-600 mb-3">
-                    Your image is ready for analysis. Click below to start the step-by-step product detection.
+                    {validationResult?.canProcess 
+                      ? 'Your image is ready for analysis. Click below to start the step-by-step product detection.'
+                      : 'Image quality check completed but processing may not work well with this image.'}
                   </p>
-                  <Link
-                    href={`/analyze/${uploadedImageId}`}
-                    className="inline-block px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    Start Analysis
-                  </Link>
+                  {validationResult?.canProcess !== false && (
+                    <Link
+                      href={`/analyze/${uploadedImageId}`}
+                      className="inline-block px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      Start Analysis
+                    </Link>
+                  )}
                 </div>
               )}
 

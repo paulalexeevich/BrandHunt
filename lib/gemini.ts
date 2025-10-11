@@ -366,6 +366,140 @@ Only return the JSON object, nothing else.
 }
 
 /**
+ * Validate image quality before processing
+ * Checks for blur and estimates product count
+ */
+export async function validateImageQuality(
+  imageBase64: string,
+  mimeType: string
+): Promise<{
+  isBlurry: boolean;
+  blurConfidence: number;
+  estimatedProductCount: number;
+  productCountConfidence: number;
+  warnings: string[];
+  canProcess: boolean;
+}> {
+  if (!process.env.GOOGLE_GEMINI_API_KEY) {
+    console.error('❌ GOOGLE_GEMINI_API_KEY is not set');
+    throw new Error('Gemini API key is not configured');
+  }
+
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      temperature: 0,
+      responseMimeType: 'application/json',
+    }
+  });
+
+  const prompt = `
+Analyze this retail image and check for quality issues that might affect AI product detection.
+
+Evaluate the following:
+1. Image Blur: Is the image blurry or out of focus? (Check for sharpness of text, product edges, and overall clarity)
+2. Product Count: Approximately how many distinct products/items are visible in this image?
+
+Return a JSON object with this exact structure:
+{
+  "isBlurry": true or false,
+  "blurConfidence": 0.0 to 1.0,
+  "estimatedProductCount": integer number,
+  "productCountConfidence": 0.0 to 1.0,
+  "imageQualityNotes": "Brief description of image quality"
+}
+
+Guidelines:
+- For isBlurry: Return true if text is hard to read or product edges are not sharp
+- For estimatedProductCount: Count all visible products/items in the image
+- For confidence: Return a value between 0.0 (not confident) and 1.0 (very confident)
+
+Only return the JSON object, nothing else.
+`;
+
+  const imagePart = {
+    inlineData: {
+      data: imageBase64,
+      mimeType: mimeType,
+    },
+  };
+
+  let text: string;
+  try {
+    const result = await model.generateContent([prompt, imagePart]);
+    const response = await result.response;
+    text = response.text();
+    
+    if (!text || text.trim().length === 0) {
+      console.error('❌ Gemini returned empty response');
+      throw new Error('Gemini returned empty response');
+    }
+  } catch (error) {
+    console.error('❌ Gemini API error:', error);
+    throw new Error(`Gemini API failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+
+  // Clean up the response
+  let cleanedText = text.trim();
+  if (cleanedText.startsWith('```json')) {
+    cleanedText = cleanedText.substring(7);
+  } else if (cleanedText.startsWith('```')) {
+    cleanedText = cleanedText.substring(3);
+  }
+  if (cleanedText.endsWith('```')) {
+    cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+  }
+  cleanedText = cleanedText.trim();
+
+  try {
+    const validation = JSON.parse(cleanedText) as {
+      isBlurry: boolean;
+      blurConfidence: number;
+      estimatedProductCount: number;
+      productCountConfidence: number;
+      imageQualityNotes: string;
+    };
+    
+    console.log('✅ Gemini validateImageQuality returned:', JSON.stringify(validation, null, 2));
+
+    // Build warnings and determine if we can process
+    const warnings: string[] = [];
+    let canProcess = true;
+
+    if (validation.isBlurry && validation.blurConfidence >= 0.6) {
+      warnings.push('⚠️ Image appears blurry - detection results may be inaccurate');
+    }
+
+    if (validation.estimatedProductCount > 50) {
+      warnings.push(`❌ Image contains approximately ${validation.estimatedProductCount} products - Gemini API works best with fewer than 50 products`);
+      canProcess = false; // Block processing if too many products
+    } else if (validation.estimatedProductCount > 40) {
+      warnings.push(`⚠️ Image contains approximately ${validation.estimatedProductCount} products - close to the recommended limit of 50`);
+    }
+
+    return {
+      isBlurry: validation.isBlurry,
+      blurConfidence: validation.blurConfidence,
+      estimatedProductCount: validation.estimatedProductCount,
+      productCountConfidence: validation.productCountConfidence,
+      warnings,
+      canProcess,
+    };
+  } catch (error) {
+    console.error('Failed to parse Gemini response:', cleanedText);
+    // On parse error, return conservative defaults
+    return {
+      isBlurry: false,
+      blurConfidence: 0,
+      estimatedProductCount: 0,
+      productCountConfidence: 0,
+      warnings: ['⚠️ Could not validate image quality'],
+      canProcess: true, // Allow processing on error
+    };
+  }
+}
+
+/**
  * Compare two product images to determine if they are the same product
  * Returns true if the products are visually identical/similar, false otherwise
  */

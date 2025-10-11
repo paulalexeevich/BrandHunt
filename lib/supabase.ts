@@ -17,6 +17,11 @@ export interface BranghuntImage {
   uploaded_at: string;
   processed: boolean;
   processing_status: string;
+  is_blurry: boolean | null;
+  blur_confidence: number | null;
+  estimated_product_count: number | null;
+  product_count_confidence: number | null;
+  quality_validated_at: string | null;
   created_at: string;
   updated_at: string;
 }
