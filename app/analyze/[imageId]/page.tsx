@@ -66,6 +66,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [showCoordinateDebug, setShowCoordinateDebug] = useState(false); // Debug off by default
   const [showOriginalSize, setShowOriginalSize] = useState(false); // Toggle for original vs scaled image
   const [extractingPrice, setExtractingPrice] = useState(false);
+  const [showProductLabels, setShowProductLabels] = useState(true); // Toggle for product labels on image
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
     natural: { width: number; height: number };
@@ -512,6 +513,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               <h2 className="text-xl font-semibold text-gray-900">Image</h2>
               <div className="flex gap-2">
                 <button
+                  onClick={() => setShowProductLabels(!showProductLabels)}
+                  className={`px-3 py-1 text-xs ${showProductLabels ? 'bg-purple-600' : 'bg-gray-400'} text-white rounded hover:opacity-80`}
+                >
+                  {showProductLabels ? '🏷️ Hide' : '🏷️ Show'} Labels
+                </button>
+                <button
                   onClick={() => setShowOriginalSize(!showOriginalSize)}
                   className={`px-3 py-1 text-xs ${showOriginalSize ? 'bg-green-600' : 'bg-blue-600'} text-white rounded hover:opacity-80`}
                 >
@@ -657,7 +664,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         <div className="text-purple-300 text-[8px] truncate max-w-[120px]">{detection.label}</div>
                       </div>
                     )}
-                    {detection.brand_name && (
+                    {detection.brand_name && showProductLabels && (
                       <div className="absolute -bottom-8 left-0 right-0 px-2 py-1 text-xs font-semibold bg-white border-2 border-green-600 rounded text-center truncate">
                         {detection.product_name || detection.brand_name}
                         {detection.category && <span className="text-gray-500"> • {detection.category}</span>}
