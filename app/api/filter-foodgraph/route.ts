@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Image filtering complete: ${matchingResults.length}/${foodgraphResults.length} products matched, ${uniqueResults.length} unique shown`);
 
     return NextResponse.json({
-      filteredResults: updatedResults, // Return all results with is_match set
+      filteredResults: uniqueResults, // Return only the top match (de-duplicated)
       totalFiltered: uniqueResults.length,
       totalOriginal: foodgraphResults.length
     });
