@@ -7,6 +7,7 @@ AI-powered product detection and brand recognition platform using Google Gemini 
 - **Image Upload**: Upload product images for AI analysis
 - **Product Detection**: Automatically detect products in images using Gemini 2.5 Flash with bounding boxes
 - **Brand Recognition**: Extract brand names from detected products using AI
+- **Price Extraction**: Extract price information from price tags below products
 - **FoodGraph Integration**: Search FoodGraph catalog for matching products (TOP 50 results)
 - **Visual Results**: Interactive visualization with bounding boxes and product information
 - **Image Gallery**: Browse all processed images and their results
@@ -31,6 +32,7 @@ AI-powered product detection and brand recognition platform using Google Gemini 
 2. **branghunt_detections**: Stores detected products
    - id, image_id (FK), detection_index, bounding_box (JSONB)
    - confidence_score, brand_name, brand_extraction_prompt/response
+   - price, price_currency, price_confidence (price extraction fields)
 
 3. **branghunt_foodgraph_results**: Stores FoodGraph search results
    - id, detection_id (FK), search_term, result_rank
@@ -76,23 +78,31 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 1. **Upload**: User uploads a product image
 2. **Detection**: Gemini 2.5 Flash detects all products in the image with bounding boxes
-3. **Brand Extraction**: For each detected product, Gemini extracts the brand name
-4. **Product Search**: Each brand is searched in FoodGraph API (TOP 50 results)
-5. **Storage**: All results are stored in Supabase with relationships
-6. **Visualization**: Results displayed with interactive bounding boxes and product matches
+3. **Brand Extraction**: For each detected product, Gemini extracts the brand name, category, flavor, size, and other details
+4. **Price Extraction**: Optionally extract price from price tags below selected products
+5. **Product Search**: Each brand is searched in FoodGraph API (TOP 50 results)
+6. **Storage**: All results are stored in Supabase with relationships
+7. **Visualization**: Results displayed with interactive bounding boxes and product matches
 
 ## API Endpoints
 
 - `POST /api/upload` - Upload image
-- `POST /api/process` - Process image (detection + brand extraction + FoodGraph search)
+- `POST /api/detect` - Detect products in image
+- `POST /api/extract-brand` - Extract brand information from a detected product
+- `POST /api/extract-price` - Extract price from price tag below product
+- `POST /api/search-foodgraph` - Search FoodGraph for matching products
 - `GET /api/images` - Get all processed images
 - `GET /api/results/[imageId]` - Get detailed results for an image
+- `DELETE /api/images/[imageId]` - Delete image and all related data
 
 ## Pages
 
 - `/` - Home page with image upload
 - `/gallery` - Gallery of all processed images
-- `/results/[imageId]` - Detailed results for a specific image
+- `/analyze/[imageId]` - Interactive analysis page with step-by-step workflow
+  - Step 1: Detect Products
+  - Step 2: Extract Brand Information & Prices
+  - Step 3: Search FoodGraph Catalog
 
 ## Development Notes
 
