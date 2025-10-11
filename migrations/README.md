@@ -38,11 +38,48 @@ supabase db push
 
 **Impact**: Non-breaking change - existing data remains intact
 
+### 2. add_product_details_columns.sql
+**Date**: October 7, 2025  
+**Description**: Adds comprehensive product information columns to branghunt_detections table
+
+**Changes**:
+- Adds `label`, `product_name`, `flavor`, `size`, `description` columns
+- Captures all product information from Gemini AI
+- Prevents data loss of product details
+
+**Impact**: Non-breaking change - existing data remains intact
+
+### 3. add_price_columns.sql
+**Date**: October 7, 2025  
+**Description**: Adds price extraction columns to branghunt_detections table
+
+**Changes**:
+- Adds `price`, `price_currency`, `price_confidence` columns
+- Stores extracted price information from retail shelf images
+- Supports multiple currencies
+
+**Impact**: Non-breaking change - existing data remains intact
+
+### 4. add_quality_validation_columns.sql
+**Date**: October 11, 2025  
+**Description**: Adds image quality validation columns to branghunt_images table
+
+**Changes**:
+- Adds `is_blurry`, `blur_confidence`, `estimated_product_count`, `product_count_confidence`, `quality_validated_at` columns
+- Enables blur detection and product count validation before processing
+- Includes indexes for faster filtering
+- Prevents processing images with >50 products (Gemini API limitation)
+
+**Impact**: Non-breaking change - existing data remains intact
+
 ## Migration History
 
 | Date | File | Description | Status |
 |------|------|-------------|--------|
-| 2025-10-07 | add_sku_column.sql | Add SKU field to detections | ✅ Pending |
+| 2025-10-07 | add_sku_column.sql | Add SKU field to detections | ✅ Applied |
+| 2025-10-07 | add_product_details_columns.sql | Add product detail fields | ✅ Applied |
+| 2025-10-07 | add_price_columns.sql | Add price extraction fields | ✅ Applied |
+| 2025-10-11 | add_quality_validation_columns.sql | Add image quality validation fields | ✅ Applied |
 
 ## Rollback Instructions
 
