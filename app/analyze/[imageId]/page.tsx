@@ -831,7 +831,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         {(() => {
                           // If filtered, show only matched results. Otherwise show all (up to 50)
                           const resultsToShow = filteredCount !== null
-                            ? foodgraphResults.filter(r => r.is_match === true)
+                            ? foodgraphResults.filter(r => r.is_match == true) // Use loose equality to match true/1/"true"
                             : foodgraphResults.slice(0, 50);
                           
                           return resultsToShow.map((result, index) => {

@@ -61,10 +61,28 @@ export async function POST(request: NextRequest) {
     // Wait for all comparisons to complete
     const comparisonResults = await Promise.all(comparisonPromises);
 
+    // Update database with is_match status for ALL results
+    console.log(`💾 Updating ${comparisonResults.length} results in database...`);
+    const updatePromises = comparisonResults.map(async ({ result, isMatch }) => {
+      const { error: updateError } = await supabase
+        .from('branghunt_foodgraph_results')
+        .update({ 
+          is_match: isMatch,
+          match_confidence: isMatch ? 0.95 : 0.0 // High confidence for matches
+        })
+        .eq('id', result.id);
+      
+      if (updateError) {
+        console.error(`Failed to update result ${result.id}:`, updateError);
+      }
+      
+      return { ...result, is_match: isMatch, match_confidence: isMatch ? 0.95 : 0.0 };
+    });
+
+    const updatedResults = await Promise.all(updatePromises);
+
     // Filter to only matching results
-    const matchingResults = comparisonResults
-      .filter(({ isMatch }) => isMatch)
-      .map(({ result }) => result);
+    const matchingResults = updatedResults.filter(r => r.is_match);
 
     // De-duplicate: Keep only the first result (highest rank) since FoodGraph returns duplicates
     // If multiple products match, they're likely the same product with duplicate entries
@@ -73,7 +91,7 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Image filtering complete: ${matchingResults.length}/${foodgraphResults.length} products matched, ${uniqueResults.length} unique shown`);
 
     return NextResponse.json({
-      filteredResults: uniqueResults,
+      filteredResults: updatedResults, // Return all results with is_match set
       totalFiltered: uniqueResults.length,
       totalOriginal: foodgraphResults.length
     });
