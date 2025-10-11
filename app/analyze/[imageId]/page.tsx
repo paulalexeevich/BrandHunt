@@ -35,6 +35,7 @@ interface Detection {
   selected_foodgraph_result_id: string | null;
   fully_analyzed: boolean | null;
   analysis_completed_at: string | null;
+  foodgraph_results?: FoodGraphResult[];
 }
 
 interface FoodGraphResult {
@@ -43,6 +44,8 @@ interface FoodGraphResult {
   brand_name: string | null;
   front_image_url: string | null;
   result_rank: number;
+  is_match?: boolean | null;
+  match_confidence?: number | null;
 }
 
 interface ImageData {
@@ -115,6 +118,36 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       };
     }
   }, [image]);
+
+  // Load FoodGraph results when a detection is selected
+  useEffect(() => {
+    if (selectedDetection && detections.length > 0) {
+      const detection = detections.find(d => d.id === selectedDetection);
+      if (detection && detection.foodgraph_results) {
+        // Load existing FoodGraph results
+        setFoodgraphResults(detection.foodgraph_results);
+        
+        // Check if results have been filtered (is_match exists on any result)
+        const hasFilteredResults = detection.foodgraph_results.some((r: any) => 
+          r.hasOwnProperty('is_match')
+        );
+        
+        if (hasFilteredResults) {
+          // Count how many matched
+          const matchedCount = detection.foodgraph_results.filter((r: any) => 
+            r.is_match === true
+          ).length;
+          setFilteredCount(matchedCount);
+        } else {
+          setFilteredCount(null);
+        }
+      } else {
+        // No existing results, reset state
+        setFoodgraphResults([]);
+        setFilteredCount(null);
+      }
+    }
+  }, [selectedDetection, detections]);
 
   const fetchImage = async () => {
     try {
@@ -661,6 +694,33 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         <CheckCircle className="w-5 h-5 text-green-600" />
                         <h4 className="font-semibold text-green-900">Extracted Information</h4>
                       </div>
+                      
+                      {/* FoodGraph Match - Show if saved */}
+                      {detection.fully_analyzed && detection.selected_foodgraph_image_url && (
+                        <div className="mb-4 p-3 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                          <div className="flex gap-3">
+                            <img
+                              src={detection.selected_foodgraph_image_url}
+                              alt={detection.selected_foodgraph_product_name || 'Product'}
+                              className="w-24 h-24 object-contain bg-white rounded-lg shadow-sm flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-blue-900 mb-1">📦 FoodGraph Match</p>
+                              <p className="text-sm font-bold text-blue-900 truncate">{detection.selected_foodgraph_product_name}</p>
+                              <p className="text-xs text-blue-700">{detection.selected_foodgraph_brand_name}</p>
+                              {detection.selected_foodgraph_gtin && (
+                                <div className="mt-2 pt-2 border-t border-blue-200">
+                                  <p className="text-xs text-gray-600">
+                                    <span className="font-semibold">UPC/GTIN:</span> <span className="font-mono text-blue-600">{detection.selected_foodgraph_gtin}</span>
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Extracted Data from Image */}
                       <div className="space-y-2 text-sm">
                         {detection.product_name && (
                           <div><span className="font-semibold text-gray-700">Product:</span> <span className="text-indigo-600 font-semibold">{detection.product_name}</span></div>
@@ -774,10 +834,16 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
-                        {foodgraphResults.slice(0, 50).map((result, index) => {
-                          const isSaved = detection.selected_foodgraph_result_id === result.id;
+                        {(() => {
+                          // If filtered, show only matched results. Otherwise show all (up to 50)
+                          const resultsToShow = filteredCount !== null
+                            ? foodgraphResults.filter(r => r.is_match === true)
+                            : foodgraphResults.slice(0, 50);
                           
-                          return (
+                          return resultsToShow.map((result, index) => {
+                            const isSaved = detection.selected_foodgraph_result_id === result.id;
+                            
+                            return (
                             <div 
                               key={result.id}
                               className={`bg-white rounded-lg border-2 ${isSaved ? 'border-green-500 ring-2 ring-green-300' : 'border-gray-200'} overflow-hidden hover:border-indigo-400 transition-colors`}
@@ -819,8 +885,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 )}
                               </div>
                             </div>
-                          );
-                        })}
+                            );
+                          });
+                        })()}
                       </div>
                       
                       {foodgraphResults.length > 50 && (
