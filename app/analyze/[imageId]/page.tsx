@@ -287,9 +287,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       brandName: detection.brand_name 
     };
 
-    // Store request for debugging
-    setDebugInfo({ request: JSON.stringify(requestBody, null, 2) });
-
     try {
       const response = await fetch('/api/search-foodgraph', {
         method: 'POST',
@@ -302,7 +299,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       if (!response.ok) {
         const errorData = await response.json();
         console.error('FoodGraph API error:', errorData);
-        setDebugInfo(prev => ({ ...prev, error: JSON.stringify(errorData, null, 2) }));
         throw new Error(errorData.details || 'FoodGraph search failed');
       }
 
@@ -310,15 +306,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       console.log('FoodGraph API response:', data);
       console.log('Products found:', data.products?.length || 0);
       
-      // Store response for debugging
-      setDebugInfo(prev => ({ ...prev, response: JSON.stringify(data, null, 2) }));
-      
       setFoodgraphResults(data.products || []);
     } catch (err) {
       console.error('FoodGraph search error:', err);
       const errorMessage = err instanceof Error ? err.message : 'FoodGraph search failed';
       setError(errorMessage);
-      setDebugInfo(prev => ({ ...prev, error: errorMessage }));
     } finally {
       setLoading(false);
     }
