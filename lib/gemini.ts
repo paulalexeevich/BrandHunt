@@ -243,6 +243,129 @@ export async function extractBrandName(
 }
 
 /**
+ * Extract price information from the area below a product
+ * Expands the bounding box downward to capture price tags
+ */
+export async function extractPrice(
+  imageBase64: string,
+  mimeType: string,
+  boundingBox: { y0: number; x0: number; y1: number; x1: number },
+  productInfo: { brand?: string; productName?: string; label?: string }
+): Promise<{ price: string; currency: string; confidence: number }> {
+  if (!process.env.GOOGLE_GEMINI_API_KEY) {
+    console.error('❌ GOOGLE_GEMINI_API_KEY is not set');
+    throw new Error('Gemini API key is not configured');
+  }
+
+  // Expand the bounding box to include the area below the product
+  // We'll expand downward by 30% of the product height to capture price tags
+  const productHeight = boundingBox.y1 - boundingBox.y0;
+  const expandedBox = {
+    x0: boundingBox.x0,
+    y0: boundingBox.y0,
+    x1: boundingBox.x1,
+    y1: Math.min(1000, boundingBox.y1 + (productHeight * 0.5)), // Expand down by 50%, max 1000
+  };
+
+  console.log(`🏷️ Expanding bounding box for price extraction: [${boundingBox.y0}, ${boundingBox.x0}, ${boundingBox.y1}, ${boundingBox.x1}] -> [${expandedBox.y0}, ${expandedBox.x0}, ${expandedBox.y1}, ${expandedBox.x1}]`);
+
+  // Crop the image to the expanded bounding box area
+  const { croppedBase64, width, height } = await cropImageToBoundingBox(imageBase64, expandedBox);
+  
+  console.log(`✂️ Cropped image to ${width}x${height}px for price extraction`);
+
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      temperature: 0,
+      responseMimeType: 'application/json',
+    }
+  });
+
+  const productDescription = productInfo.productName || productInfo.brand || productInfo.label || 'the product';
+
+  const prompt = `
+Analyze this retail shelf image and extract the PRICE for "${productDescription}".
+
+The product is located in the upper portion of this image, and the price tag should be BELOW the product.
+
+Extract the following information:
+1. Price (numeric value only, e.g., "2.49", "5.99", "12.99")
+2. Currency (e.g., "USD", "EUR", "GBP")
+3. Confidence (0.0 to 1.0) - how confident you are about this price
+
+Look for:
+- Price tags below the product
+- Digital displays showing prices
+- Paper labels with prices
+- Any text indicating price (including $ symbols)
+
+Return a JSON object with this exact structure:
+{
+  "price": "numeric price as string",
+  "currency": "USD",
+  "confidence": 0.0 to 1.0
+}
+
+If you cannot find a price, return:
+{
+  "price": "Unknown",
+  "currency": "USD",
+  "confidence": 0.0
+}
+
+Only return the JSON object, nothing else.
+`;
+
+  const imagePart = {
+    inlineData: {
+      data: croppedBase64,
+      mimeType: mimeType,
+    },
+  };
+
+  let text: string;
+  try {
+    const result = await model.generateContent([prompt, imagePart]);
+    const response = await result.response;
+    text = response.text();
+    
+    if (!text || text.trim().length === 0) {
+      console.error('❌ Gemini returned empty response');
+      throw new Error('Gemini returned empty response');
+    }
+  } catch (error) {
+    console.error('❌ Gemini API error:', error);
+    throw new Error(`Gemini API failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+
+  // Clean up the response
+  let cleanedText = text.trim();
+  if (cleanedText.startsWith('```json')) {
+    cleanedText = cleanedText.substring(7);
+  } else if (cleanedText.startsWith('```')) {
+    cleanedText = cleanedText.substring(3);
+  }
+  if (cleanedText.endsWith('```')) {
+    cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+  }
+  cleanedText = cleanedText.trim();
+
+  try {
+    const priceInfo = JSON.parse(cleanedText) as { price: string; currency: string; confidence: number };
+    console.log('✅ Gemini extractPrice returned:', JSON.stringify(priceInfo, null, 2));
+    return priceInfo;
+  } catch (error) {
+    console.error('Failed to parse Gemini response:', cleanedText);
+    return {
+      price: 'Unknown',
+      currency: 'USD',
+      confidence: 0
+    };
+  }
+}
+
+/**
  * Compare two product images to determine if they are the same product
  * Returns true if the products are visually identical/similar, false otherwise
  */

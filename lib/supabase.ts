@@ -40,6 +40,9 @@ export interface BranghuntDetection {
   flavor: string | null; // Flavor or variant
   size: string | null; // Size or weight
   description: string | null; // Product description
+  price: string | null; // Extracted price value
+  price_currency: string | null; // Currency code (USD, EUR, etc.)
+  price_confidence: number | null; // Confidence score for price extraction
   brand_extraction_prompt: string | null;
   brand_extraction_response: string | null;
   created_at: string;

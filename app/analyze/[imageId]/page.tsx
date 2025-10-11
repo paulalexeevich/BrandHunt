@@ -24,6 +24,9 @@ interface Detection {
   flavor: string | null;
   size: string | null;
   description: string | null;
+  price: string | null;
+  price_currency: string | null;
+  price_confidence: number | null;
 }
 
 interface FoodGraphResult {
@@ -62,6 +65,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
   const [showCoordinateDebug, setShowCoordinateDebug] = useState(false); // Debug off by default
   const [showOriginalSize, setShowOriginalSize] = useState(false); // Toggle for original vs scaled image
+  const [extractingPrice, setExtractingPrice] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
     natural: { width: number; height: number };
@@ -238,6 +242,49 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       setError(err instanceof Error ? err.message : 'Brand extraction failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExtractPrice = async (detectionId: string) => {
+    setExtractingPrice(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/extract-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ detectionId }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Price extraction failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.details || errorData.error || errorMessage;
+        } catch (e) {
+          errorMessage = `${errorMessage}: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      
+      console.log('💰 Price extraction result:', data);
+      
+      // Update detection in state with price info
+      setDetections(prev => prev.map(d => 
+        d.id === detectionId ? { 
+          ...d, 
+          price: data.price,
+          price_currency: data.currency,
+          price_confidence: data.confidence
+        } : d
+      ));
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Price extraction failed');
+    } finally {
+      setExtractingPrice(false);
     }
   };
 
@@ -684,7 +731,26 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               {detection.category && <div>{detection.category}</div>}
                               {detection.flavor && <div className="text-purple-600">Flavor: {detection.flavor}</div>}
                               {detection.size && <div className="text-blue-600">Size: {detection.size}</div>}
+                              {detection.price && detection.price !== 'Unknown' && (
+                                <div className="text-green-700 font-semibold mt-1">
+                                  Price: {detection.price_currency === 'USD' ? '$' : detection.price_currency}{detection.price}
+                                  {detection.price_confidence && detection.price_confidence > 0 && (
+                                    <span className="text-xs text-gray-500 ml-1">
+                                      ({Math.round(detection.price_confidence * 100)}%)
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
+                            {!detection.price && (
+                              <button
+                                onClick={() => handleExtractPrice(detection.id)}
+                                disabled={extractingPrice}
+                                className="mt-2 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs disabled:bg-gray-400"
+                              >
+                                {extractingPrice ? '💰 Extracting...' : '💰 Extract Price'}
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <button
