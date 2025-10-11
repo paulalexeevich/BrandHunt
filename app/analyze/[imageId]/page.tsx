@@ -890,17 +890,29 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-gray-600">
-                    Select a product with extracted brand to search FoodGraph catalog.
+                    {selectedDetection 
+                      ? 'Analyzing selected product. Click another product to switch.'
+                      : 'Select a product with extracted brand to search FoodGraph catalog.'}
                   </p>
-                  <button
-                    onClick={() => setCurrentStep('brand')}
-                    className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold"
-                  >
-                    ← Back to Extract
-                  </button>
+                  <div className="flex gap-2">
+                    {selectedDetection && (
+                      <button
+                        onClick={() => setSelectedDetection(null)}
+                        className="text-sm text-purple-600 hover:text-purple-800 font-semibold"
+                      >
+                        ← Show All Products
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setCurrentStep('brand')}
+                      className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold"
+                    >
+                      ← Back to Extract
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2 mb-4">
-                  {detections.filter(d => d.brand_name).map((detection, index) => (
+                  {detections.filter(d => d.brand_name).filter(d => !selectedDetection || d.id === selectedDetection).map((detection, index) => (
                     <button
                       key={detection.id}
                       onClick={() => setSelectedDetection(detection.id)}
