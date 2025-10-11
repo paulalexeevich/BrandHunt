@@ -224,12 +224,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
 
       const data = await response.json();
       
-      // Store extraction debug info
-      setExtractionDebug({
-        detectionId,
-        response: data
-      });
-      
       // Update detection in state with all product info
       setDetections(prev => prev.map(d => 
         d.id === detectionId ? { 
@@ -537,7 +531,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   → Product #{detections.findIndex(d => d.id === selectedDetection) + 1} selected
                 </span>
               )}
-            </div>
+              </div>
             {!productsDetected && (
               <button
                 onClick={handleDetectProducts}
@@ -568,12 +562,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Image</h2>
-              <button
-                onClick={() => setShowProductLabels(!showProductLabels)}
-                className={`px-3 py-1 text-xs ${showProductLabels ? 'bg-purple-600' : 'bg-gray-400'} text-white rounded hover:opacity-80`}
-              >
-                {showProductLabels ? '🏷️ Hide' : '🏷️ Show'} Labels
-              </button>
+                <button
+                  onClick={() => setShowProductLabels(!showProductLabels)}
+                  className={`px-3 py-1 text-xs ${showProductLabels ? 'bg-purple-600' : 'bg-gray-400'} text-white rounded hover:opacity-80`}
+                >
+                  {showProductLabels ? '🏷️ Hide' : '🏷️ Show'} Labels
+                </button>
             </div>
             
             <div className="relative inline-block max-w-full">
@@ -667,26 +661,26 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           <CheckCircle className="w-3 h-3" />
                           Saved
                         </span>
-                      )}
-                    </div>
+                          )}
+                        </div>
                     
                     {/* Progress Indicators */}
                     <div className="flex gap-2 text-xs">
                       <span className={`px-2 py-1 rounded ${detection.brand_name ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
                         {detection.brand_name ? '✓' : '○'} Info
-                      </span>
+                            </span>
                       <span className={`px-2 py-1 rounded ${detection.price && detection.price !== 'Unknown' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
                         {detection.price && detection.price !== 'Unknown' ? '✓' : '○'} Price
-                      </span>
+                                    </span>
                       <span className={`px-2 py-1 rounded ${foodgraphResults.length > 0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
                         {foodgraphResults.length > 0 ? '✓' : '○'} Search
                       </span>
                       <span className={`px-2 py-1 rounded ${filteredCount !== null ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
                         {filteredCount !== null ? '✓' : '○'} Filter
                       </span>
-                    </div>
-                  </div>
-
+                                </div>
+                </div>
+                
                   {/* Extracted Product Information */}
                   {detection.brand_name ? (
                     <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
@@ -713,12 +707,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                   <p className="text-xs text-gray-600">
                                     <span className="font-semibold">UPC/GTIN:</span> <span className="font-mono text-blue-600">{detection.selected_foodgraph_gtin}</span>
                                   </p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                </div>
+                          )}
                         </div>
-                      )}
+                      </div>
+                          </div>
+                        )}
                       
                       {/* Extracted Data from Image */}
                       <div className="space-y-2 text-sm">
@@ -741,7 +735,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           </div>
                         )}
                       </div>
-                    </div>
+                </div>
                   ) : (
                     <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
                       <p className="text-sm text-yellow-800">
@@ -753,22 +747,22 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   {/* Action Buttons */}
                   <div className="space-y-2">
                     {!detection.brand_name && (
-                      <button
+                  <button
                         onClick={() => handleExtractBrand(detection.id)}
-                        disabled={loading}
+                    disabled={loading}
                         className="w-full px-4 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
-                      >
-                        {loading ? (
-                          <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
                             Extracting...
-                          </>
-                        ) : (
+                      </>
+                    ) : (
                           '📋 Extract Brand & Info'
-                        )}
-                      </button>
                     )}
-                    
+                  </button>
+                )}
+
                     {detection.brand_name && (!detection.price || detection.price === 'Unknown') && (
                       <button
                         onClick={() => handleExtractPrice(detection.id)}
@@ -787,7 +781,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     )}
                     
                     {detection.brand_name && foodgraphResults.length === 0 && (
-                      <button
+                    <button
                         onClick={handleSearchFoodGraph}
                         disabled={loading}
                         className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
@@ -800,7 +794,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         ) : (
                           '🔍 Search FoodGraph'
                         )}
-                      </button>
+                    </button>
                     )}
                     
                     {foodgraphResults.length > 0 && filteredCount === null && (
@@ -819,7 +813,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         )}
                       </button>
                     )}
-                  </div>
+                    </div>
 
                   {/* FoodGraph Results */}
                   {foodgraphResults.length > 0 && (
@@ -848,32 +842,32 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               key={result.id}
                               className={`bg-white rounded-lg border-2 ${isSaved ? 'border-green-500 ring-2 ring-green-300' : 'border-gray-200'} overflow-hidden hover:border-indigo-400 transition-colors`}
                             >
-                              {result.front_image_url ? (
-                                <img
-                                  src={result.front_image_url}
-                                  alt={result.product_name || 'Product'}
+                          {result.front_image_url ? (
+                            <img
+                              src={result.front_image_url}
+                              alt={result.product_name || 'Product'}
                                   className="w-full h-24 object-contain bg-gray-50"
-                                />
-                              ) : (
+                            />
+                          ) : (
                                 <div className="w-full h-24 bg-gray-100 flex items-center justify-center">
-                                  <Package className="w-8 h-8 text-gray-400" />
-                                </div>
-                              )}
+                              <Package className="w-8 h-8 text-gray-400" />
+                            </div>
+                          )}
                               <div className="p-2">
                                 <p className="text-xs font-semibold text-gray-900 truncate" title={result.product_name || 'Unnamed'}>
-                                  {result.product_name || 'Unnamed Product'}
-                                </p>
-                                <p className="text-xs text-gray-600 truncate">
-                                  {result.brand_name || 'Unknown Brand'}
-                                </p>
-                                <p className="text-xs text-indigo-600 font-semibold mt-1">
-                                  #{index + 1}
-                                </p>
+                              {result.product_name || 'Unnamed Product'}
+                            </p>
+                            <p className="text-xs text-gray-600 truncate">
+                              {result.brand_name || 'Unknown Brand'}
+                            </p>
+                            <p className="text-xs text-indigo-600 font-semibold mt-1">
+                              #{index + 1}
+                            </p>
                                 {isSaved ? (
                                   <div className="mt-2 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded text-center flex items-center justify-center gap-1">
                                     <CheckCircle className="w-3 h-3" />
                                     Saved
-                                  </div>
+                          </div>
                                 ) : (
                                   <button
                                     onClick={() => handleSaveResult(result.id)}
@@ -883,21 +877,21 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                     {savingResult && savedResultId === result.id ? 'Saving...' : '💾 Save'}
                                   </button>
                                 )}
-                              </div>
-                            </div>
+                        </div>
+                    </div>
                             );
                           });
                         })()}
                       </div>
                       
-                      {foodgraphResults.length > 50 && (
-                        <p className="text-sm text-gray-500 text-center mt-3">
-                          + {foodgraphResults.length - 50} more results available
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    {foodgraphResults.length > 50 && (
+                      <p className="text-sm text-gray-500 text-center mt-3">
+                        + {foodgraphResults.length - 50} more results available
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
               );
             })()}
           </div>
