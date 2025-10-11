@@ -32,17 +32,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract base64 and mime type from the data URL
-    const dataUrlMatch = image.image_data.match(/^data:(.+);base64,(.+)$/);
-    if (!dataUrlMatch) {
-      return NextResponse.json(
-        { error: 'Invalid image data format' },
-        { status: 400 }
-      );
-    }
-
-    const mimeType = dataUrlMatch[1];
-    const imageBase64 = dataUrlMatch[2];
+    // Get base64 and mime type
+    const imageBase64 = image.file_path;
+    const mimeType = image.mime_type || 'image/jpeg';
 
     // Validate image quality using Gemini
     const validation = await validateImageQuality(imageBase64, mimeType);
