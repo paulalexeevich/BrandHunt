@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
             
             const brandData = await extractProductInfo(
               image.file_path,
+              image.mime_type || 'image/jpeg',
               detection.bounding_box
             );
 
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
             try {
               const priceData = await extractPrice(
                 image.file_path,
+                image.mime_type || 'image/jpeg',
                 detection.bounding_box,
                 {
                   brand: detection.brand_name,
