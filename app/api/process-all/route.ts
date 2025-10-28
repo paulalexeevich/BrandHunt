@@ -317,8 +317,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Extended timeout for batch processing (10 minutes for processing many products)
-export const maxDuration = 600;
+// Extended timeout for batch processing (5 minutes for processing many products)
+export const maxDuration = 300;
 
 // Explicitly set runtime to nodejs (required for maxDuration > 10s with Fluid Compute)
 export const runtime = 'nodejs';
