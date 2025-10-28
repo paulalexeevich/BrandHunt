@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { extractBrandInfo, extractPrice, compareProductImages } from '@/lib/gemini';
-import { searchFoodGraph } from '@/lib/foodgraph';
+import { extractProductInfo, extractPrice, compareProductImages } from '@/lib/gemini';
+import { searchProducts } from '@/lib/foodgraph';
 
 interface ProcessResult {
   detectionId: string;
@@ -94,16 +94,16 @@ export async function POST(request: NextRequest) {
           if (!detection.brand_name) {
             console.log(`  [${detection.detection_index}] Extracting brand info...`);
             
-            const brandData = await extractBrandInfo(
+            const brandData = await extractProductInfo(
               image.file_path,
               detection.bounding_box
             );
 
-            if (brandData.brand) {
+            if (brandData.brandName) {
               await supabase
                 .from('branghunt_detections')
                 .update({
-                  brand_name: brandData.brand,
+                  brand_name: brandData.brandName,
                   product_name: brandData.productName,
                   category: brandData.category,
                   flavor: brandData.flavor,
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
                 .eq('id', detection.id);
 
               result.steps.brandExtraction = true;
-              detection.brand_name = brandData.brand; // Update for next steps
+              detection.brand_name = brandData.brandName; // Update for next steps
             }
           } else {
             result.steps.brandExtraction = true;
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
           if (detection.brand_name) {
             console.log(`  [${detection.detection_index}] Searching FoodGraph...`);
             
-            const foodgraphResults = await searchFoodGraph(detection.brand_name);
+            const foodgraphResults = await searchProducts(detection.brand_name);
             
             if (foodgraphResults.length > 0) {
               // Save top 50 results to database
