@@ -75,6 +75,18 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [savedResultId, setSavedResultId] = useState<string | null>(null);
   const [processingAll, setProcessingAll] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ total: number; success: number; partial: number; errors: number } | null>(null);
+  const [currentStep, setCurrentStep] = useState<string>('');
+  const [stepProgress, setStepProgress] = useState<{ 
+    step1: { done: boolean; success: number; total: number };
+    step2: { done: boolean; success: number; total: number };
+    step3: { done: boolean; success: number; total: number };
+    step4: { done: boolean; success: number; total: number };
+  }>({
+    step1: { done: false, success: 0, total: 0 },
+    step2: { done: false, success: 0, total: 0 },
+    step3: { done: false, success: 0, total: 0 },
+    step4: { done: false, success: 0, total: 0 }
+  });
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
     natural: { width: number; height: number };
@@ -472,49 +484,124 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     setProcessingAll(true);
     setError(null);
     setBatchProgress(null);
+    setStepProgress({
+      step1: { done: false, success: 0, total: 0 },
+      step2: { done: false, success: 0, total: 0 },
+      step3: { done: false, success: 0, total: 0 },
+      step4: { done: false, success: 0, total: 0 }
+    });
+
+    let totalProcessed = 0;
+    let totalSuccess = 0;
+    let totalErrors = 0;
 
     try {
-      const response = await fetch('/api/process-all', {
+      // Step 1: Extract product info for all products
+      setCurrentStep('📋 Step 1/4: Extracting product information...');
+      console.log('🚀 Starting Step 1: Extract Info');
+      
+      const step1Response = await fetch('/api/batch-extract-info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageId: resolvedParams.imageId }),
       });
 
-      if (!response.ok) {
-        let errorMessage = 'Batch processing failed';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.details || errorData.error || errorMessage;
-        } catch (e) {
-          errorMessage = `${errorMessage}: ${response.status} ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
+      if (step1Response.ok) {
+        const step1Data = await step1Response.json();
+        console.log('✅ Step 1 complete:', step1Data);
+        setStepProgress(prev => ({
+          ...prev,
+          step1: { done: true, success: step1Data.success, total: step1Data.total }
+        }));
+        totalProcessed += step1Data.total;
+        totalSuccess += step1Data.success;
+        totalErrors += step1Data.errors;
+      } else {
+        console.error('❌ Step 1 failed');
       }
 
-      const data = await response.json();
+      // Step 2: Extract prices for all products
+      setCurrentStep('💰 Step 2/4: Extracting prices...');
+      console.log('🚀 Starting Step 2: Extract Prices');
       
-      console.log('✅ Batch processing result:', data);
-      
-      // Update progress
-      setBatchProgress({
-        total: data.total,
-        success: data.success,
-        partial: data.partial,
-        errors: data.errors
+      const step2Response = await fetch('/api/batch-extract-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId: resolvedParams.imageId }),
       });
+
+      if (step2Response.ok) {
+        const step2Data = await step2Response.json();
+        console.log('✅ Step 2 complete:', step2Data);
+        setStepProgress(prev => ({
+          ...prev,
+          step2: { done: true, success: step2Data.success, total: step2Data.total }
+        }));
+      } else {
+        console.error('❌ Step 2 failed');
+      }
+
+      // Step 3: Search FoodGraph for all products
+      setCurrentStep('🔍 Step 3/4: Searching FoodGraph database...');
+      console.log('🚀 Starting Step 3: Search FoodGraph');
+      
+      const step3Response = await fetch('/api/batch-search-foodgraph', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId: resolvedParams.imageId }),
+      });
+
+      if (step3Response.ok) {
+        const step3Data = await step3Response.json();
+        console.log('✅ Step 3 complete:', step3Data);
+        setStepProgress(prev => ({
+          ...prev,
+          step3: { done: true, success: step3Data.success, total: step3Data.total }
+        }));
+      } else {
+        console.error('❌ Step 3 failed');
+      }
+
+      // Step 4: AI filter and auto-save best matches
+      setCurrentStep('🤖 Step 4/4: AI filtering and saving best matches...');
+      console.log('🚀 Starting Step 4: AI Filter');
+      
+      const step4Response = await fetch('/api/batch-filter-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId: resolvedParams.imageId }),
+      });
+
+      if (step4Response.ok) {
+        const step4Data = await step4Response.json();
+        console.log('✅ Step 4 complete:', step4Data);
+        setStepProgress(prev => ({
+          ...prev,
+          step4: { done: true, success: step4Data.saved, total: step4Data.total }
+        }));
+      } else {
+        console.error('❌ Step 4 failed');
+      }
+
+      setCurrentStep('✅ All steps complete!');
 
       // Reload the page data to show updated products
       await fetchImage();
 
+      // Calculate final stats
+      const step1Success = stepProgress.step1.success;
+      const step4Saved = stepProgress.step4.success;
+
       // Show success message
-      alert(`✅ Batch Processing Complete!\n\n✓ Successfully processed: ${data.success}\n○ Partially processed: ${data.partial}\n✗ Errors: ${data.errors}\n\nTotal products: ${data.total}`);
+      alert(`✅ Batch Processing Complete!\n\n📋 Step 1: Extracted ${step1Success} product infos\n💰 Step 2: Extracted prices\n🔍 Step 3: Searched FoodGraph\n🤖 Step 4: Saved ${step4Saved} best matches\n\nAll intermediate results have been saved to the database!`);
       
     } catch (err) {
       console.error('❌ Batch processing failed:', err);
       setError(err instanceof Error ? err.message : 'Batch processing failed');
-      alert(`Failed to process all products: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      alert(`Failed to process all products: ${err instanceof Error ? err.message : 'Unknown error'}\n\nNote: All completed steps have been saved to the database.`);
     } finally {
       setProcessingAll(false);
+      setCurrentStep('');
     }
   };
 
@@ -629,25 +716,37 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           </div>
         )}
 
-        {batchProgress && (
-          <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 rounded-lg p-4 mb-6">
-            <h3 className="font-bold text-green-900 mb-2">✅ Batch Processing Complete</h3>
-            <div className="grid grid-cols-4 gap-4 text-sm">
-              <div className="bg-white rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-gray-900">{batchProgress.total}</div>
-                <div className="text-gray-600">Total</div>
+        {processingAll && (
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-lg p-4 mb-6">
+            <h3 className="font-bold text-blue-900 mb-3">{currentStep || '🚀 Processing...'}</h3>
+            <div className="grid grid-cols-4 gap-3 text-sm">
+              <div className={`bg-white rounded-lg p-3 border-2 ${stepProgress.step1.done ? 'border-green-500' : 'border-gray-300'}`}>
+                <div className="text-xs font-semibold text-gray-600 mb-1">📋 Extract Info</div>
+                <div className={`text-lg font-bold ${stepProgress.step1.done ? 'text-green-600' : 'text-gray-400'}`}>
+                  {stepProgress.step1.done ? `${stepProgress.step1.success}/${stepProgress.step1.total}` : '—'}
+                </div>
+                <div className="text-xs text-gray-500">{stepProgress.step1.done ? 'Done ✓' : 'Waiting...'}</div>
               </div>
-              <div className="bg-white rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-green-600">{batchProgress.success}</div>
-                <div className="text-gray-600">✓ Success</div>
+              <div className={`bg-white rounded-lg p-3 border-2 ${stepProgress.step2.done ? 'border-green-500' : 'border-gray-300'}`}>
+                <div className="text-xs font-semibold text-gray-600 mb-1">💰 Extract Price</div>
+                <div className={`text-lg font-bold ${stepProgress.step2.done ? 'text-green-600' : 'text-gray-400'}`}>
+                  {stepProgress.step2.done ? `${stepProgress.step2.success}/${stepProgress.step2.total}` : '—'}
+                </div>
+                <div className="text-xs text-gray-500">{stepProgress.step2.done ? 'Done ✓' : 'Waiting...'}</div>
               </div>
-              <div className="bg-white rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-yellow-600">{batchProgress.partial}</div>
-                <div className="text-gray-600">○ Partial</div>
+              <div className={`bg-white rounded-lg p-3 border-2 ${stepProgress.step3.done ? 'border-green-500' : 'border-gray-300'}`}>
+                <div className="text-xs font-semibold text-gray-600 mb-1">🔍 Search DB</div>
+                <div className={`text-lg font-bold ${stepProgress.step3.done ? 'text-green-600' : 'text-gray-400'}`}>
+                  {stepProgress.step3.done ? `${stepProgress.step3.success}/${stepProgress.step3.total}` : '—'}
+                </div>
+                <div className="text-xs text-gray-500">{stepProgress.step3.done ? 'Done ✓' : 'Waiting...'}</div>
               </div>
-              <div className="bg-white rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-red-600">{batchProgress.errors}</div>
-                <div className="text-gray-600">✗ Errors</div>
+              <div className={`bg-white rounded-lg p-3 border-2 ${stepProgress.step4.done ? 'border-green-500' : 'border-gray-300'}`}>
+                <div className="text-xs font-semibold text-gray-600 mb-1">🤖 AI Filter</div>
+                <div className={`text-lg font-bold ${stepProgress.step4.done ? 'text-green-600' : 'text-gray-400'}`}>
+                  {stepProgress.step4.done ? `${stepProgress.step4.success}/${stepProgress.step4.total}` : '—'}
+                </div>
+                <div className="text-xs text-gray-500">{stepProgress.step4.done ? 'Done ✓' : 'Waiting...'}</div>
               </div>
             </div>
           </div>
