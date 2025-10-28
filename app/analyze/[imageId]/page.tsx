@@ -73,6 +73,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [extractingPrice, setExtractingPrice] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
   const [savedResultId, setSavedResultId] = useState<string | null>(null);
+  const [processingAll, setProcessingAll] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ total: number; success: number; partial: number; errors: number } | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
     natural: { width: number; height: number };
@@ -466,6 +468,56 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
   };
 
+  const handleProcessAll = async () => {
+    setProcessingAll(true);
+    setError(null);
+    setBatchProgress(null);
+
+    try {
+      const response = await fetch('/api/process-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId: resolvedParams.imageId }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Batch processing failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.details || errorData.error || errorMessage;
+        } catch (e) {
+          errorMessage = `${errorMessage}: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      
+      console.log('✅ Batch processing result:', data);
+      
+      // Update progress
+      setBatchProgress({
+        total: data.total,
+        success: data.success,
+        partial: data.partial,
+        errors: data.errors
+      });
+
+      // Reload the page data to show updated products
+      await fetchImage();
+
+      // Show success message
+      alert(`✅ Batch Processing Complete!\n\n✓ Successfully processed: ${data.success}\n○ Partially processed: ${data.partial}\n✗ Errors: ${data.errors}\n\nTotal products: ${data.total}`);
+      
+    } catch (err) {
+      console.error('❌ Batch processing failed:', err);
+      setError(err instanceof Error ? err.message : 'Batch processing failed');
+      alert(`Failed to process all products: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setProcessingAll(false);
+    }
+  };
+
   const handleDeleteImage = async () => {
     setDeleting(true);
     setError(null);
@@ -532,28 +584,72 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 </span>
               )}
               </div>
-            {!productsDetected && (
-              <button
-                onClick={handleDetectProducts}
-                disabled={loading}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Detecting...
-                  </>
-                ) : (
-                  '🎯 Detect Products'
-                )}
-              </button>
-            )}
+            <div className="flex gap-3">
+              {!productsDetected && (
+                <button
+                  onClick={handleDetectProducts}
+                  disabled={loading}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Detecting...
+                    </>
+                  ) : (
+                    '🎯 Detect Products'
+                  )}
+                </button>
+              )}
+              {productsDetected && detections.some(d => !d.fully_analyzed) && (
+                <button
+                  onClick={handleProcessAll}
+                  disabled={processingAll}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all font-bold disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                >
+                  {processingAll ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Processing All Products...
+                    </>
+                  ) : (
+                    <>
+                      ⚡ Process All Products ({detections.filter(d => !d.fully_analyzed).length})
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-red-700">
             {error}
+          </div>
+        )}
+
+        {batchProgress && (
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 rounded-lg p-4 mb-6">
+            <h3 className="font-bold text-green-900 mb-2">✅ Batch Processing Complete</h3>
+            <div className="grid grid-cols-4 gap-4 text-sm">
+              <div className="bg-white rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-gray-900">{batchProgress.total}</div>
+                <div className="text-gray-600">Total</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-green-600">{batchProgress.success}</div>
+                <div className="text-gray-600">✓ Success</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-yellow-600">{batchProgress.partial}</div>
+                <div className="text-gray-600">○ Partial</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-red-600">{batchProgress.errors}</div>
+                <div className="text-gray-600">✗ Errors</div>
+              </div>
+            </div>
           </div>
         )}
 
