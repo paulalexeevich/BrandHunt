@@ -100,11 +100,11 @@ export async function POST(request: NextRequest) {
               detection.bounding_box
             );
 
-            if (brandData.brandName) {
+            if (brandData.brand) {
               await supabase
                 .from('branghunt_detections')
                 .update({
-                  brand_name: brandData.brandName,
+                  brand_name: brandData.brand,
                   product_name: brandData.productName,
                   category: brandData.category,
                   flavor: brandData.flavor,
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
                 .eq('id', detection.id);
 
               result.steps.brandExtraction = true;
-              detection.brand_name = brandData.brandName; // Update for next steps
+              detection.brand_name = brandData.brand; // Update for next steps
             }
           } else {
             result.steps.brandExtraction = true;
