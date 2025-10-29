@@ -121,10 +121,10 @@ export async function POST(request: NextRequest) {
 
       results.push(result);
 
-      // Add delay between requests (1.5 seconds) to avoid rate limiting
+      // Add delay between requests (10 seconds) to avoid rate limiting and allow API to respond
       if (i < detectionsToProcess.length - 1) {
-        console.log(`  ⏳ Waiting 1.5s before next request...`);
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        console.log(`  ⏳ Waiting 10s before next request...`);
+        await new Promise(resolve => setTimeout(resolve, 10000));
       }
     }
 
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 180 second timeout for sequential searches (40 products × 1.5s delay + processing time)
-export const maxDuration = 180;
+// 300 second timeout for sequential searches (40 products × 10s delay + processing time = ~400s, capped at Vercel max)
+export const maxDuration = 300;
 export const runtime = 'nodejs';
 
