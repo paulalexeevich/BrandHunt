@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    // Fetch all detections that have FoodGraph results but no filtering done yet
+    // Fetch all detections that have cached FoodGraph results but no filtering done yet
     const { data: detections, error: detectionsError } = await supabase
       .from('branghunt_detections')
       .select(`
@@ -69,20 +69,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Filter to only those with FoodGraph results
+    // Filter to only those with cached FoodGraph results (from Step 3)
     const detectionsToProcess = detections.filter((d: any) => 
       d.branghunt_foodgraph_results && d.branghunt_foodgraph_results.length > 0
     );
 
     if (detectionsToProcess.length === 0) {
       return NextResponse.json({
-        message: 'No products with FoodGraph results to filter',
+        message: 'No products with cached FoodGraph results to filter. Run Step 3 first.',
         processed: 0,
         results: []
       });
     }
 
-    console.log(`🔍 AI filtering ${detectionsToProcess.length} products in parallel...`);
+    console.log(`🔍 AI filtering ${detectionsToProcess.length} products using cached FoodGraph results...`);
 
     // Get the image as base64 once
     const { data: imageBlob } = await supabase.storage
@@ -106,8 +106,9 @@ export async function POST(request: NextRequest) {
         };
 
         try {
-          console.log(`  [${detection.detection_index}] Filtering ${detection.branghunt_foodgraph_results.length} results...`);
+          console.log(`  [${detection.detection_index}] Filtering ${detection.branghunt_foodgraph_results.length} cached results...`);
           
+          // Use cached results from Step 3 (stored in branghunt_foodgraph_results table)
           const foodgraphResults = detection.branghunt_foodgraph_results;
 
           // Compare each result in parallel (limited batches)

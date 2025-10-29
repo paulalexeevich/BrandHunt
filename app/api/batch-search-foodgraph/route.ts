@@ -64,73 +64,82 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`🔎 Searching FoodGraph for ${detectionsToProcess.length} products in parallel...`);
+    console.log(`🔎 Searching FoodGraph for ${detectionsToProcess.length} products SEQUENTIALLY (with delays)...`);
 
-    // Process all detections in parallel
-    const results: SearchResult[] = await Promise.all(
-      detectionsToProcess.map(async (detection) => {
-        const result: SearchResult = {
-          detectionId: detection.id,
-          detectionIndex: detection.detection_index,
-          status: 'error'
-        };
+    // Process detections sequentially with delays to avoid rate limiting
+    const results: SearchResult[] = [];
+    
+    for (let i = 0; i < detectionsToProcess.length; i++) {
+      const detection = detectionsToProcess[i];
+      const result: SearchResult = {
+        detectionId: detection.id,
+        detectionIndex: detection.detection_index,
+        status: 'error'
+      };
 
-        try {
-          console.log(`  [${detection.detection_index}] Searching for: ${detection.brand_name}...`);
-          
-          const foodgraphResults = await searchProducts(detection.brand_name);
-          
-          if (foodgraphResults.length > 0) {
-            // Save top 50 results to database
-            const resultsToSave = foodgraphResults.slice(0, 50).map((r: any, index: number) => ({
-              detection_id: detection.id,
-              result_rank: index + 1,
-              product_name: r.product_name,
-              brand_name: r.brand_name,
-              category: r.category,
-              front_image_url: r.front_image_url,
-              product_gtin: r.product_gtin,
-              full_data: r
-            }));
+      try {
+        console.log(`  [${detection.detection_index}] (${i + 1}/${detectionsToProcess.length}) Searching for: ${detection.brand_name}...`);
+        
+        const foodgraphResults = await searchProducts(detection.brand_name);
+        
+        if (foodgraphResults.length > 0) {
+          // Save top 50 results to intermediate table (cache for step 4)
+          const resultsToSave = foodgraphResults.slice(0, 50).map((r: any, index: number) => ({
+            detection_id: detection.id,
+            result_rank: index + 1,
+            product_name: r.product_name,
+            brand_name: r.brand_name,
+            category: r.category,
+            front_image_url: r.front_image_url,
+            product_gtin: r.product_gtin,
+            full_data: r
+          }));
 
-            const { error: insertError } = await supabase
-              .from('branghunt_foodgraph_results')
-              .insert(resultsToSave);
+          const { error: insertError } = await supabase
+            .from('branghunt_foodgraph_results')
+            .insert(resultsToSave);
 
-            if (insertError) {
-              throw new Error(`Database insert failed: ${insertError.message}`);
-            }
-
-            result.status = 'success';
-            result.resultsCount = resultsToSave.length;
-
-            console.log(`  ✅ [${detection.detection_index}] Found and saved ${resultsToSave.length} results`);
-          } else {
-            result.status = 'error';
-            result.error = 'No results found';
-            console.log(`  ⚠️ [${detection.detection_index}] No results found`);
+          if (insertError) {
+            throw new Error(`Database insert failed: ${insertError.message}`);
           }
 
-        } catch (error) {
-          console.error(`  ❌ [${detection.detection_index}] Error:`, error);
-          result.error = error instanceof Error ? error.message : 'Unknown error';
+          result.status = 'success';
+          result.resultsCount = resultsToSave.length;
+
+          console.log(`  ✅ [${detection.detection_index}] Found and saved ${resultsToSave.length} results to cache`);
+        } else {
           result.status = 'error';
+          result.error = 'No results found';
+          console.log(`  ⚠️ [${detection.detection_index}] No results found`);
         }
 
-        return result;
-      })
-    );
+      } catch (error) {
+        console.error(`  ❌ [${detection.detection_index}] Error:`, error);
+        result.error = error instanceof Error ? error.message : 'Unknown error';
+        result.status = 'error';
+      }
+
+      results.push(result);
+
+      // Add delay between requests (1.5 seconds) to avoid rate limiting
+      if (i < detectionsToProcess.length - 1) {
+        console.log(`  ⏳ Waiting 1.5s before next request...`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    }
 
     const successCount = results.filter(r => r.status === 'success').length;
     const errorCount = results.filter(r => r.status === 'error').length;
+    const totalResultsCached = results.reduce((sum, r) => sum + (r.resultsCount || 0), 0);
 
-    console.log(`✅ Batch FoodGraph search complete: ${successCount} success, ${errorCount} errors`);
+    console.log(`✅ Batch FoodGraph search complete: ${successCount} success, ${errorCount} errors, ${totalResultsCached} total results cached`);
 
     return NextResponse.json({
       message: 'Batch FoodGraph search complete',
       total: detectionsToProcess.length,
       success: successCount,
       errors: errorCount,
+      totalCached: totalResultsCached,
       results: results
     });
 
@@ -143,7 +152,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 90 second timeout for parallel searches
-export const maxDuration = 90;
+// 180 second timeout for sequential searches (40 products × 1.5s delay + processing time)
+export const maxDuration = 180;
 export const runtime = 'nodejs';
 
