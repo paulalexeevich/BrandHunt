@@ -2,10 +2,12 @@
 
 ## Overview
 
-Integrated external YOLO Product Detector API (http://157.180.25.214) as an alternative detection method to Gemini API. Users can now choose between two detection approaches:
+Integrated external YOLO Product Detector API (http://157.180.25.214) as an alternative detection method to Gemini API with **50% confidence filtering** for high-quality results. Users can now choose between two detection approaches:
 
 1. **YOLO + Gemini (Hybrid)** - Fast YOLO detection + Gemini extraction ⚡
 2. **Gemini Only** - Gemini handles both detection and extraction 🤖
+
+**Quality Control:** Only detections with ≥50% confidence are saved to prevent false positives.
 
 ## Architecture
 
@@ -64,9 +66,10 @@ Integrated external YOLO Product Detector API (http://157.180.25.214) as an alte
 1. Fetch image from Supabase by `imageId`
 2. Convert base64 → Buffer → Blob
 3. Call YOLO API at `http://157.180.25.214/api/detect`
-4. Convert YOLO coordinates (pixel x1,y1,x2,y2) → BrangHunt normalized (0-1000 y0,x0,y1,x1)
-5. Save detections to `branghunt_detections` table
-6. Return results with timing metrics
+4. **Filter detections:** Keep only confidence ≥ 50% (configurable via `CONFIDENCE_THRESHOLD`)
+5. Convert YOLO coordinates (pixel x1,y1,x2,y2) → BrangHunt normalized (0-1000 y0,x0,y1,x1)
+6. Save high-confidence detections to `branghunt_detections` table
+7. Return results with timing metrics
 
 **YOLO Response Format:**
 ```json
