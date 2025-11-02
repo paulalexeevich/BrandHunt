@@ -87,6 +87,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     step3: { done: false, success: 0, total: 0 },
     step4: { done: false, success: 0, total: 0 }
   });
+  const [detectionMethod, setDetectionMethod] = useState<'gemini' | 'yolo'>('yolo');
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
     natural: { width: number; height: number };
@@ -183,7 +184,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     setError(null);
 
     try {
-      const response = await fetch('/api/detect', {
+      // Choose API endpoint based on detection method
+      const endpoint = detectionMethod === 'yolo' ? '/api/detect-yolo' : '/api/detect';
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageId: resolvedParams.imageId }),
@@ -197,6 +201,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       const data = await response.json();
       setDetections(data.detections);
       setProductsDetected(true);
+      
+      // Show detection time info
+      if (data.processing_time_ms) {
+        console.log(`Detection completed in ${data.processing_time_ms}ms using ${data.detection_method || detectionMethod.toUpperCase()}`);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Detection failed';
       setError(errorMessage);
@@ -671,22 +680,49 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 </span>
               )}
               </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
               {!productsDetected && (
-                <button
-                  onClick={handleDetectProducts}
-                  disabled={loading}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Detecting...
-                    </>
-                  ) : (
-                    '🎯 Detect Products'
-                  )}
-                </button>
+                <>
+                  {/* Detection Method Toggle */}
+                  <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setDetectionMethod('yolo')}
+                      disabled={loading}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        detectionMethod === 'yolo'
+                          ? 'bg-white text-indigo-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      ⚡ YOLO
+                    </button>
+                    <button
+                      onClick={() => setDetectionMethod('gemini')}
+                      disabled={loading}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        detectionMethod === 'gemini'
+                          ? 'bg-white text-indigo-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      🤖 Gemini
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleDetectProducts}
+                    disabled={loading}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Detecting...
+                      </>
+                    ) : (
+                      '🎯 Detect Products'
+                    )}
+                  </button>
+                </>
               )}
               {productsDetected && detections.some(d => !d.fully_analyzed) && (
                 <button
