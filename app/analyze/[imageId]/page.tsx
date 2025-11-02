@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use, useRef } from 'react';
+import React, { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, CheckCircle, Package, Trash2 } from 'lucide-react';
@@ -682,7 +682,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               </div>
             <div className="flex gap-3 items-center">
               {!productsDetected && (
-                <>
+                <React.Fragment key="detection-controls">
                   {/* Detection Method Toggle */}
                   <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
                     <button
@@ -722,7 +722,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       '🎯 Detect Products'
                     )}
                   </button>
-                </>
+                </React.Fragment>
               )}
               {productsDetected && detections.some(d => !d.fully_analyzed) && (
                 <button
