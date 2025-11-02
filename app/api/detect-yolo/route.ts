@@ -128,6 +128,8 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`[YOLO Detection] Converted ${detections.length} detections to BrangHunt format`);
+    console.log(`[YOLO Detection] Sample detection #1:`, JSON.stringify(detections[0]));
+    console.log(`[YOLO Detection] Sample detection #44:`, JSON.stringify(detections[43]));
 
     // Save detections to database
     const { error: insertError } = await supabase
