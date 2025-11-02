@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-server';
+import { supabase } from '@/lib/supabase';
 
 // Configure for Fluid Compute (60s timeout on Vercel free tier)
 export const runtime = 'nodejs';
@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
     console.log(`[YOLO Detection] Processing image ID: ${imageId}`);
 
     // Fetch image from database
-    const supabase = createClient();
     const { data: image, error: fetchError } = await supabase
       .from('branghunt_images')
       .select('*')
@@ -65,26 +64,39 @@ export async function POST(request: NextRequest) {
 
     console.log(`[YOLO Detection] Image size: ${image.width}x${image.height}`);
 
-    // Convert base64 to blob for YOLO API
+    // Convert base64 to buffer for YOLO API
     const base64Data = image.file_path.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
     
-    // Create FormData for YOLO API
-    const yoloFormData = new FormData();
-    const blob = new Blob([buffer], { type: image.mime_type });
-    yoloFormData.append('file', blob, 'image.jpg');
-
     console.log('[YOLO Detection] Calling YOLO API...');
+    console.log(`[YOLO Detection] Buffer size: ${buffer.length} bytes`);
     const yoloStartTime = Date.now();
+
+    // Create FormData using Node.js built-in (available in Node 18+)
+    const formData = new FormData();
+    const blob = new Blob([buffer], { type: image.mime_type || 'image/jpeg' });
+    formData.append('file', blob, 'image.jpg');
 
     // Call YOLO API
     const yoloResponse = await fetch(YOLO_API_URL, {
       method: 'POST',
-      body: yoloFormData,
+      body: formData,
     });
 
+    console.log(`[YOLO Detection] API response status: ${yoloResponse.status}`);
+    
     if (!yoloResponse.ok) {
-      throw new Error(`YOLO API error: ${yoloResponse.status}`);
+      const errorText = await yoloResponse.text();
+      console.error('[YOLO Detection] API error response:', errorText.substring(0, 200));
+      throw new Error(`YOLO API error: ${yoloResponse.status} - ${errorText.substring(0, 100)}`);
+    }
+
+    // Check if response is JSON
+    const contentType = yoloResponse.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const responseText = await yoloResponse.text();
+      console.error('[YOLO Detection] Non-JSON response:', responseText.substring(0, 200));
+      throw new Error(`YOLO API returned non-JSON response (${contentType}): ${responseText.substring(0, 100)}`);
     }
 
     const yoloData: YOLOResponse = await yoloResponse.json();
