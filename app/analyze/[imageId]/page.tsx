@@ -839,13 +839,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       display: imageDimensions ? 'block' : 'none',
                     }}
                   >
-                    <div key="badge" className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${isSelected ? 'bg-indigo-600' : detection.brand_name ? 'bg-green-600' : 'bg-yellow-600'}`}>
+                    {/* Product number badge */}
+                    <div className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${isSelected ? 'bg-indigo-600' : detection.brand_name ? 'bg-green-600' : 'bg-yellow-600'}`}>
                       #{index + 1}
                     </div>
+                    {/* Product label */}
                     {detection.brand_name && showProductLabels && (
-                      <div key="label" className="absolute -bottom-8 left-0 right-0 px-2 py-1 text-xs font-semibold bg-white border-2 border-green-600 rounded text-center truncate">
+                      <div className="absolute -bottom-8 left-0 right-0 px-2 py-1 text-xs font-semibold bg-white border-2 border-green-600 rounded text-center truncate">
                         {detection.product_name || detection.brand_name}
-                        {detection.category && <span key="category" className="text-gray-500"> • {detection.category}</span>}
+                        {detection.category && <span className="text-gray-500"> • {detection.category}</span>}
                       </div>
                     )}
                   </div>
