@@ -111,12 +111,18 @@ export async function POST(request: NextRequest) {
     // Convert YOLO format to BrangHunt format
     // YOLO returns pixel coordinates (x1, y1, x2, y2)
     // BrangHunt expects normalized coordinates {y0, x0, y1, x1} (0-1000 scale)
+    // IMPORTANT: Use YOLO's reported dimensions, not database dimensions!
+    const yoloWidth = yoloData.image_dimensions.width;
+    const yoloHeight = yoloData.image_dimensions.height;
+    
+    console.log(`[YOLO Detection] Using YOLO dimensions: ${yoloWidth}x${yoloHeight} (DB: ${image.width}x${image.height})`);
+    
     const detections = yoloData.detections.map((det, index) => {
       const normalizedBox = {
-        y0: Math.round((det.bbox.y1 / image.height) * 1000),
-        x0: Math.round((det.bbox.x1 / image.width) * 1000),
-        y1: Math.round((det.bbox.y2 / image.height) * 1000),
-        x1: Math.round((det.bbox.x2 / image.width) * 1000),
+        y0: Math.round((det.bbox.y1 / yoloHeight) * 1000),
+        x0: Math.round((det.bbox.x1 / yoloWidth) * 1000),
+        y1: Math.round((det.bbox.y2 / yoloHeight) * 1000),
+        x1: Math.round((det.bbox.x2 / yoloWidth) * 1000),
       };
 
       return {
