@@ -7,6 +7,7 @@ export const maxDuration = 60;
 
 // YOLO API configuration
 const YOLO_API_URL = 'http://157.180.25.214/api/detect';
+const CONFIDENCE_THRESHOLD = 0.5; // Minimum 50% confidence required
 
 interface YOLODetection {
   bbox: {
@@ -117,7 +118,11 @@ export async function POST(request: NextRequest) {
     
     console.log(`[YOLO Detection] Using YOLO dimensions: ${yoloWidth}x${yoloHeight} (DB: ${image.width}x${image.height})`);
     
-    const detections = yoloData.detections.map((det, index) => {
+    // Filter out low-confidence detections (< 50%)
+    const filteredDetections = yoloData.detections.filter(det => det.confidence >= CONFIDENCE_THRESHOLD);
+    console.log(`[YOLO Detection] Filtered ${yoloData.detections.length} detections to ${filteredDetections.length} (confidence >= ${CONFIDENCE_THRESHOLD * 100}%)`);
+    
+    const detections = filteredDetections.map((det, index) => {
       const normalizedBox = {
         y0: Math.round((det.bbox.y1 / yoloHeight) * 1000),
         x0: Math.round((det.bbox.x1 / yoloWidth) * 1000),
@@ -134,8 +139,10 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`[YOLO Detection] Converted ${detections.length} detections to BrangHunt format`);
-    console.log(`[YOLO Detection] Sample detection #1:`, JSON.stringify(detections[0]));
-    console.log(`[YOLO Detection] Sample detection #44:`, JSON.stringify(detections[43]));
+    if (detections.length > 0) {
+      console.log(`[YOLO Detection] Sample detection #1:`, JSON.stringify(detections[0]));
+      console.log(`[YOLO Detection] Confidence range: ${Math.min(...detections.map(d => d.confidence))} - ${Math.max(...detections.map(d => d.confidence))}`);
+    }
 
     // Save detections to database
     const { error: insertError } = await supabase
