@@ -123,12 +123,14 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to save detections');
     }
 
-    // Update image status
+    // Update image status - set detection_completed flag
     await supabase
       .from('branghunt_images')
       .update({ 
         processing_status: 'detected',
-        processed: false 
+        processed: false,
+        detection_completed: true,
+        detection_completed_at: new Date().toISOString(),
       })
       .eq('id', imageId);
 
