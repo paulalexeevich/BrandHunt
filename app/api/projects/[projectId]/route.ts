@@ -32,7 +32,15 @@ export async function GET(
     const { data: images, error: imagesError } = await supabase
       .from('branghunt_images')
       .select(`
-        *,
+        id,
+        file_path,
+        mime_type,
+        width,
+        height,
+        store_name,
+        detection_completed,
+        detection_completed_at,
+        created_at,
         detections:branghunt_detections(count)
       `)
       .eq('project_id', projectId)
@@ -46,9 +54,15 @@ export async function GET(
       );
     }
 
+    // Format images with proper data URIs
+    const formattedImages = (images || []).map(img => ({
+      ...img,
+      image_data: `data:${img.mime_type};base64,${img.file_path}`
+    }));
+
     return NextResponse.json({ 
       project: projectStats,
-      images: images || []
+      images: formattedImages
     });
   } catch (error) {
     console.error('Error in GET /api/projects/[projectId]:', error);
