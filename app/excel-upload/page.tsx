@@ -86,8 +86,14 @@ function ExcelUploadContent() {
     try {
       // Parse Excel file client-side
       console.log('[Excel Upload] Reading Excel file...');
+      console.log('[Excel Upload] File size:', file.size, 'bytes');
+      console.log('[Excel Upload] File name:', file.name);
+      
       const arrayBuffer = await file.arrayBuffer();
+      console.log('[Excel Upload] File read into memory, buffer size:', arrayBuffer.byteLength);
+      
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      console.log('[Excel Upload] Workbook parsed, sheets:', workbook.SheetNames);
       
       // Get first sheet
       const sheetName = workbook.SheetNames[0];
@@ -101,12 +107,17 @@ function ExcelUploadContent() {
         throw new Error('Excel file is empty or has no data rows');
       }
 
+      // Log first row to check data structure
+      console.log('[Excel Upload] First row sample:', jsonData[0]);
+
       // Prepare rows for batch processing
       const rows = jsonData.map((row, index) => ({
         imageUrl: row['Probe Image Path'],
         storeName: row['Store Name'],
         rowNumber: index + 2, // Excel row number (accounting for header)
       }));
+
+      console.log('[Excel Upload] Prepared rows, first row:', rows[0]);
 
       // Split into batches of 50 rows
       const BATCH_SIZE = 50;
@@ -117,6 +128,7 @@ function ExcelUploadContent() {
 
       const totalBatches = batches.length;
       console.log(`[Excel Upload] Split into ${totalBatches} batches of up to ${BATCH_SIZE} rows`);
+      console.log(`[Excel Upload] Batch sizes:`, batches.map(b => b.length));
 
       // Cumulative results across all batches
       const cumulativeResults = {
@@ -145,6 +157,12 @@ function ExcelUploadContent() {
         });
 
         try {
+          console.log(`[Excel Upload] Sending batch ${batchNumber} with ${batch.length} rows...`);
+          
+          // Create abort controller for timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 150000); // 2.5 minutes timeout
+          
           const response = await fetch('/api/upload-excel-batch', {
             method: 'POST',
             headers: {
@@ -156,9 +174,14 @@ function ExcelUploadContent() {
               batchNumber,
               totalBatches,
             }),
+            signal: controller.signal,
           });
 
+          clearTimeout(timeoutId);
+          console.log(`[Excel Upload] Batch ${batchNumber} response received, status: ${response.status}`);
+
           const data = await response.json();
+          console.log(`[Excel Upload] Batch ${batchNumber} data:`, data);
 
           if (!response.ok) {
             throw new Error(data.error || data.details || 'Batch upload failed');
@@ -187,14 +210,35 @@ function ExcelUploadContent() {
 
         } catch (batchError) {
           console.error(`[Excel Upload] Batch ${batchNumber} failed:`, batchError);
+          
+          // Check if it's an abort error (timeout)
+          const errorMessage = batchError instanceof Error && batchError.name === 'AbortError'
+            ? 'Batch upload timed out after 2.5 minutes'
+            : batchError instanceof Error 
+              ? batchError.message 
+              : 'Unknown error';
+          
+          console.error(`[Excel Upload] Error details: ${errorMessage}`);
+          
           // Mark all rows in this batch as failed
           batch.forEach(row => {
             cumulativeResults.failed++;
             cumulativeResults.errors.push({
               row: row.rowNumber,
-              error: `Batch processing failed: ${batchError instanceof Error ? batchError.message : 'Unknown error'}`,
+              error: `Batch ${batchNumber} failed: ${errorMessage}`,
               storeName: row.storeName,
             });
+          });
+          
+          // Update progress to show the failure
+          setProgress({
+            current: cumulativeResults.successful + cumulativeResults.failed,
+            total: rows.length,
+            successful: cumulativeResults.successful,
+            failed: cumulativeResults.failed,
+            currentBatch: batchNumber,
+            totalBatches: totalBatches,
+            currentStore: `Batch ${batchNumber}/${totalBatches} failed`,
           });
         }
       }
