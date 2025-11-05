@@ -138,6 +138,23 @@ export default function Home() {
           <p className="text-lg text-gray-600">
             AI-powered product detection and brand recognition
           </p>
+          {!authLoading && user && (
+            <div className="flex gap-3 justify-center mt-4">
+              <Link
+                href="/gallery"
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                View Gallery
+              </Link>
+              <span className="text-gray-400">•</span>
+              <Link
+                href="/excel-upload"
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Bulk Upload from Excel
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Auth Loading State */}

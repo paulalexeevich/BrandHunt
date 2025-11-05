@@ -52,6 +52,7 @@ interface ImageData {
   file_path: string;
   uploaded_at: string;
   processing_status: string;
+  store_name?: string | null;
 }
 
 export default function ResultsPage({ params }: { params: Promise<{ imageId: string }> }) {
@@ -113,7 +114,13 @@ export default function ResultsPage({ params }: { params: Promise<{ imageId: str
             Back to Gallery
           </Link>
           <h1 className="text-3xl font-bold text-gray-900">{image.original_filename}</h1>
-          <p className="text-gray-600">
+          {image.store_name && (
+            <p className="text-sm text-gray-600 mt-1 flex items-center">
+              <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+              {image.store_name}
+            </p>
+          )}
+          <p className="text-gray-600 mt-2">
             {detections.length} product{detections.length !== 1 ? 's' : ''} detected
           </p>
         </div>

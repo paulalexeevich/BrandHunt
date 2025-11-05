@@ -53,6 +53,7 @@ interface ImageData {
   original_filename: string;
   file_path: string;
   processing_status: string;
+  store_name?: string | null;
 }
 
 export default function AnalyzePage({ params }: { params: Promise<{ imageId: string }> }) {
@@ -664,7 +665,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               Delete Image
             </button>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">{image.original_filename}</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{image.original_filename}</h1>
+            {image.store_name && (
+              <p className="text-sm text-gray-600 mt-1 flex items-center">
+                <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                {image.store_name}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Status Bar */}
