@@ -79,7 +79,7 @@ export default function LoginPage() {
             </div>
 
             {/* Password Field */}
-            <div className="mb-6">
+            <div className="mb-2">
               <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
                 Password
               </label>
@@ -93,6 +93,13 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 disabled={loading}
               />
+            </div>
+
+            {/* Forgot Password Link */}
+            <div className="mb-6 text-right">
+              <Link href="/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                Forgot password?
+              </Link>
             </div>
 
             {/* Login Button */}
