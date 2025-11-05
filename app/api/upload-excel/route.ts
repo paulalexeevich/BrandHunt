@@ -56,131 +56,215 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Track results
-    const results = {
-      total: jsonData.length,
-      successful: 0,
-      failed: 0,
-      errors: [] as Array<{ row: number; error: string; storeName?: string }>,
-    };
+    // Create a streaming response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Track results
+        const results = {
+          total: jsonData.length,
+          successful: 0,
+          failed: 0,
+          errors: [] as Array<{ row: number; error: string; storeName?: string }>,
+        };
 
-    // Process each row
-    for (let i = 0; i < jsonData.length; i++) {
-      const row = jsonData[i];
-      const rowNumber = i + 2; // Excel row number (accounting for header)
+        // Send initial progress
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+          type: 'progress', 
+          current: 0, 
+          total: jsonData.length,
+          successful: 0,
+          failed: 0
+        })}\n\n`));
 
-      try {
-        // Extract required fields
-        const imageUrl = row['Probe Image Path'];
-        const storeName = row['Store Name'];
+        // Process each row
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          const rowNumber = i + 2; // Excel row number (accounting for header)
 
-        // Validate required fields
-        if (!imageUrl) {
-          results.failed++;
-          results.errors.push({ 
-            row: rowNumber, 
-            error: 'Missing "Probe Image Path" column',
-            storeName 
-          });
-          continue;
-        }
+          try {
+            // Extract required fields
+            const imageUrl = row['Probe Image Path'];
+            const storeName = row['Store Name'];
 
-        if (!storeName) {
-          results.failed++;
-          results.errors.push({ 
-            row: rowNumber, 
-            error: 'Missing "Store Name" column',
-            storeName 
-          });
-          continue;
-        }
+            // Validate required fields
+            if (!imageUrl) {
+              results.failed++;
+              results.errors.push({ 
+                row: rowNumber, 
+                error: 'Missing "Probe Image Path" column',
+                storeName 
+              });
+              
+              // Send progress update
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                type: 'progress', 
+                current: i + 1, 
+                total: jsonData.length,
+                successful: results.successful,
+                failed: results.failed,
+                currentRow: rowNumber,
+                currentStore: storeName || 'Unknown'
+              })}\n\n`));
+              continue;
+            }
 
-        console.log(`[Upload Excel] Processing row ${rowNumber}: ${storeName}`);
+            if (!storeName) {
+              results.failed++;
+              results.errors.push({ 
+                row: rowNumber, 
+                error: 'Missing "Store Name" column',
+                storeName 
+              });
+              
+              // Send progress update
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                type: 'progress', 
+                current: i + 1, 
+                total: jsonData.length,
+                successful: results.successful,
+                failed: results.failed,
+                currentRow: rowNumber,
+                currentStore: 'Unknown'
+              })}\n\n`));
+              continue;
+            }
 
-        // Fetch image from URL
-        let base64: string;
-        let fileSize: number;
-        let mimeType: string;
-        let filename: string;
+            console.log(`[Upload Excel] Processing row ${rowNumber}: ${storeName}`);
 
-        try {
-          const response = await fetch(imageUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.statusText}`);
+            // Fetch image from URL
+            let base64: string;
+            let fileSize: number;
+            let mimeType: string;
+            let filename: string;
+
+            try {
+              const response = await fetch(imageUrl);
+              if (!response.ok) {
+                throw new Error(`Failed to fetch image: ${response.statusText}`);
+              }
+
+              const arrayBuffer = await response.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+              base64 = buffer.toString('base64');
+              fileSize = buffer.length;
+              mimeType = response.headers.get('content-type') || 'image/jpeg';
+
+              // Extract filename from URL
+              const urlParts = imageUrl.split('/');
+              filename = urlParts[urlParts.length - 1] || `image-${rowNumber}.jpg`;
+
+              // Validate it's an image
+              if (!mimeType.startsWith('image/')) {
+                throw new Error('URL does not point to an image');
+              }
+            } catch (fetchError) {
+              results.failed++;
+              results.errors.push({ 
+                row: rowNumber, 
+                error: `Failed to fetch image: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`,
+                storeName 
+              });
+              
+              // Send progress update
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                type: 'progress', 
+                current: i + 1, 
+                total: jsonData.length,
+                successful: results.successful,
+                failed: results.failed,
+                currentRow: rowNumber,
+                currentStore: storeName
+              })}\n\n`));
+              continue;
+            }
+
+            // Store image metadata in Supabase with store_name
+            const { error: dbError } = await supabase
+              .from('branghunt_images')
+              .insert({
+                user_id: user.id,
+                original_filename: filename,
+                file_path: base64,
+                file_size: fileSize,
+                mime_type: mimeType,
+                store_name: storeName,
+                project_id: projectId || null,
+                width: null,
+                height: null,
+                processing_status: 'pending',
+                processed: false,
+              });
+
+            if (dbError) {
+              console.error(`[Upload Excel] Database error for row ${rowNumber}:`, dbError);
+              results.failed++;
+              results.errors.push({ 
+                row: rowNumber, 
+                error: `Database error: ${dbError.message}`,
+                storeName 
+              });
+            } else {
+              results.successful++;
+              console.log(`[Upload Excel] Row ${rowNumber} uploaded successfully`);
+            }
+
+            // Send progress update after each row
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+              type: 'progress', 
+              current: i + 1, 
+              total: jsonData.length,
+              successful: results.successful,
+              failed: results.failed,
+              currentRow: rowNumber,
+              currentStore: storeName
+            })}\n\n`));
+
+          } catch (rowError) {
+            console.error(`[Upload Excel] Error processing row ${rowNumber}:`, rowError);
+            results.failed++;
+            results.errors.push({ 
+              row: rowNumber, 
+              error: rowError instanceof Error ? rowError.message : 'Unknown error',
+              storeName: row['Store Name'] 
+            });
+            
+            // Send progress update
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+              type: 'progress', 
+              current: i + 1, 
+              total: jsonData.length,
+              successful: results.successful,
+              failed: results.failed,
+              currentRow: rowNumber,
+              currentStore: row['Store Name'] || 'Unknown'
+            })}\n\n`));
           }
+        }
 
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-          base64 = buffer.toString('base64');
-          fileSize = buffer.length;
-          mimeType = response.headers.get('content-type') || 'image/jpeg';
+        console.log('[Upload Excel] Completed:', results);
 
-          // Extract filename from URL
-          const urlParts = imageUrl.split('/');
-          filename = urlParts[urlParts.length - 1] || `image-${rowNumber}.jpg`;
-
-          // Validate it's an image
-          if (!mimeType.startsWith('image/')) {
-            throw new Error('URL does not point to an image');
+        // Send final results
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+          type: 'complete',
+          results: {
+            total: results.total,
+            successful: results.successful,
+            failed: results.failed,
+            errors: results.errors
           }
-        } catch (fetchError) {
-          results.failed++;
-          results.errors.push({ 
-            row: rowNumber, 
-            error: `Failed to fetch image: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`,
-            storeName 
-          });
-          continue;
-        }
+        })}\n\n`));
 
-        // Store image metadata in Supabase with store_name
-        const { error: dbError } = await supabase
-          .from('branghunt_images')
-          .insert({
-            user_id: user.id,
-            original_filename: filename,
-            file_path: base64,
-            file_size: fileSize,
-            mime_type: mimeType,
-            store_name: storeName,
-            project_id: projectId || null,
-            width: null,
-            height: null,
-            processing_status: 'pending',
-            processed: false,
-          });
-
-        if (dbError) {
-          console.error(`[Upload Excel] Database error for row ${rowNumber}:`, dbError);
-          results.failed++;
-          results.errors.push({ 
-            row: rowNumber, 
-            error: `Database error: ${dbError.message}`,
-            storeName 
-          });
-          continue;
-        }
-
-        results.successful++;
-        console.log(`[Upload Excel] Row ${rowNumber} uploaded successfully`);
-
-      } catch (rowError) {
-        console.error(`[Upload Excel] Error processing row ${rowNumber}:`, rowError);
-        results.failed++;
-        results.errors.push({ 
-          row: rowNumber, 
-          error: rowError instanceof Error ? rowError.message : 'Unknown error',
-          storeName: row['Store Name'] 
-        });
+        controller.close();
       }
-    }
+    });
 
-    console.log('[Upload Excel] Completed:', results);
-
-    return NextResponse.json({ 
-      success: true,
-      message: `Processed ${results.total} rows: ${results.successful} successful, ${results.failed} failed`,
-      results,
+    return new NextResponse(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
 
   } catch (error) {

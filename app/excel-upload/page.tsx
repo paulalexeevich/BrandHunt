@@ -12,12 +12,22 @@ interface UploadResults {
   errors: Array<{ row: number; error: string; storeName?: string }>;
 }
 
+interface ProgressData {
+  current: number;
+  total: number;
+  successful: number;
+  failed: number;
+  currentRow?: number;
+  currentStore?: string;
+}
+
 function ExcelUploadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams.get('projectId');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<ProgressData | null>(null);
   const [results, setResults] = useState<UploadResults | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -68,6 +78,7 @@ function ExcelUploadContent() {
     setUploading(true);
     setError(null);
     setResults(null);
+    setProgress(null);
 
     try {
       const formData = new FormData();
@@ -81,19 +92,60 @@ function ExcelUploadContent() {
         body: formData,
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json();
         throw new Error(data.error || data.details || 'Upload failed');
       }
 
-      setResults(data.results);
-      
-      // If all successful, show success message
-      if (data.results.failed === 0) {
-        setTimeout(() => {
-          router.push('/gallery');
-        }, 3000);
+      // Read the streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Failed to read response stream');
+      }
+
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process complete messages
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || ''; // Keep incomplete message in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === 'progress') {
+                setProgress({
+                  current: data.current,
+                  total: data.total,
+                  successful: data.successful,
+                  failed: data.failed,
+                  currentRow: data.currentRow,
+                  currentStore: data.currentStore,
+                });
+              } else if (data.type === 'complete') {
+                setResults(data.results);
+                
+                // If all successful, redirect to gallery
+                if (data.results.failed === 0) {
+                  setTimeout(() => {
+                    router.push('/gallery');
+                  }, 3000);
+                }
+              }
+            } catch (parseError) {
+              console.error('Failed to parse progress data:', parseError);
+            }
+          }
+        }
       }
 
     } catch (err) {
@@ -202,6 +254,70 @@ function ExcelUploadContent() {
             )}
           </button>
         </div>
+
+        {/* Progress Card */}
+        {uploading && progress && (
+          <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Upload Progress</h2>
+            
+            {/* Progress Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-blue-600 font-medium">Processed</span>
+                  <span className="text-2xl font-bold text-blue-700">
+                    {progress.current} / {progress.total}
+                  </span>
+                </div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-green-600 font-medium">Successful</span>
+                  <span className="text-2xl font-bold text-green-700">{progress.successful}</span>
+                </div>
+              </div>
+              <div className="bg-red-50 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-red-600 font-medium">Failed</span>
+                  <span className="text-2xl font-bold text-red-700">{progress.failed}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Overall Progress</span>
+                <span className="text-sm font-bold text-blue-600">
+                  {Math.round((progress.current / progress.total) * 100)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 h-4 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Current Processing */}
+            {progress.currentStore && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <Loader2 className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0 animate-spin" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">
+                      Currently processing row {progress.currentRow}
+                    </p>
+                    <p className="text-xs text-blue-700 mt-1 truncate">
+                      {progress.currentStore}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Results Card */}
         {results && (
