@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { searchProducts } from '@/lib/foodgraph';
 
 interface SearchResult {
@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`🔍 Starting batch FoodGraph search for image ${imageId}...`);
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // Fetch all detections that have brand info but no FoodGraph results yet
     const { data: detections, error: detectionsError } = await supabase

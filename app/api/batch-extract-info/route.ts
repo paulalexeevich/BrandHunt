@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { extractProductInfo } from '@/lib/gemini';
 
 interface ExtractionResult {
@@ -29,6 +29,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`📋 Starting batch info extraction for image ${imageId}...`);
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // Fetch the image data
     const { data: image, error: imageError } = await supabase
