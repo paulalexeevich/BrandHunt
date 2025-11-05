@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Home, Loader2, FolderOpen } from 'lucide-react';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
 
 interface UploadResults {
   total: number;
@@ -19,6 +20,8 @@ interface ProgressData {
   failed: number;
   currentRow?: number;
   currentStore?: string;
+  currentBatch?: number;
+  totalBatches?: number;
 }
 
 function ExcelUploadContent() {
@@ -81,71 +84,131 @@ function ExcelUploadContent() {
     setProgress(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      if (projectId) {
-        formData.append('projectId', projectId);
+      // Parse Excel file client-side
+      console.log('[Excel Upload] Reading Excel file...');
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      
+      // Get first sheet
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Convert to JSON
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+      console.log('[Excel Upload] Parsed', jsonData.length, 'rows from Excel');
+
+      if (jsonData.length === 0) {
+        throw new Error('Excel file is empty or has no data rows');
       }
 
-      const response = await fetch('/api/upload-excel', {
-        method: 'POST',
-        body: formData,
-      });
+      // Prepare rows for batch processing
+      const rows = jsonData.map((row, index) => ({
+        imageUrl: row['Probe Image Path'],
+        storeName: row['Store Name'],
+        rowNumber: index + 2, // Excel row number (accounting for header)
+      }));
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || data.details || 'Upload failed');
+      // Split into batches of 50 rows
+      const BATCH_SIZE = 50;
+      const batches: typeof rows[] = [];
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        batches.push(rows.slice(i, i + BATCH_SIZE));
       }
 
-      // Read the streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      const totalBatches = batches.length;
+      console.log(`[Excel Upload] Split into ${totalBatches} batches of up to ${BATCH_SIZE} rows`);
 
-      if (!reader) {
-        throw new Error('Failed to read response stream');
-      }
+      // Cumulative results across all batches
+      const cumulativeResults = {
+        total: rows.length,
+        successful: 0,
+        failed: 0,
+        errors: [] as Array<{ row: number; error: string; storeName?: string }>,
+      };
 
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) break;
+      // Process batches sequentially
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        const batchNumber = batchIndex + 1;
 
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Process complete messages
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || ''; // Keep incomplete message in buffer
+        console.log(`[Excel Upload] Processing batch ${batchNumber}/${totalBatches}...`);
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              
-              if (data.type === 'progress') {
-                setProgress({
-                  current: data.current,
-                  total: data.total,
-                  successful: data.successful,
-                  failed: data.failed,
-                  currentRow: data.currentRow,
-                  currentStore: data.currentStore,
-                });
-              } else if (data.type === 'complete') {
-                setResults(data.results);
-                
-                // If all successful, redirect to gallery
-                if (data.results.failed === 0) {
-                  setTimeout(() => {
-                    router.push('/gallery');
-                  }, 3000);
-                }
-              }
-            } catch (parseError) {
-              console.error('Failed to parse progress data:', parseError);
-            }
+        // Update progress to show current batch
+        setProgress({
+          current: cumulativeResults.successful + cumulativeResults.failed,
+          total: rows.length,
+          successful: cumulativeResults.successful,
+          failed: cumulativeResults.failed,
+          currentBatch: batchNumber,
+          totalBatches: totalBatches,
+          currentStore: `Batch ${batchNumber}/${totalBatches}`,
+        });
+
+        try {
+          const response = await fetch('/api/upload-excel-batch', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              rows: batch,
+              projectId: projectId || undefined,
+              batchNumber,
+              totalBatches,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || data.details || 'Batch upload failed');
           }
+
+          // Accumulate results from this batch
+          cumulativeResults.successful += data.results.successful;
+          cumulativeResults.failed += data.results.failed;
+          cumulativeResults.errors.push(...data.results.errors);
+
+          console.log(`[Excel Upload] Batch ${batchNumber}/${totalBatches} completed:`, {
+            successful: data.results.successful,
+            failed: data.results.failed,
+          });
+
+          // Update progress with batch completion
+          setProgress({
+            current: cumulativeResults.successful + cumulativeResults.failed,
+            total: rows.length,
+            successful: cumulativeResults.successful,
+            failed: cumulativeResults.failed,
+            currentBatch: batchNumber,
+            totalBatches: totalBatches,
+            currentStore: `Completed batch ${batchNumber}/${totalBatches}`,
+          });
+
+        } catch (batchError) {
+          console.error(`[Excel Upload] Batch ${batchNumber} failed:`, batchError);
+          // Mark all rows in this batch as failed
+          batch.forEach(row => {
+            cumulativeResults.failed++;
+            cumulativeResults.errors.push({
+              row: row.rowNumber,
+              error: `Batch processing failed: ${batchError instanceof Error ? batchError.message : 'Unknown error'}`,
+              storeName: row.storeName,
+            });
+          });
         }
+      }
+
+      console.log('[Excel Upload] All batches completed:', cumulativeResults);
+
+      // Set final results
+      setResults(cumulativeResults);
+      
+      // If all successful, redirect to gallery
+      if (cumulativeResults.failed === 0) {
+        setTimeout(() => {
+          router.push('/gallery');
+        }, 3000);
       }
 
     } catch (err) {
@@ -153,6 +216,7 @@ function ExcelUploadContent() {
       setError(err instanceof Error ? err.message : 'Failed to upload Excel file');
     } finally {
       setUploading(false);
+      setProgress(null);
     }
   };
 
@@ -260,6 +324,21 @@ function ExcelUploadContent() {
           <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Upload Progress</h2>
             
+            {/* Batch Info */}
+            {progress.currentBatch && progress.totalBatches && (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <span className="text-purple-700 font-medium">Current Batch</span>
+                  <span className="text-xl font-bold text-purple-900">
+                    {progress.currentBatch} / {progress.totalBatches}
+                  </span>
+                </div>
+                <p className="text-xs text-purple-600 mt-1">
+                  Processing in batches of 50 images to ensure reliability
+                </p>
+              </div>
+            )}
+            
             {/* Progress Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="bg-blue-50 rounded-lg p-4">
@@ -305,13 +384,15 @@ function ExcelUploadContent() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start">
                   <Loader2 className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0 animate-spin" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-blue-900">
-                      Currently processing row {progress.currentRow}
-                    </p>
-                    <p className="text-xs text-blue-700 mt-1 truncate">
                       {progress.currentStore}
                     </p>
+                    {progress.currentBatch && progress.totalBatches && (
+                      <p className="text-xs text-blue-700 mt-1">
+                        Processing images in chunks - please wait...
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -434,4 +515,5 @@ export default function ExcelUploadPage() {
     </Suspense>
   );
 }
+
 
