@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
         project_id: projectId || null,
         width: null,
         height: null,
+        status: 'uploaded',
         processing_status: 'pending',
         processed: false,
       })

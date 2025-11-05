@@ -18,6 +18,7 @@ import {
   Search,
   Filter,
   XCircle,
+  Package,
 } from 'lucide-react';
 import AuthNav from '@/components/AuthNav';
 import { createClient } from '@/lib/supabase-browser';
@@ -47,6 +48,7 @@ interface ImageData {
   width: number;
   height: number;
   store_name: string | null;
+  status: 'uploaded' | 'detected' | 'extracted' | 'selected';
   detection_completed: boolean;
   detection_completed_at: string | null;
   created_at: string;
@@ -359,16 +361,29 @@ export default function ProjectViewPage() {
                             alt="Shelf image"
                             className="w-full h-full object-cover"
                           />
-                          {/* Detection Status Badge */}
-                          {image.detection_completed ? (
+                          {/* Status Badge - 4 stages: uploaded, detected, extracted, selected */}
+                          {image.status === 'uploaded' && (
+                            <div className="absolute top-2 right-2 bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                              <Upload className="w-3 h-3" />
+                              Uploaded
+                            </div>
+                          )}
+                          {image.status === 'detected' && (
+                            <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                              <Target className="w-3 h-3" />
+                              {detectionCount} detected
+                            </div>
+                          )}
+                          {image.status === 'extracted' && (
+                            <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                              <Package className="w-3 h-3" />
+                              {detectionCount} extracted
+                            </div>
+                          )}
+                          {image.status === 'selected' && (
                             <div className="absolute top-2 right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
                               <CheckCircle className="w-3 h-3" />
-                              {detectionCount} products
-                            </div>
-                          ) : (
-                            <div className="absolute top-2 right-2 bg-gray-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                              <XCircle className="w-3 h-3" />
-                              Not detected
+                              {detectionCount} selected
                             </div>
                           )}
                         </div>

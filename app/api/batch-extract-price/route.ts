@@ -137,6 +137,13 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Batch price extraction complete: ${successCount} success, ${skippedCount} skipped, ${errorCount} errors`);
 
+    // Update image status to 'extracted' after price extraction completes
+    // (Price extraction is the final extraction step after brand extraction)
+    await supabase
+      .from('branghunt_images')
+      .update({ status: 'extracted' })
+      .eq('id', imageId);
+
     return NextResponse.json({
       message: 'Batch price extraction complete',
       total: detections.length,

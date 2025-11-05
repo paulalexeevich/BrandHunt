@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', detectionId)
-      .select()
+      .select('*, image_id')
       .single();
 
     if (updateError) {
@@ -69,6 +69,26 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ Successfully saved result for detection:', detectionId);
+
+    // Update image status to 'selected' after saving FoodGraph match
+    // Check if all detections for this image are now fully analyzed
+    const { data: allDetections, error: detectionsError } = await supabase
+      .from('branghunt_detections')
+      .select('fully_analyzed')
+      .eq('image_id', updatedDetection.image_id);
+
+    if (!detectionsError && allDetections) {
+      const allFullyAnalyzed = allDetections.every(d => d.fully_analyzed);
+      
+      // Set status to 'selected' if at least one detection is fully analyzed
+      // (User may choose to analyze only some products in the image)
+      await supabase
+        .from('branghunt_images')
+        .update({ status: 'selected' })
+        .eq('id', updatedDetection.image_id);
+        
+      console.log(`✅ Updated image status to 'selected' (${allDetections.filter(d => d.fully_analyzed).length}/${allDetections.length} detections analyzed)`);
+    }
 
     return NextResponse.json({
       success: true,
