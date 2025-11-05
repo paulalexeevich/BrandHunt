@@ -33,79 +33,68 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Upload Excel Batch] Processing batch ${batchNumber}/${totalBatches} with ${rows.length} rows`);
 
-    // Track results for this batch
-    const results = {
-      successful: 0,
-      failed: 0,
-      errors: [] as Array<{ row: number; error: string; storeName?: string }>,
-    };
-
-    // Process each row in the batch
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
+    // Process single row (extracted for parallel processing)
+    const processRow = async (row: BatchRow) => {
       const { imageUrl, storeName, rowNumber } = row;
 
+      // Validate required fields
+      if (!imageUrl) {
+        return { 
+          success: false, 
+          row: rowNumber, 
+          error: 'Missing image URL',
+          storeName 
+        };
+      }
+
+      if (!storeName) {
+        return { 
+          success: false, 
+          row: rowNumber, 
+          error: 'Missing store name',
+          storeName 
+        };
+      }
+
+      console.log(`[Upload Excel Batch] Processing row ${rowNumber}: ${storeName}`);
+
+      // Fetch image from URL
+      let base64: string;
+      let fileSize: number;
+      let mimeType: string;
+      let filename: string;
+
       try {
-        // Validate required fields
-        if (!imageUrl) {
-          results.failed++;
-          results.errors.push({ 
-            row: rowNumber, 
-            error: 'Missing image URL',
-            storeName 
-          });
-          continue;
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.statusText}`);
         }
 
-        if (!storeName) {
-          results.failed++;
-          results.errors.push({ 
-            row: rowNumber, 
-            error: 'Missing store name',
-            storeName 
-          });
-          continue;
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        base64 = buffer.toString('base64');
+        fileSize = buffer.length;
+        mimeType = response.headers.get('content-type') || 'image/jpeg';
+
+        // Extract filename from URL
+        const urlParts = imageUrl.split('/');
+        filename = urlParts[urlParts.length - 1] || `image-${rowNumber}.jpg`;
+
+        // Validate it's an image
+        if (!mimeType.startsWith('image/')) {
+          throw new Error('URL does not point to an image');
         }
+      } catch (fetchError) {
+        return { 
+          success: false, 
+          row: rowNumber, 
+          error: `Failed to fetch image: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`,
+          storeName 
+        };
+      }
 
-        console.log(`[Upload Excel Batch] Processing row ${rowNumber}: ${storeName}`);
-
-        // Fetch image from URL
-        let base64: string;
-        let fileSize: number;
-        let mimeType: string;
-        let filename: string;
-
-        try {
-          const response = await fetch(imageUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.statusText}`);
-          }
-
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-          base64 = buffer.toString('base64');
-          fileSize = buffer.length;
-          mimeType = response.headers.get('content-type') || 'image/jpeg';
-
-          // Extract filename from URL
-          const urlParts = imageUrl.split('/');
-          filename = urlParts[urlParts.length - 1] || `image-${rowNumber}.jpg`;
-
-          // Validate it's an image
-          if (!mimeType.startsWith('image/')) {
-            throw new Error('URL does not point to an image');
-          }
-        } catch (fetchError) {
-          results.failed++;
-          results.errors.push({ 
-            row: rowNumber, 
-            error: `Failed to fetch image: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`,
-            storeName 
-          });
-          continue;
-        }
-
-        // Store image metadata in Supabase
+      // Store image metadata in Supabase
+      try {
         const { error: dbError } = await supabase
           .from('branghunt_images')
           .insert({
@@ -124,29 +113,70 @@ export async function POST(request: NextRequest) {
 
         if (dbError) {
           console.error(`[Upload Excel Batch] Database error for row ${rowNumber}:`, dbError);
-          results.failed++;
-          results.errors.push({ 
+          return { 
+            success: false, 
             row: rowNumber, 
             error: `Database error: ${dbError.message}`,
             storeName 
-          });
-        } else {
-          results.successful++;
-          console.log(`[Upload Excel Batch] Row ${rowNumber} uploaded successfully`);
+          };
         }
 
-      } catch (rowError) {
-        console.error(`[Upload Excel Batch] Error processing row ${rowNumber}:`, rowError);
-        results.failed++;
-        results.errors.push({ 
+        console.log(`[Upload Excel Batch] Row ${rowNumber} uploaded successfully`);
+        return { success: true, row: rowNumber, storeName };
+      } catch (dbError) {
+        return { 
+          success: false, 
           row: rowNumber, 
-          error: rowError instanceof Error ? rowError.message : 'Unknown error',
+          error: dbError instanceof Error ? dbError.message : 'Database error',
           storeName 
+        };
+      }
+    };
+
+    // Process all rows in parallel using Promise.allSettled
+    console.log(`[Upload Excel Batch] Starting parallel processing of ${rows.length} images...`);
+    const startTime = Date.now();
+    
+    const rowResults = await Promise.allSettled(
+      rows.map(row => processRow(row))
+    );
+
+    const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`[Upload Excel Batch] Parallel processing completed in ${processingTime}s`);
+
+    // Collect results
+    const results = {
+      successful: 0,
+      failed: 0,
+      errors: [] as Array<{ row: number; error: string; storeName?: string }>,
+    };
+
+    rowResults.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        const rowResult = result.value;
+        if (rowResult.success) {
+          results.successful++;
+        } else {
+          results.failed++;
+          results.errors.push({
+            row: rowResult.row,
+            error: rowResult.error || 'Unknown error',
+            storeName: rowResult.storeName
+          });
+        }
+      } else {
+        // Promise was rejected (shouldn't happen with our error handling, but just in case)
+        results.failed++;
+        results.errors.push({
+          row: rows[index].rowNumber,
+          error: result.reason instanceof Error ? result.reason.message : 'Promise rejected',
+          storeName: rows[index].storeName
         });
       }
-    }
+    });
 
     console.log(`[Upload Excel Batch] Batch ${batchNumber}/${totalBatches} completed:`, results);
+    console.log(`[Upload Excel Batch] Processing speed: ${(rows.length / parseFloat(processingTime)).toFixed(2)} images/second`);
 
     return NextResponse.json({ 
       success: true,
