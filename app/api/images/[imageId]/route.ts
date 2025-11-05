@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/auth';
 
 /**
  * DELETE /api/images/[imageId]
@@ -10,6 +11,9 @@ export async function DELETE(
   { params }: { params: Promise<{ imageId: string }> }
 ) {
   try {
+    // Require authentication
+    const user = await requireAuth();
+
     const { imageId } = await params;
 
     if (!imageId) {
@@ -80,6 +84,13 @@ export async function DELETE(
     });
   } catch (error) {
     console.error('Delete error:', error);
+    // Handle authentication errors
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ 
+        error: 'Authentication required',
+        details: 'Please log in to delete images'
+      }, { status: 401 });
+    }
     return NextResponse.json({ 
       error: 'Failed to delete image',
       details: error instanceof Error ? error.message : 'Unknown error'

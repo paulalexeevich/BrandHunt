@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Image as ImageIcon, Loader2, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Image as ImageIcon, Loader2, Trash2, Lock, LogIn } from 'lucide-react';
+import { createClient } from '@/lib/supabase-browser';
+import { User } from '@supabase/supabase-js';
 
 interface Image {
   id: string;
@@ -14,14 +17,39 @@ interface Image {
 }
 
 export default function Gallery() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [images, setImages] = useState<Image[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; filename: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
 
   useEffect(() => {
-    fetchImages();
-  }, []);
+    // Check authentication first
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+      
+      // Only fetch images if authenticated
+      if (session?.user) {
+        fetchImages();
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchImages();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   const fetchImages = async () => {
     try {
@@ -88,20 +116,59 @@ export default function Gallery() {
             className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800 mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Upload
+            Back to Home
           </Link>
           <h1 className="text-4xl font-bold text-gray-900">Processed Images</h1>
         </div>
 
+        {/* Auth Loading State */}
+        {authLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          </div>
+        )}
+
+        {/* Login Required Message */}
+        {!authLoading && !user && (
+          <div className="bg-white rounded-2xl shadow-xl p-12">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-indigo-100 rounded-full mb-6">
+                <Lock className="w-10 h-10 text-indigo-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                Authentication Required
+              </h2>
+              <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                Please sign in to view your processed images and analysis results
+              </p>
+              <div className="flex gap-4 justify-center">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold text-lg"
+                >
+                  <LogIn className="w-5 h-5" />
+                  <span>Sign In</span>
+                </Link>
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center gap-2 px-8 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold text-lg"
+                >
+                  <span>Create Account</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Loading State */}
-        {loading && (
+        {!authLoading && user && loading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
           </div>
         )}
 
         {/* Empty State */}
-        {!loading && images.length === 0 && (
+        {!authLoading && user && !loading && images.length === 0 && (
           <div className="text-center py-12">
             <ImageIcon className="w-16 h-16 mx-auto mb-4 text-gray-400" />
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No images yet</h3>
@@ -116,7 +183,7 @@ export default function Gallery() {
         )}
 
         {/* Images Grid */}
-        {!loading && images.length > 0 && (
+        {!authLoading && user && !loading && images.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {images.map((image) => (
               <div
