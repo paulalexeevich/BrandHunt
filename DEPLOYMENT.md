@@ -1,45 +1,46 @@
 # BrangHunt Deployment Information
 
-## 🚀 Latest Deployment - October 11, 2025
+## 🚀 Latest Deployment - November 5, 2025
+
+### Production URL
+**🌐 https://branghunt.vercel.app**
 
 ### GitHub Repository
 - **Repository**: https://github.com/paulalexeevich/BrandHunt
 - **Branch**: main
-- **Latest Commits**: 3 commits pushed
-  1. Price extraction feature implementation
-  2. README documentation update
-  3. Label toggle feature
+- **Latest Commits**: 2 commits pushed
+  1. Remove image quality validation step from upload flow
+  2. Add documentation for validation removal
 
 ### Vercel Production Deployment
 - **Status**: ✅ Ready (Production)
-- **Latest URL**: https://branghunt-1fsaiwmsi-paulalexeevichs-projects.vercel.app
-- **Build Time**: 57 seconds
+- **Production URL**: https://branghunt.vercel.app
+- **Deployment ID**: branghunt-2azof3pun
+- **Build Time**: 59 seconds
 - **Build Status**: ✓ Compiled successfully
-- **Deployed**: October 11, 2025
+- **Deployed**: November 5, 2025
 
-### New Features Deployed
+### Latest Changes
 
-#### 1. Price Extraction Feature 💰
-- Extract price information from price tags below products
-- Expands bounding box 50% downward to capture price tag area
-- Context-aware extraction using product information
-- Displays price with currency symbol and confidence score
-- Average processing time: 5-10 seconds per product
-- High accuracy: 90%+ confidence scores
+#### Removed Image Quality Validation Step ⚡
+- **Removed** automatic validation step after upload
+- **Faster** upload experience - no 5-10 second validation delay
+- **Simplified** UI flow: Upload → Success → Start Analysis
+- **Reason**: YOLO detector can now handle any amount of products without limitations
+- No more product count warnings or blur detection
 
-**Database Changes:**
-- Added `price` column (TEXT)
-- Added `price_currency` column (TEXT, default: USD)
-- Added `price_confidence` column (DECIMAL 3,2)
+**What Changed:**
+- Removed validation API call from upload flow
+- Removed validation loading spinner
+- Removed warning/error messages for blur and product count
+- Simplified success message
+- Upload is now instant after image is saved
 
-**API Endpoints:**
-- `POST /api/extract-price` - Extract price from price tag below product
-
-#### 2. Label Toggle Feature 🏷️
-- New toggle button: "Show/Hide Labels"
-- Hides product name labels on bounding boxes
-- Allows clear visibility of actual price tags on shelf
-- Labels shown by default, can be hidden on demand
+**User Impact:**
+- ✅ Faster upload (no validation delay)
+- ✅ Less friction in workflow
+- ✅ No false warnings blocking analysis
+- ✅ Cleaner, simpler UI
 
 ### Build Configuration
 - **Framework**: Next.js 15.5.4
@@ -92,36 +93,49 @@ npx vercel ls
 
 ### Testing the Deployment
 
-1. **Access the App**: https://branghunt-1fsaiwmsi-paulalexeevichs-projects.vercel.app
-2. **Upload Image**: Use the home page to upload a retail shelf image
-3. **Detect Products**: Navigate to analyze page and detect products
-4. **Extract Brand**: Click on products to extract brand information
-5. **Extract Price**: Click "💰 Extract Price" button for products with extracted brands
-6. **Toggle Labels**: Click "🏷️ Hide Labels" to see actual price tags on shelf
+1. **Access the App**: https://branghunt.vercel.app
+2. **Upload Image**: Use the home page to upload a retail shelf image (file or S3 URL)
+3. **Verify Fast Upload**: Upload completes instantly with no validation delay
+4. **Start Analysis**: Click "Start Analysis" button to navigate to analyze page
+5. **Detect Products**: Click "⚡ Detect Products with YOLO" for fast detection
+6. **Extract Brand**: Click on products to extract brand information
+7. **Extract Price**: Click "💰 Extract Price" button for products with extracted brands
+8. **Search & Filter**: Search FoodGraph catalog and filter with AI
+9. **Save Results**: Save matched products for viewing in results page
 
 ### Performance Notes
 
-- Build completed successfully in 57 seconds
+- Build completed successfully in 59 seconds
 - No linting errors
 - Type checking passed
 - All routes compiled successfully
-- Static page generation completed (16/16 pages)
+- Upload flow is now instant (no validation delay)
 
 ### Documentation
 
-- `PRICE_EXTRACTION_FEATURE.md` - Complete technical documentation for price extraction
-- `README.md` - Updated with new features
+- `VALIDATION_REMOVAL.md` - Documentation for removing validation step
+- `YOLO_INTEGRATION.md` - YOLO detector integration
+- `README.md` - Updated with latest features
 - `DEPLOYMENT.md` - This file
+
+### Vercel Aliases
+
+The deployment is accessible via multiple URLs:
+- **Production**: https://branghunt.vercel.app ⭐ (Use this)
+- **Project**: https://branghunt-paulalexeevichs-projects.vercel.app
+- **Git Branch**: https://branghunt-git-main-paulalexeevichs-projects.vercel.app
+- **Deployment ID**: https://branghunt-2azof3pun-paulalexeevichs-projects.vercel.app
 
 ### Support
 
 For issues or questions:
 - GitHub Issues: https://github.com/paulalexeevich/BrandHunt/issues
-- Check deployment logs: `npx vercel inspect [deployment-url] --logs`
+- Check deployment logs: `npx vercel inspect [deployment-url]`
 
 ---
 
-**Last Updated**: October 11, 2025  
-**Deployment ID**: branghunt-1fsaiwmsi-paulalexeevichs-projects  
+**Last Updated**: November 5, 2025  
+**Production URL**: https://branghunt.vercel.app  
+**Deployment ID**: branghunt-2azof3pun  
 **Status**: ✅ Live and Ready
 
