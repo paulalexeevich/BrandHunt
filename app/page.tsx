@@ -1,19 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Loader2, CheckCircle, XCircle, Link as LinkIcon, LogIn, Lock } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Link as LinkIcon, LogIn, Lock, FileSpreadsheet } from 'lucide-react';
 import Link from 'next/link';
 import AuthNav from '@/components/AuthNav';
 import { createClient } from '@/lib/supabase-browser';
 import { User } from '@supabase/supabase-js';
 
-type UploadMode = 'file' | 'url';
-
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [uploadMode, setUploadMode] = useState<UploadMode>('file');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string>('');
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -38,23 +34,6 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setError(null);
-      setSuccess(false);
-      setUploadedImageId(null);
-
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setImageUrl(event.target.value);
     setError(null);
@@ -69,11 +48,7 @@ export default function Home() {
   };
 
   const handleUpload = async () => {
-    if (uploadMode === 'file' && !selectedFile) {
-      setError('Please select a file');
-      return;
-    }
-    if (uploadMode === 'url' && !imageUrl) {
+    if (!imageUrl) {
       setError('Please enter an image URL');
       return;
     }
@@ -84,12 +59,7 @@ export default function Home() {
     try {
       // Upload image
       const formData = new FormData();
-      
-      if (uploadMode === 'file') {
-        formData.append('image', selectedFile!);
-      } else {
-        formData.append('imageUrl', imageUrl);
-      }
+      formData.append('imageUrl', imageUrl);
 
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
@@ -114,7 +84,6 @@ export default function Home() {
   };
 
   const handleReset = () => {
-    setSelectedFile(null);
     setImageUrl('');
     setPreview(null);
     setUploadedImageId(null);
@@ -138,23 +107,6 @@ export default function Home() {
           <p className="text-lg text-gray-600">
             AI-powered product detection and brand recognition
           </p>
-          {!authLoading && user && (
-            <div className="flex gap-3 justify-center mt-4">
-              <Link
-                href="/gallery"
-                className="text-sm text-blue-600 hover:text-blue-800 underline"
-              >
-                View Gallery
-              </Link>
-              <span className="text-gray-400">•</span>
-              <Link
-                href="/excel-upload"
-                className="text-sm text-blue-600 hover:text-blue-800 underline"
-              >
-                Bulk Upload from Excel
-              </Link>
-            </div>
-          )}
         </div>
 
         {/* Auth Loading State */}
@@ -204,76 +156,45 @@ export default function Home() {
           <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
           {!preview ? (
             <>
-              {/* Upload Mode Selector */}
-              <div className="flex gap-2 mb-6 justify-center">
-                <button
-                  onClick={() => setUploadMode('file')}
-                  className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-                    uploadMode === 'file'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+              {/* Upload Options */}
+              <div className="flex gap-4 mb-8 justify-center">
+                <Link
+                  href="/excel-upload"
+                  className="flex-1 max-w-xs px-6 py-4 rounded-xl font-semibold transition-all bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                 >
-                  <Upload className="w-4 h-4 inline mr-2" />
-                  Upload File
-                </button>
-                <button
-                  onClick={() => setUploadMode('url')}
-                  className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-                    uploadMode === 'url'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  <LinkIcon className="w-4 h-4 inline mr-2" />
-                  S3 URL
-                </button>
+                  <FileSpreadsheet className="w-5 h-5" />
+                  Bulk Upload Excel
+                </Link>
+                <div className="flex-1 max-w-xs px-6 py-4 rounded-xl font-semibold bg-indigo-600 text-white shadow-lg flex items-center justify-center gap-2">
+                  <LinkIcon className="w-5 h-5" />
+                  S3 URL (Single Photo)
+                </div>
               </div>
 
-              {uploadMode === 'file' ? (
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-500 transition-colors">
-                  <Upload className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                    Upload Product Image
-                  </h3>
-                  <p className="text-gray-500 mb-4">
-                    Select an image to detect products and find brand information
-                  </p>
-                  <label className="cursor-pointer inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-                    Choose Image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              ) : (
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-500 transition-colors">
-                  <LinkIcon className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                    Enter S3 Image URL
-                  </h3>
-                  <p className="text-gray-500 mb-4">
-                    Paste the S3 URL of a product image
-                  </p>
-                  <input
-                    type="text"
-                    value={imageUrl}
-                    onChange={handleUrlChange}
-                    placeholder="https://traxus.s3.amazonaws.com/..."
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                  <button
-                    onClick={handleUrlPreview}
-                    disabled={!imageUrl}
-                    className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                  >
-                    Preview & Process
-                  </button>
-                </div>
-              )}
+              {/* S3 URL Upload Interface */}
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-500 transition-colors">
+                <LinkIcon className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                  Enter S3 Image URL
+                </h3>
+                <p className="text-gray-500 mb-4">
+                  Paste the S3 URL of a product image
+                </p>
+                <input
+                  type="text"
+                  value={imageUrl}
+                  onChange={handleUrlChange}
+                  placeholder="https://traxus.s3.amazonaws.com/..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <button
+                  onClick={handleUrlPreview}
+                  disabled={!imageUrl}
+                  className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  Preview & Process
+                </button>
+              </div>
             </>
           ) : (
             <div>
@@ -352,15 +273,17 @@ export default function Home() {
         </div>
         )}
 
-        {/* Recent Images Link */}
-        <div className="text-center">
-          <Link
-            href="/gallery"
-            className="text-indigo-600 hover:text-indigo-800 font-semibold"
-          >
-            View All Processed Images →
-          </Link>
-        </div>
+        {/* Gallery Link */}
+        {!authLoading && user && (
+          <div className="text-center">
+            <Link
+              href="/gallery"
+              className="text-indigo-600 hover:text-indigo-800 font-semibold"
+            >
+              View Gallery →
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
