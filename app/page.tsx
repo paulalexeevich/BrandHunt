@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Upload, Loader2, CheckCircle, XCircle, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
+import AuthNav from '@/components/AuthNav';
 
 type UploadMode = 'file' | 'url';
 
@@ -106,6 +107,11 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-4xl mx-auto">
+        {/* Auth Nav */}
+        <div className="flex justify-end mb-6">
+          <AuthNav />
+        </div>
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">BrangHunt</h1>

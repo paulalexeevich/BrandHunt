@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const user = await requireAuth();
+
     const formData = await request.formData();
     const file = formData.get('image') as File | null;
     const imageUrl = formData.get('imageUrl') as string | null;
@@ -63,6 +67,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('branghunt_images')
       .insert({
+        user_id: user.id,
         original_filename: filename,
         file_path: base64,
         file_size: fileSize,
@@ -88,6 +93,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Upload error:', error);
+    // Handle authentication errors
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ 
+        error: 'Authentication required',
+        details: 'Please log in to upload images'
+      }, { status: 401 });
+    }
     return NextResponse.json({ 
       error: 'Upload failed',
       details: error instanceof Error ? error.message : 'Unknown error'
