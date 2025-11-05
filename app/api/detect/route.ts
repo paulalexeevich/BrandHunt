@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { detectProducts } from '@/lib/gemini';
 
 export async function POST(request: NextRequest) {
@@ -14,6 +14,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`📸 Processing image: ${imageId}`);
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // Fetch image from database
     const { data: image, error: imageError } = await supabase

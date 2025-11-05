@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { extractPrice } from '@/lib/gemini';
 
 export const maxDuration = 300; // 5 minutes timeout for Gemini API
+export const runtime = 'nodejs'; // Required for maxDuration > 10s
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +17,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🏷️ Starting price extraction for detection:', detectionId);
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // 1. Get the detection and its image
     const { data: detection, error: detectionError } = await supabase

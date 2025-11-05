@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { compareProductImages } from '@/lib/gemini';
 
 export async function POST(request: NextRequest) {
@@ -11,6 +11,9 @@ export async function POST(request: NextRequest) {
         error: 'Missing required parameters' 
       }, { status: 400 });
     }
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // Fetch only top 50 FoodGraph results for this detection (matching what's displayed)
     const { data: foodgraphResults, error: fetchError } = await supabase

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { searchProducts, getFrontImageUrl } from '@/lib/foodgraph';
 
 export async function POST(request: NextRequest) {
@@ -9,6 +9,9 @@ export async function POST(request: NextRequest) {
     if (!detectionId || !brandName) {
       return NextResponse.json({ error: 'detectionId and brandName required' }, { status: 400 });
     }
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // Fetch full detection info to get all extracted product details
     const { data: detection, error: detectionError } = await supabase

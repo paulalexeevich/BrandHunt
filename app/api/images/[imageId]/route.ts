@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, createAuthenticatedSupabaseClient } from '@/lib/auth';
 
 /**
  * DELETE /api/images/[imageId]
@@ -13,6 +12,9 @@ export async function DELETE(
   try {
     // Require authentication
     const user = await requireAuth();
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     const { imageId } = await params;
 

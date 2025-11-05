@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { extractProductInfo } from '@/lib/gemini';
 
 export async function POST(request: NextRequest) {
@@ -9,6 +9,9 @@ export async function POST(request: NextRequest) {
     if (!detectionId) {
       return NextResponse.json({ error: 'No detectionId provided' }, { status: 400 });
     }
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // Fetch detection and associated image
     const { data: detection, error: detectionError } = await supabase

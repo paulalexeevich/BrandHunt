@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, createAuthenticatedSupabaseClient } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
     // Require authentication
     const user = await requireAuth();
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     const { data: images, error } = await supabase
       .from('branghunt_images')

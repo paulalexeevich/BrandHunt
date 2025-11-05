@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 10;
@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('💾 Saving result for detection:', detectionId, 'with FoodGraph result:', foodgraphResultId);
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // Fetch the FoodGraph result details
     const { data: foodgraphResult, error: fetchError } = await supabase
