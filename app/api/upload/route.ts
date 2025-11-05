@@ -4,9 +4,12 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
+  console.log('[Upload] Starting upload process...');
   try {
     // Require authentication
+    console.log('[Upload] Checking authentication...');
     const user = await requireAuth();
+    console.log('[Upload] User authenticated:', user.id);
 
     // Create authenticated Supabase client with user session
     const cookieStore = await cookies();
@@ -88,6 +91,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Store image metadata in Supabase
+    console.log('[Upload] Saving to database...');
+    console.log('[Upload] Image size:', fileSize, 'bytes, MIME:', mimeType);
     const { data, error } = await supabase
       .from('branghunt_images')
       .insert({
@@ -105,10 +110,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Supabase error:', error);
+      console.error('[Upload] Supabase error:', error);
       return NextResponse.json({ error: 'Failed to save image' }, { status: 500 });
     }
 
+    console.log('[Upload] Image saved successfully! ID:', data.id);
     return NextResponse.json({ 
       success: true, 
       imageId: data.id,
@@ -130,3 +136,8 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+// Enable Node.js runtime for Fluid Compute
+export const runtime = 'nodejs';
+// Set timeout to 30 seconds for large image uploads
+export const maxDuration = 30;
