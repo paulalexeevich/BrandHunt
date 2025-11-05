@@ -28,7 +28,13 @@ export async function GET(
       );
     }
 
-    // Fetch images for this project with detection counts
+    // Get page and limit from query params
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const offset = (page - 1) * limit;
+
+    // Fetch images for this project with detection counts (paginated)
     const { data: images, error: imagesError } = await supabase
       .from('branghunt_images')
       .select(`
@@ -38,13 +44,15 @@ export async function GET(
         width,
         height,
         store_name,
+        status,
         detection_completed,
         detection_completed_at,
         created_at,
         detections:branghunt_detections(count)
       `)
       .eq('project_id', projectId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (imagesError) {
       console.error('Error fetching project images:', imagesError);
@@ -54,15 +62,28 @@ export async function GET(
       );
     }
 
+    console.log(`Fetched ${images?.length || 0} images for project ${projectId} (page ${page}, limit ${limit})`);
+
     // Format images with proper data URIs
     const formattedImages = (images || []).map(img => ({
       ...img,
       image_data: `data:${img.mime_type};base64,${img.file_path}`
     }));
 
+    // Calculate pagination metadata
+    const totalImages = projectStats.total_images || 0;
+    const totalPages = Math.ceil(totalImages / limit);
+
     return NextResponse.json({ 
       project: projectStats,
-      images: formattedImages
+      images: formattedImages,
+      pagination: {
+        page,
+        limit,
+        total: totalImages,
+        totalPages,
+        hasMore: page < totalPages
+      }
     });
   } catch (error) {
     console.error('Error in GET /api/projects/[projectId]:', error);

@@ -66,6 +66,12 @@ export default function ProjectViewPage() {
   const [images, setImages] = useState<ImageData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<{
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  } | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -90,19 +96,30 @@ export default function ProjectViewPage() {
     return () => subscription.unsubscribe();
   }, [supabase, projectId]);
 
-  const fetchProjectData = async () => {
+  // Refetch when page changes
+  useEffect(() => {
+    if (user) {
+      fetchProjectData(page);
+    }
+  }, [page, user]);
+
+  const fetchProjectData = async (pageNum: number = page) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}`);
+      const response = await fetch(`/api/projects/${projectId}?page=${pageNum}&limit=50`, {
+        credentials: 'include',
+      });
       if (!response.ok) {
-        throw new Error('Failed to fetch project data');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch project data');
       }
 
       const data = await response.json();
       setProject(data.project);
       setImages(data.images || []);
+      setPagination(data.pagination || null);
     } catch (err) {
       console.error('Error fetching project data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch project data');
@@ -333,7 +350,7 @@ export default function ProjectViewPage() {
             {/* Images Grid */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Images ({images.length})
+                Images {pagination ? `(${pagination.total} total, showing ${(page - 1) * 50 + 1}-${Math.min(page * 50, pagination.total)})` : `(${images.length})`}
               </h2>
 
               {images.length === 0 ? (
@@ -407,6 +424,31 @@ export default function ProjectViewPage() {
                       </Link>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Pagination Controls */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-between border-t pt-6">
+                  <div className="text-sm text-gray-600">
+                    Page {page} of {pagination.totalPages}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPage(page - 1)}
+                      disabled={page === 1}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setPage(page + 1)}
+                      disabled={!pagination.hasMore}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
