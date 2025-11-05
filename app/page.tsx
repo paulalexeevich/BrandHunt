@@ -1,13 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { Upload, Loader2, CheckCircle, XCircle, Link as LinkIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Upload, Loader2, CheckCircle, XCircle, Link as LinkIcon, LogIn, Lock } from 'lucide-react';
 import Link from 'next/link';
 import AuthNav from '@/components/AuthNav';
+import { createClient } from '@/lib/supabase-browser';
+import { User } from '@supabase/supabase-js';
 
 type UploadMode = 'file' | 'url';
 
 export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [uploadMode, setUploadMode] = useState<UploadMode>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string>('');
@@ -17,6 +21,22 @@ export default function Home() {
   const [uploadedImageId, setUploadedImageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const supabase = createClient();
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -120,8 +140,51 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Main Upload Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+        {/* Auth Loading State */}
+        {authLoading && (
+          <div className="bg-white rounded-2xl shadow-xl p-16 mb-6">
+            <div className="flex flex-col items-center justify-center">
+              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+              <p className="text-gray-600">Loading...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Login Required Message - Show when not authenticated */}
+        {!authLoading && !user && (
+          <div className="bg-white rounded-2xl shadow-xl p-12 mb-6">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-indigo-100 rounded-full mb-6">
+                <Lock className="w-10 h-10 text-indigo-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                Authentication Required
+              </h2>
+              <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                Please sign in to upload images and analyze products with AI-powered detection
+              </p>
+              <div className="flex gap-4 justify-center">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold text-lg"
+                >
+                  <LogIn className="w-5 h-5" />
+                  <span>Sign In</span>
+                </Link>
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center gap-2 px-8 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold text-lg"
+                >
+                  <span>Create Account</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Upload Card - Show only when authenticated */}
+        {!authLoading && user && (
+          <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
           {!preview ? (
             <>
               {/* Upload Mode Selector */}
@@ -270,6 +333,7 @@ export default function Home() {
             </div>
           )}
         </div>
+        )}
 
         {/* Recent Images Link */}
         <div className="text-center">
