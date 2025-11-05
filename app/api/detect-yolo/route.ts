@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 
 // Configure for Fluid Compute (60s timeout on Vercel free tier)
 export const runtime = 'nodejs';
@@ -47,6 +47,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[YOLO Detection] Processing image ID: ${imageId}`);
+
+    // Create authenticated Supabase client
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // Fetch image from database
     const { data: image, error: fetchError } = await supabase

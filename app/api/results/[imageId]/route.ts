@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -7,6 +7,9 @@ export async function GET(
 ) {
   try {
     const { imageId } = await params;
+
+    // Create authenticated Supabase client with user session
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // Fetch image
     const { data: image, error: imageError } = await supabase

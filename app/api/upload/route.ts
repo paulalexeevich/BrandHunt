@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { requireAuth, createAuthenticatedSupabaseClient } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   console.log('[Upload] Starting upload process...');
@@ -12,27 +10,7 @@ export async function POST(request: NextRequest) {
     console.log('[Upload] User authenticated:', user.id);
 
     // Create authenticated Supabase client with user session
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => {
-                cookieStore.set(name, value, options);
-              });
-            } catch (error) {
-              // Ignore - setAll can be called from API routes
-            }
-          },
-        },
-      }
-    );
+    const supabase = await createAuthenticatedSupabaseClient();
 
     const formData = await request.formData();
     const file = formData.get('image') as File | null;
