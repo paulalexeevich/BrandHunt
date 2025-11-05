@@ -822,7 +822,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 className="max-w-full h-auto rounded-lg"
                 style={{ display: 'block' }}
               />
-              {imageDimensions && detections.map((detection, index) => {
+              {imageDimensions ? detections.map((detection, index) => {
                 const box = detection.bounding_box;
                 const isSelected = detection.id === selectedDetection;
                 
@@ -865,7 +865,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     )}
                   </div>
                 );
-              })}
+              }) : null}
             </div>
           </div>
 
