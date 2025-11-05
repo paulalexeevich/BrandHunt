@@ -54,6 +54,7 @@ interface ImageData {
   file_path: string;
   processing_status: string;
   store_name?: string | null;
+  project_id?: string | null;
 }
 
 export default function AnalyzePage({ params }: { params: Promise<{ imageId: string }> }) {
@@ -652,9 +653,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <Link href="/gallery" className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800">
+            <Link 
+              href={image?.project_id ? `/projects/${image.project_id}` : '/projects'} 
+              className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800"
+            >
               <ArrowLeft className="w-4 h-4" />
-              Back to Gallery
+              {image?.project_id ? 'Back to Project' : 'Back to Projects'}
             </Link>
             <button
               onClick={() => setShowDeleteConfirm(true)}

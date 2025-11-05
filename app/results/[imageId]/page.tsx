@@ -53,6 +53,7 @@ interface ImageData {
   uploaded_at: string;
   processing_status: string;
   store_name?: string | null;
+  project_id?: string | null;
 }
 
 export default function ResultsPage({ params }: { params: Promise<{ imageId: string }> }) {
@@ -107,11 +108,11 @@ export default function ResultsPage({ params }: { params: Promise<{ imageId: str
         {/* Header */}
         <div className="mb-6">
           <Link
-            href="/gallery"
+            href={image?.project_id ? `/projects/${image.project_id}` : '/projects'}
             className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800 mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Gallery
+            {image?.project_id ? 'Back to Project' : 'Back to Projects'}
           </Link>
           <h1 className="text-3xl font-bold text-gray-900">{image.original_filename}</h1>
           {image.store_name && (
