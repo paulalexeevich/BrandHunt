@@ -7,11 +7,11 @@ export const maxDuration = 10;
 // GET /api/projects/[projectId] - Get a single project with stats and images
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
     const supabase = await createAuthenticatedSupabaseClient();
-    const projectId = params.projectId;
+    const { projectId } = await params;
 
     // Fetch project with statistics
     const { data: projectStats, error: statsError } = await supabase
@@ -76,11 +76,11 @@ export async function GET(
 // PUT /api/projects/[projectId] - Update a project
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
     const supabase = await createAuthenticatedSupabaseClient();
-    const projectId = params.projectId;
+    const { projectId } = await params;
 
     // Parse request body
     const body = await request.json();
@@ -126,11 +126,11 @@ export async function PUT(
 // DELETE /api/projects/[projectId] - Delete a project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
     const supabase = await createAuthenticatedSupabaseClient();
-    const projectId = params.projectId;
+    const { projectId } = await params;
 
     // Delete project (CASCADE will handle related images)
     const { error } = await supabase

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Home, Loader2, FolderOpen } from 'lucide-react';
 import Link from 'next/link';
@@ -12,7 +12,7 @@ interface UploadResults {
   errors: Array<{ row: number; error: string; storeName?: string }>;
 }
 
-export default function ExcelUploadPage() {
+function ExcelUploadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams.get('projectId');
@@ -297,6 +297,25 @@ export default function ExcelUploadPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ExcelUploadPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+              <span className="ml-3 text-gray-600">Loading...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <ExcelUploadContent />
+    </Suspense>
   );
 }
 
