@@ -1,13 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, XCircle, Link as LinkIcon, LogIn, Lock, FileSpreadsheet } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Loader2, CheckCircle, XCircle, Link as LinkIcon, LogIn, Lock, FileSpreadsheet, FolderOpen } from 'lucide-react';
 import Link from 'next/link';
 import AuthNav from '@/components/AuthNav';
 import { createClient } from '@/lib/supabase-browser';
 import { User } from '@supabase/supabase-js';
 
 export default function Home() {
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get('projectId');
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string>('');
@@ -17,6 +20,7 @@ export default function Home() {
   const [uploadedImageId, setUploadedImageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [projectName, setProjectName] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -33,6 +37,25 @@ export default function Home() {
 
     return () => subscription.unsubscribe();
   }, [supabase]);
+
+  // Fetch project name if projectId is provided
+  useEffect(() => {
+    const fetchProjectName = async () => {
+      if (projectId && user) {
+        try {
+          const response = await fetch(`/api/projects/${projectId}`);
+          if (response.ok) {
+            const data = await response.json();
+            setProjectName(data.project.project_name);
+          }
+        } catch (err) {
+          console.error('Error fetching project:', err);
+        }
+      }
+    };
+
+    fetchProjectName();
+  }, [projectId, user]);
 
   const handleUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setImageUrl(event.target.value);
@@ -60,6 +83,9 @@ export default function Home() {
       // Upload image
       const formData = new FormData();
       formData.append('imageUrl', imageUrl);
+      if (projectId) {
+        formData.append('projectId', projectId);
+      }
 
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
@@ -107,6 +133,12 @@ export default function Home() {
           <p className="text-lg text-gray-600">
             AI-powered product detection and brand recognition
           </p>
+          {projectId && projectName && (
+            <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-800 rounded-full">
+              <FolderOpen className="w-4 h-4" />
+              <span className="text-sm font-semibold">Uploading to: {projectName}</span>
+            </div>
+          )}
         </div>
 
         {/* Auth Loading State */}
@@ -159,7 +191,7 @@ export default function Home() {
               {/* Upload Options */}
               <div className="flex gap-4 mb-8 justify-center">
                 <Link
-                  href="/excel-upload"
+                  href={projectId ? `/excel-upload?projectId=${projectId}` : "/excel-upload"}
                   className="flex-1 max-w-xs px-6 py-4 rounded-xl font-semibold transition-all bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                 >
                   <FileSpreadsheet className="w-5 h-5" />
@@ -273,9 +305,16 @@ export default function Home() {
         </div>
         )}
 
-        {/* Gallery Link */}
+        {/* Navigation Links */}
         {!authLoading && user && (
-          <div className="text-center">
+          <div className="text-center flex gap-6 justify-center">
+            <Link
+              href="/projects"
+              className="text-indigo-600 hover:text-indigo-800 font-semibold"
+            >
+              View Projects →
+            </Link>
+            <span className="text-gray-300">|</span>
             <Link
               href="/gallery"
               className="text-indigo-600 hover:text-indigo-800 font-semibold"

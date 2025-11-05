@@ -15,9 +15,14 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
+    const projectId = formData.get('projectId') as string | null;
 
     if (!file) {
       return NextResponse.json({ error: 'No Excel file provided' }, { status: 400 });
+    }
+
+    if (projectId) {
+      console.log('[Upload Excel] Project ID:', projectId);
     }
 
     // Validate file type
@@ -138,6 +143,7 @@ export async function POST(request: NextRequest) {
             file_size: fileSize,
             mime_type: mimeType,
             store_name: storeName,
+            project_id: projectId || null,
             width: null,
             height: null,
             processing_status: 'pending',

@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get('image') as File | null;
     const imageUrl = formData.get('imageUrl') as string | null;
     const storeName = formData.get('storeName') as string | null;
+    const projectId = formData.get('projectId') as string | null;
 
     if (!file && !imageUrl) {
       return NextResponse.json({ error: 'No file or URL provided' }, { status: 400 });
@@ -75,6 +76,9 @@ export async function POST(request: NextRequest) {
     if (storeName) {
       console.log('[Upload] Store name:', storeName);
     }
+    if (projectId) {
+      console.log('[Upload] Project ID:', projectId);
+    }
     const { data, error } = await supabase
       .from('branghunt_images')
       .insert({
@@ -84,6 +88,7 @@ export async function POST(request: NextRequest) {
         file_size: fileSize,
         mime_type: mimeType,
         store_name: storeName || null,
+        project_id: projectId || null,
         width: null,
         height: null,
         processing_status: 'pending',

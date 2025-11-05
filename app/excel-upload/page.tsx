@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Home, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Home, Loader2, FolderOpen } from 'lucide-react';
 import Link from 'next/link';
 
 interface UploadResults {
@@ -14,10 +14,31 @@ interface UploadResults {
 
 export default function ExcelUploadPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get('projectId');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [results, setResults] = useState<UploadResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProjectName = async () => {
+      if (projectId) {
+        try {
+          const response = await fetch(`/api/projects/${projectId}`);
+          if (response.ok) {
+            const data = await response.json();
+            setProjectName(data.project.project_name);
+          }
+        } catch (err) {
+          console.error('Error fetching project:', err);
+        }
+      }
+    };
+
+    fetchProjectName();
+  }, [projectId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -51,6 +72,9 @@ export default function ExcelUploadPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      if (projectId) {
+        formData.append('projectId', projectId);
+      }
 
       const response = await fetch('/api/upload-excel', {
         method: 'POST',
@@ -98,6 +122,12 @@ export default function ExcelUploadPage() {
           <p className="text-gray-600 mt-2">
             Upload multiple shelf images from an Excel file with store information
           </p>
+          {projectId && projectName && (
+            <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-800 rounded-full">
+              <FolderOpen className="w-4 h-4" />
+              <span className="text-sm font-semibold">Uploading to: {projectName}</span>
+            </div>
+          )}
         </div>
 
         {/* Upload Card */}

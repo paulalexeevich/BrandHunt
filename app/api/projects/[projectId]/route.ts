@@ -1,0 +1,144 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
+
+export const runtime = 'nodejs';
+export const maxDuration = 10;
+
+// GET /api/projects/[projectId] - Get a single project with stats and images
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { projectId: string } }
+) {
+  try {
+    const supabase = await createAuthenticatedSupabaseClient();
+    const projectId = params.projectId;
+
+    // Fetch project with statistics
+    const { data: projectStats, error: statsError } = await supabase
+      .from('branghunt_project_stats')
+      .select('*')
+      .eq('project_id', projectId)
+      .single();
+
+    if (statsError) {
+      console.error('Error fetching project stats:', statsError);
+      return NextResponse.json(
+        { error: 'Project not found', details: statsError.message },
+        { status: 404 }
+      );
+    }
+
+    // Fetch images for this project with detection counts
+    const { data: images, error: imagesError } = await supabase
+      .from('branghunt_images')
+      .select(`
+        *,
+        detections:branghunt_detections(count)
+      `)
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+
+    if (imagesError) {
+      console.error('Error fetching project images:', imagesError);
+      return NextResponse.json(
+        { error: 'Failed to fetch project images', details: imagesError.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ 
+      project: projectStats,
+      images: images || []
+    });
+  } catch (error) {
+    console.error('Error in GET /api/projects/[projectId]:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/projects/[projectId] - Update a project
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { projectId: string } }
+) {
+  try {
+    const supabase = await createAuthenticatedSupabaseClient();
+    const projectId = params.projectId;
+
+    // Parse request body
+    const body = await request.json();
+    const { name, description } = body;
+
+    // Validate required fields
+    if (!name || name.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Project name is required' },
+        { status: 400 }
+      );
+    }
+
+    // Update project
+    const { data: project, error } = await supabase
+      .from('branghunt_projects')
+      .update({
+        name: name.trim(),
+        description: description?.trim() || null,
+      })
+      .eq('id', projectId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating project:', error);
+      return NextResponse.json(
+        { error: 'Failed to update project', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ project });
+  } catch (error) {
+    console.error('Error in PUT /api/projects/[projectId]:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/projects/[projectId] - Delete a project
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { projectId: string } }
+) {
+  try {
+    const supabase = await createAuthenticatedSupabaseClient();
+    const projectId = params.projectId;
+
+    // Delete project (CASCADE will handle related images)
+    const { error } = await supabase
+      .from('branghunt_projects')
+      .delete()
+      .eq('id', projectId);
+
+    if (error) {
+      console.error('Error deleting project:', error);
+      return NextResponse.json(
+        { error: 'Failed to delete project', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in DELETE /api/projects/[projectId]:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
