@@ -30,8 +30,8 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        // Redirect to home page after successful login
-        router.push('/');
+        // Redirect to projects page after successful login
+        router.push('/projects');
         router.refresh();
       }
     } catch (err) {

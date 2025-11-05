@@ -197,10 +197,7 @@ export default function ProjectsPage() {
         {/* Header with Auth Nav */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <Link href="/" className="text-sm text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
-              ← Back to Home
-            </Link>
-            <h1 className="text-4xl font-bold text-gray-900">Projects</h1>
+            <h1 className="text-4xl font-bold text-gray-900">BrangHunt Projects</h1>
             <p className="text-gray-600 mt-2">Organize your shelf images into projects</p>
           </div>
           <AuthNav />

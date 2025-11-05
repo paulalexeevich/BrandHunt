@@ -54,7 +54,7 @@ export default function SignupPage() {
         // If email confirmation is disabled, redirect immediately
         if (data.session) {
           setTimeout(() => {
-            router.push('/');
+            router.push('/projects');
             router.refresh();
           }, 2000);
         }
@@ -92,7 +92,7 @@ export default function SignupPage() {
                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                 <div className="text-green-700 text-sm">
                   <p className="font-semibold mb-1">Account created successfully!</p>
-                  <p>Redirecting you to the home page...</p>
+                  <p>Redirecting you to your projects...</p>
                 </div>
               </div>
             )}
