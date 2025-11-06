@@ -16,27 +16,35 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[Login] Form submitted', { email });
     setLoading(true);
     setError(null);
 
     try {
+      console.log('[Login] Calling Supabase signInWithPassword...');
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
+      console.log('[Login] Supabase response:', { data, error });
+
       if (error) {
+        console.error('[Login] Supabase error:', error);
         throw error;
       }
 
       if (data.user) {
+        console.log('[Login] Login successful! User:', data.user.id);
         // Redirect to projects page after successful login
         router.push('/projects');
         router.refresh();
       }
     } catch (err) {
+      console.error('[Login] Caught error:', err);
       setError(err instanceof Error ? err.message : 'Failed to login');
     } finally {
+      console.log('[Login] Setting loading to false');
       setLoading(false);
     }
   };
