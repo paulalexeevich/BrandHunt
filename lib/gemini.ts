@@ -94,7 +94,7 @@ Ensure bounding boxes tightly fit each product. Only return the JSON array.
  * Crop image to bounding box region
  * Converts normalized coordinates (0-1000) to pixel coordinates and crops
  */
-async function cropImageToBoundingBox(
+export async function cropImageToBoundingBox(
   imageBase64: string,
   boundingBox: { y0: number; x0: number; y1: number; x1: number }
 ): Promise<{ croppedBase64: string; width: number; height: number }> {

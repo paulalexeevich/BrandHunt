@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { searchProducts, getFrontImageUrl } from '@/lib/foodgraph';
-import { compareProductImages } from '@/lib/gemini';
+import { compareProductImages, cropImageToBoundingBox } from '@/lib/gemini';
 
 interface SearchAndSaveResult {
   detectionId: string;
@@ -201,6 +201,18 @@ export async function POST(request: NextRequest) {
 
             console.log(`  [#${detection.detection_index}] AI filtering ${foodgraphResults.length} results...`);
 
+            // CRITICAL: Crop image to just this product (like manual filter does!)
+            const boundingBox = {
+              y0: detection.y0,
+              x0: detection.x0,
+              y1: detection.y1,
+              x1: detection.x1
+            };
+            
+            console.log(`    ✂️ Cropping product #${detection.detection_index} from full image...`);
+            const { croppedBase64 } = await cropImageToBoundingBox(imageBase64, boundingBox);
+            console.log(`    ✅ Cropped to product image`);
+
             // Compare ALL results in PARALLEL (same as manual filter)
             const resultsToCompare = foodgraphResults;
             
@@ -214,7 +226,7 @@ export async function POST(request: NextRequest) {
 
               try {
                 const isMatch = await compareProductImages(
-                  imageBase64,
+                  croppedBase64,  // Use cropped product image, not full shelf!
                   fgResult.front_image_url as string
                 );
                 return { result: fgResult, isMatch };
