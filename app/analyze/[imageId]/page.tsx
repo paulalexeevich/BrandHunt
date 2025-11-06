@@ -76,20 +76,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [extractingPrice, setExtractingPrice] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
   const [savedResultId, setSavedResultId] = useState<string | null>(null);
-  const [processingAll, setProcessingAll] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<{ total: number; success: number; partial: number; errors: number } | null>(null);
-  const [currentStep, setCurrentStep] = useState<string>('');
-  const [stepProgress, setStepProgress] = useState<{ 
-    step1: { done: boolean; success: number; total: number };
-    step2: { done: boolean; success: number; total: number };
-    step3: { done: boolean; success: number; total: number };
-    step4: { done: boolean; success: number; total: number };
-  }>({
-    step1: { done: false, success: 0, total: 0 },
-    step2: { done: false, success: 0, total: 0 },
-    step3: { done: false, success: 0, total: 0 },
-    step4: { done: false, success: 0, total: 0 }
-  });
+  const [processingStep1, setProcessingStep1] = useState(false);
+  const [processingStep2, setProcessingStep2] = useState(false);
+  const [processingStep3, setProcessingStep3] = useState(false);
+  const [step1Progress, setStep1Progress] = useState<{ success: number; total: number; errors: number } | null>(null);
+  const [step2Progress, setStep2Progress] = useState<{ success: number; total: number; errors: number } | null>(null);
+  const [step3Progress, setStep3Progress] = useState<{ success: number; total: number; noMatch: number; errors: number } | null>(null);
   const [detectionMethod, setDetectionMethod] = useState<'gemini' | 'yolo'>('yolo');
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
@@ -495,128 +487,127 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
   };
 
-  const handleProcessAll = async () => {
-    setProcessingAll(true);
+  const handleExtractInfoAll = async () => {
+    setProcessingStep1(true);
     setError(null);
-    setBatchProgress(null);
-    setStepProgress({
-      step1: { done: false, success: 0, total: 0 },
-      step2: { done: false, success: 0, total: 0 },
-      step3: { done: false, success: 0, total: 0 },
-      step4: { done: false, success: 0, total: 0 }
-    });
-
-    let totalProcessed = 0;
-    let totalSuccess = 0;
-    let totalErrors = 0;
+    setStep1Progress(null);
 
     try {
-      // Step 1: Extract product info for all products
-      setCurrentStep('📋 Step 1/4: Extracting product information...');
-      console.log('🚀 Starting Step 1: Extract Info');
+      console.log('🚀 Starting Step 1: Extract Info for All Products');
       
-      const step1Response = await fetch('/api/batch-extract-info', {
+      const response = await fetch('/api/batch-extract-info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageId: resolvedParams.imageId }),
       });
 
-      if (step1Response.ok) {
-        const step1Data = await step1Response.json();
-        console.log('✅ Step 1 complete:', step1Data);
-        setStepProgress(prev => ({
-          ...prev,
-          step1: { done: true, success: step1Data.success, total: step1Data.total }
-        }));
-        totalProcessed += step1Data.total;
-        totalSuccess += step1Data.success;
-        totalErrors += step1Data.errors;
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Step 1 complete:', data);
+        setStep1Progress({
+          success: data.success,
+          total: data.total,
+          errors: data.errors
+        });
+
+        // Reload the page data to show updated products
+        await fetchImage();
+
+        alert(`✅ Extract Info Complete!\n\n📋 Processed: ${data.total} products\n✓ Success: ${data.success}\n✗ Errors: ${data.errors}`);
       } else {
-        console.error('❌ Step 1 failed');
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to extract info');
       }
-
-      // Step 2: Extract prices for all products
-      setCurrentStep('💰 Step 2/4: Extracting prices...');
-      console.log('🚀 Starting Step 2: Extract Prices');
-      
-      const step2Response = await fetch('/api/batch-extract-price', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageId: resolvedParams.imageId }),
-      });
-
-      if (step2Response.ok) {
-        const step2Data = await step2Response.json();
-        console.log('✅ Step 2 complete:', step2Data);
-        setStepProgress(prev => ({
-          ...prev,
-          step2: { done: true, success: step2Data.success, total: step2Data.total }
-        }));
-      } else {
-        console.error('❌ Step 2 failed');
-      }
-
-      // Step 3: Search FoodGraph for all products
-      setCurrentStep('🔍 Step 3/4: Searching FoodGraph database...');
-      console.log('🚀 Starting Step 3: Search FoodGraph');
-      
-      const step3Response = await fetch('/api/batch-search-foodgraph', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageId: resolvedParams.imageId }),
-      });
-
-      if (step3Response.ok) {
-        const step3Data = await step3Response.json();
-        console.log('✅ Step 3 complete:', step3Data);
-        setStepProgress(prev => ({
-          ...prev,
-          step3: { done: true, success: step3Data.success, total: step3Data.total }
-        }));
-      } else {
-        console.error('❌ Step 3 failed');
-      }
-
-      // Step 4: AI filter and auto-save best matches
-      setCurrentStep('🤖 Step 4/4: AI filtering and saving best matches...');
-      console.log('🚀 Starting Step 4: AI Filter');
-      
-      const step4Response = await fetch('/api/batch-filter-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageId: resolvedParams.imageId }),
-      });
-
-      if (step4Response.ok) {
-        const step4Data = await step4Response.json();
-        console.log('✅ Step 4 complete:', step4Data);
-        setStepProgress(prev => ({
-          ...prev,
-          step4: { done: true, success: step4Data.saved, total: step4Data.total }
-        }));
-      } else {
-        console.error('❌ Step 4 failed');
-      }
-
-      setCurrentStep('✅ All steps complete!');
-
-      // Reload the page data to show updated products
-      await fetchImage();
-
-      // Calculate final stats
-      const step1Success = stepProgress.step1.success;
-      const step4Saved = stepProgress.step4.success;
-
-      // Show success message
-      alert(`✅ Batch Processing Complete!\n\n📋 Step 1: Extracted ${step1Success} product infos\n💰 Step 2: Extracted prices\n🔍 Step 3: Searched FoodGraph\n🤖 Step 4: Saved ${step4Saved} best matches\n\nAll intermediate results have been saved to the database!`);
       
     } catch (err) {
-      console.error('❌ Batch processing failed:', err);
-      setError(err instanceof Error ? err.message : 'Batch processing failed');
-      alert(`Failed to process all products: ${err instanceof Error ? err.message : 'Unknown error'}\n\nNote: All completed steps have been saved to the database.`);
+      console.error('❌ Extract Info failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to extract info');
+      alert(`Failed to extract info: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
-      setProcessingAll(false);
-      setCurrentStep('');
+      setProcessingStep1(false);
+    }
+  };
+
+  const handleExtractPriceAll = async () => {
+    setProcessingStep2(true);
+    setError(null);
+    setStep2Progress(null);
+
+    try {
+      console.log('🚀 Starting Step 2: Extract Prices for All Products');
+      
+      const response = await fetch('/api/batch-extract-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId: resolvedParams.imageId }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Step 2 complete:', data);
+        setStep2Progress({
+          success: data.success,
+          total: data.total,
+          errors: data.errors
+        });
+
+        // Reload the page data to show updated products
+        await fetchImage();
+
+        alert(`✅ Extract Price Complete!\n\n💰 Processed: ${data.total} products\n✓ Success: ${data.success}\n✗ Errors: ${data.errors}`);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to extract prices');
+      }
+      
+    } catch (err) {
+      console.error('❌ Extract Price failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to extract prices');
+      alert(`Failed to extract prices: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setProcessingStep2(false);
+    }
+  };
+
+  const handleSearchAndSaveAll = async () => {
+    setProcessingStep3(true);
+    setError(null);
+    setStep3Progress(null);
+
+    try {
+      console.log('🚀 Starting Step 3: Search & Save for All Products');
+      
+      const response = await fetch('/api/batch-search-and-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId: resolvedParams.imageId }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Step 3 complete:', data);
+        setStep3Progress({
+          success: data.success,
+          total: data.total,
+          noMatch: data.noMatch,
+          errors: data.errors
+        });
+
+        // Reload the page data to show updated products
+        await fetchImage();
+
+        alert(`✅ Search & Save Complete!\n\n🔍 Processed: ${data.total} products\n✓ Saved: ${data.success}\n⚠️ No Match: ${data.noMatch}\n✗ Errors: ${data.errors}`);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to search and save');
+      }
+      
+    } catch (err) {
+      console.error('❌ Search & Save failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to search and save');
+      alert(`Failed to search and save: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setProcessingStep3(false);
     }
   };
 
@@ -742,22 +733,50 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 </React.Fragment>
               )}
               {productsDetected && detections.some(d => !d.fully_analyzed) && (
-                <button
-                  onClick={handleProcessAll}
-                  disabled={processingAll}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all font-bold disabled:opacity-50 flex items-center gap-2 shadow-lg"
-                >
-                  {processingAll ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Processing All Products...
-                    </>
-                  ) : (
-                    <>
-                      ⚡ Process All Products ({detections.filter(d => !d.fully_analyzed).length})
-                    </>
-                  )}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExtractInfoAll}
+                    disabled={processingStep1}
+                    className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
+                  >
+                    {processingStep1 ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Extracting...
+                      </>
+                    ) : (
+                      '📋 Extract Info (All)'
+                    )}
+                  </button>
+                  <button
+                    onClick={handleExtractPriceAll}
+                    disabled={processingStep2}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
+                  >
+                    {processingStep2 ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Extracting...
+                      </>
+                    ) : (
+                      '💰 Extract Price (All)'
+                    )}
+                  </button>
+                  <button
+                    onClick={handleSearchAndSaveAll}
+                    disabled={processingStep3}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
+                  >
+                    {processingStep3 ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Searching...
+                      </>
+                    ) : (
+                      '🔍 Search & Save (All)'
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -769,37 +788,36 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           </div>
         )}
 
-        {processingAll && (
+        {(processingStep1 || processingStep2 || processingStep3 || step1Progress || step2Progress || step3Progress) && (
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-lg p-4 mb-6">
-            <h3 className="font-bold text-blue-900 mb-3">{currentStep || '🚀 Processing...'}</h3>
-            <div className="grid grid-cols-4 gap-3 text-sm">
-              <div className={`bg-white rounded-lg p-3 border-2 ${stepProgress.step1.done ? 'border-green-500' : 'border-gray-300'}`}>
+            <h3 className="font-bold text-blue-900 mb-3">📊 Batch Processing Progress</h3>
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <div className={`bg-white rounded-lg p-3 border-2 ${step1Progress ? 'border-green-500' : processingStep1 ? 'border-yellow-500' : 'border-gray-300'}`}>
                 <div className="text-xs font-semibold text-gray-600 mb-1">📋 Extract Info</div>
-                <div className={`text-lg font-bold ${stepProgress.step1.done ? 'text-green-600' : 'text-gray-400'}`}>
-                  {stepProgress.step1.done ? `${stepProgress.step1.success}/${stepProgress.step1.total}` : '—'}
+                <div className={`text-lg font-bold ${step1Progress ? 'text-green-600' : processingStep1 ? 'text-yellow-600' : 'text-gray-400'}`}>
+                  {step1Progress ? `${step1Progress.success}/${step1Progress.total}` : processingStep1 ? 'Running...' : '—'}
                 </div>
-                <div className="text-xs text-gray-500">{stepProgress.step1.done ? 'Done ✓' : 'Waiting...'}</div>
+                <div className="text-xs text-gray-500">
+                  {step1Progress ? `✓ Done (${step1Progress.errors} errors)` : processingStep1 ? 'In Progress...' : 'Not Started'}
+                </div>
               </div>
-              <div className={`bg-white rounded-lg p-3 border-2 ${stepProgress.step2.done ? 'border-green-500' : 'border-gray-300'}`}>
+              <div className={`bg-white rounded-lg p-3 border-2 ${step2Progress ? 'border-green-500' : processingStep2 ? 'border-green-500' : 'border-gray-300'}`}>
                 <div className="text-xs font-semibold text-gray-600 mb-1">💰 Extract Price</div>
-                <div className={`text-lg font-bold ${stepProgress.step2.done ? 'text-green-600' : 'text-gray-400'}`}>
-                  {stepProgress.step2.done ? `${stepProgress.step2.success}/${stepProgress.step2.total}` : '—'}
+                <div className={`text-lg font-bold ${step2Progress ? 'text-green-600' : processingStep2 ? 'text-green-600' : 'text-gray-400'}`}>
+                  {step2Progress ? `${step2Progress.success}/${step2Progress.total}` : processingStep2 ? 'Running...' : '—'}
                 </div>
-                <div className="text-xs text-gray-500">{stepProgress.step2.done ? 'Done ✓' : 'Waiting...'}</div>
+                <div className="text-xs text-gray-500">
+                  {step2Progress ? `✓ Done (${step2Progress.errors} errors)` : processingStep2 ? 'In Progress...' : 'Not Started'}
+                </div>
               </div>
-              <div className={`bg-white rounded-lg p-3 border-2 ${stepProgress.step3.done ? 'border-green-500' : 'border-gray-300'}`}>
-                <div className="text-xs font-semibold text-gray-600 mb-1">🔍 Search DB</div>
-                <div className={`text-lg font-bold ${stepProgress.step3.done ? 'text-green-600' : 'text-gray-400'}`}>
-                  {stepProgress.step3.done ? `${stepProgress.step3.success}/${stepProgress.step3.total}` : '—'}
+              <div className={`bg-white rounded-lg p-3 border-2 ${step3Progress ? 'border-green-500' : processingStep3 ? 'border-blue-500' : 'border-gray-300'}`}>
+                <div className="text-xs font-semibold text-gray-600 mb-1">🔍 Search & Save</div>
+                <div className={`text-lg font-bold ${step3Progress ? 'text-green-600' : processingStep3 ? 'text-blue-600' : 'text-gray-400'}`}>
+                  {step3Progress ? `${step3Progress.success}/${step3Progress.total}` : processingStep3 ? 'Running...' : '—'}
                 </div>
-                <div className="text-xs text-gray-500">{stepProgress.step3.done ? 'Done ✓' : 'Waiting...'}</div>
-              </div>
-              <div className={`bg-white rounded-lg p-3 border-2 ${stepProgress.step4.done ? 'border-green-500' : 'border-gray-300'}`}>
-                <div className="text-xs font-semibold text-gray-600 mb-1">🤖 AI Filter</div>
-                <div className={`text-lg font-bold ${stepProgress.step4.done ? 'text-green-600' : 'text-gray-400'}`}>
-                  {stepProgress.step4.done ? `${stepProgress.step4.success}/${stepProgress.step4.total}` : '—'}
+                <div className="text-xs text-gray-500">
+                  {step3Progress ? `✓ Saved ${step3Progress.success}, No Match ${step3Progress.noMatch}` : processingStep3 ? 'In Progress...' : 'Not Started'}
                 </div>
-                <div className="text-xs text-gray-500">{stepProgress.step4.done ? 'Done ✓' : 'Waiting...'}</div>
               </div>
             </div>
           </div>
