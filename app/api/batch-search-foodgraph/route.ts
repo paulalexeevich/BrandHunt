@@ -81,9 +81,32 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        console.log(`  [${detection.detection_index}] (${i + 1}/${detectionsToProcess.length}) Searching for: ${detection.brand_name}...`);
+        // Parse product info from brand_extraction_response for comprehensive search
+        let productInfo = null;
+        if (detection.brand_extraction_response) {
+          try {
+            productInfo = JSON.parse(detection.brand_extraction_response);
+          } catch (e) {
+            console.error(`  ⚠️ Failed to parse brand_extraction_response for detection ${detection.id}:`, e);
+          }
+        }
+
+        // Build search description for logging
+        const searchDesc = productInfo 
+          ? `${productInfo.brand || ''} ${productInfo.productName || ''} ${productInfo.flavor || ''} ${productInfo.size || ''}`.trim()
+          : detection.brand_name;
         
-        const foodgraphResults = await searchProducts(detection.brand_name);
+        console.log(`  [${detection.detection_index}] (${i + 1}/${detectionsToProcess.length}) Searching for: ${searchDesc}...`);
+        
+        // Search with all available product details
+        const foodgraphResults = productInfo && (productInfo.productName || productInfo.flavor || productInfo.size)
+          ? await searchProducts(detection.brand_name, {
+              brand: productInfo.brand,
+              productName: productInfo.productName,
+              flavor: productInfo.flavor,
+              size: productInfo.size
+            })
+          : await searchProducts(detection.brand_name);
         
         if (foodgraphResults.length > 0) {
           // Save top 50 results to intermediate table (cache for step 4)
