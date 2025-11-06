@@ -82,6 +82,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [step1Progress, setStep1Progress] = useState<{ success: number; total: number; errors: number } | null>(null);
   const [step2Progress, setStep2Progress] = useState<{ success: number; total: number; errors: number } | null>(null);
   const [step3Progress, setStep3Progress] = useState<{ success: number; total: number; noMatch: number; errors: number } | null>(null);
+  const [step3Details, setStep3Details] = useState<Array<{ detectionIndex: number; product: string; stage: string; message: string }>>([]);
   const [detectionMethod, setDetectionMethod] = useState<'gemini' | 'yolo'>('yolo');
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
@@ -573,6 +574,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     setProcessingStep3(true);
     setError(null);
     setStep3Progress(null);
+    setStep3Details([]);
 
     try {
       console.log('🚀 Starting Step 3: Search & Save for All Products');
@@ -583,23 +585,79 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         body: JSON.stringify({ imageId: resolvedParams.imageId }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Step 3 complete:', data);
-        setStep3Progress({
-          success: data.success,
-          total: data.total,
-          noMatch: data.noMatch,
-          errors: data.errors
-        });
-
-        // Reload the page data to show updated products
-        await fetchImage();
-
-        alert(`✅ Search & Save Complete!\n\n🔍 Processed: ${data.total} products\n✓ Saved: ${data.success}\n⚠️ No Match: ${data.noMatch}\n✗ Errors: ${data.errors}`);
-      } else {
+      if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.details || 'Failed to search and save');
+      }
+
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+            console.log('📡 Progress update:', data);
+
+            if (data.type === 'progress') {
+              // Update detailed progress
+              setStep3Details(prev => {
+                const existing = prev.findIndex(p => p.detectionIndex === data.detectionIndex);
+                const newItem = {
+                  detectionIndex: data.detectionIndex,
+                  product: data.currentProduct || '',
+                  stage: data.stage || '',
+                  message: data.message || ''
+                };
+                
+                if (existing >= 0) {
+                  const updated = [...prev];
+                  updated[existing] = newItem;
+                  return updated;
+                } else {
+                  return [...prev, newItem];
+                }
+              });
+
+              // Update summary progress
+              if (data.processed !== undefined && data.total !== undefined) {
+                setStep3Progress({
+                  success: data.success || 0,
+                  total: data.total,
+                  noMatch: data.noMatch || 0,
+                  errors: data.errors || 0
+                });
+              }
+            } else if (data.type === 'complete') {
+              console.log('✅ Step 3 complete:', data);
+              setStep3Progress({
+                success: data.success,
+                total: data.total,
+                noMatch: data.noMatch,
+                errors: data.errors
+              });
+
+              // Reload the page data to show updated products
+              await fetchImage();
+
+              alert(`✅ Search & Save Complete!\n\n🔍 Processed: ${data.total} products\n✓ Saved: ${data.success}\n⚠️ No Match: ${data.noMatch}\n✗ Errors: ${data.errors}`);
+            }
+          }
+        }
       }
       
     } catch (err) {
@@ -830,6 +888,36 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 </div>
               </div>
             </div>
+            
+            {/* Detailed Per-Product Progress for Step 3 */}
+            {processingStep3 && step3Details.length > 0 && (
+              <div className="mt-4 bg-white rounded-lg p-4 border border-blue-200">
+                <h4 className="font-semibold text-sm text-gray-700 mb-2">📦 Product Progress (3 at a time)</h4>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {step3Details.map((detail) => (
+                    <div key={detail.detectionIndex} className="flex items-center gap-2 text-xs py-1 px-2 bg-gray-50 rounded">
+                      <span className="font-mono text-gray-500">#{detail.detectionIndex}</span>
+                      <span className="flex-1 truncate text-gray-700">{detail.product}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        detail.stage === 'done' ? 'bg-green-100 text-green-700' :
+                        detail.stage === 'searching' ? 'bg-blue-100 text-blue-700' :
+                        detail.stage === 'filtering' ? 'bg-purple-100 text-purple-700' :
+                        detail.stage === 'saving' ? 'bg-yellow-100 text-yellow-700' :
+                        detail.stage === 'error' ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {detail.stage === 'searching' ? '🔍' : 
+                         detail.stage === 'filtering' ? '🤖' : 
+                         detail.stage === 'saving' ? '💾' : 
+                         detail.stage === 'done' ? '✓' : 
+                         detail.stage === 'error' ? '✗' : '⏳'}
+                        {detail.message}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
