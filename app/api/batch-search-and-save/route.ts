@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
-import { searchProducts } from '@/lib/foodgraph';
+import { searchProducts, getFrontImageUrl } from '@/lib/foodgraph';
 import { compareProductImages } from '@/lib/gemini';
 
 interface SearchAndSaveResult {
@@ -49,12 +49,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch all detections that have brand info but are not fully analyzed yet
+    // Match frontend logic: !fully_analyzed includes both null AND false
     const { data: detections, error: detectionsError } = await supabase
       .from('branghunt_detections')
       .select('*')
       .eq('image_id', imageId)
       .not('brand_name', 'is', null)
-      .is('fully_analyzed', null)
+      .not('fully_analyzed', 'eq', true)
       .order('detection_index');
 
     if (detectionsError) {
@@ -121,7 +122,15 @@ export async function POST(request: NextRequest) {
             })
           : await searchProducts(detection.brand_name);
         
-        const foodgraphResults = searchResult.products;
+        // Transform products to add front_image_url property
+        const foodgraphResults = searchResult.products.map(product => ({
+          ...product,
+          product_name: product.title,
+          brand_name: product.companyBrand || null,
+          product_gtin: product.keys?.GTIN14 || product.key || null,
+          category: Array.isArray(product.category) ? product.category.join(', ') : product.category,
+          front_image_url: getFrontImageUrl(product)
+        }));
         result.resultsSearched = foodgraphResults.length;
         result.productName = detection.product_name || detection.brand_name;
         result.brandName = detection.brand_name;
@@ -151,15 +160,15 @@ export async function POST(request: NextRequest) {
 
         // Step 3b: Filter with AI (results still in memory)
         console.log(`\n  [${detection.detection_index}] Step 2: AI filtering ${foodgraphResults.length} results...`);
+        
+        // For simplicity, use the full image base64 for comparison
+        // (In production, you might want to crop it first for better accuracy)
+        const imageBase64 = image.file_path;
         console.log(`     🖼️ Using image base64 length: ${imageBase64.length} chars`);
         
         // Crop the product from the image for comparison
         const img = Buffer.from(image.file_path, 'base64');
         const boundingBox = detection.bounding_box;
-        
-        // For simplicity, use the full image base64 for comparison
-        // (In production, you might want to crop it first for better accuracy)
-        const imageBase64 = image.file_path;
 
         // Compare first 20 results (to avoid too many API calls)
         const resultsToCompare = foodgraphResults.slice(0, 20);
@@ -175,7 +184,8 @@ export async function POST(request: NextRequest) {
 
           try {
             console.log(`     🔄 [${j + 1}/${resultsToCompare.length}] Comparing with: ${fgResult.product_name}`);
-            console.log(`        Image URL: ${fgResult.front_image_url?.substring(0, 60)}...`);
+            const imageUrlPreview = fgResult.front_image_url ? fgResult.front_image_url.substring(0, 60) : 'N/A';
+            console.log(`        Image URL: ${imageUrlPreview}...`);
             
             const isMatch = await compareProductImages(
               imageBase64,
