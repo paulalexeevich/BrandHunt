@@ -202,10 +202,22 @@ export async function POST(request: NextRequest) {
             console.log(`  [#${detection.detection_index}] AI filtering ${foodgraphResults.length} results...`);
 
             // CRITICAL: Crop image to just this product (like manual filter does!)
-            // First, validate bounding box coordinates (check for null/undefined or NaN)
-            if (detection.y0 == null || detection.x0 == null || detection.y1 == null || detection.x1 == null ||
-                isNaN(detection.y0) || isNaN(detection.x0) || isNaN(detection.y1) || isNaN(detection.x1)) {
-              console.error(`    ❌ Invalid bounding box coordinates: y0=${detection.y0}, x0=${detection.x0}, y1=${detection.y1}, x1=${detection.x1}`);
+            // Extract bounding box from JSONB column or individual columns
+            let boundingBox: { y0: number; x0: number; y1: number; x1: number };
+            
+            if (detection.bounding_box && typeof detection.bounding_box === 'object') {
+              // Coordinates stored in bounding_box JSONB column
+              boundingBox = detection.bounding_box as { y0: number; x0: number; y1: number; x1: number };
+            } else if (detection.y0 != null && detection.x0 != null && detection.y1 != null && detection.x1 != null) {
+              // Coordinates stored as individual columns
+              boundingBox = {
+                y0: detection.y0,
+                x0: detection.x0,
+                y1: detection.y1,
+                x1: detection.x1
+              };
+            } else {
+              console.error(`    ❌ Invalid bounding box data:`, detection.bounding_box || { y0: detection.y0, x0: detection.x0, y1: detection.y1, x1: detection.x1 });
               result.status = 'error';
               result.error = 'Invalid bounding box coordinates';
               
@@ -221,12 +233,23 @@ export async function POST(request: NextRequest) {
               return result;
             }
             
-            const boundingBox = {
-              y0: detection.y0,
-              x0: detection.x0,
-              y1: detection.y1,
-              x1: detection.x1
-            };
+            // Validate the extracted coordinates
+            if (isNaN(boundingBox.y0) || isNaN(boundingBox.x0) || isNaN(boundingBox.y1) || isNaN(boundingBox.x1)) {
+              console.error(`    ❌ NaN in bounding box:`, boundingBox);
+              result.status = 'error';
+              result.error = 'Invalid bounding box coordinates';
+              
+              sendProgress({
+                type: 'progress',
+                detectionIndex: detection.detection_index,
+                stage: 'error',
+                message: 'Invalid coordinates',
+                processed: globalIndex + 1,
+                total: detections.length
+              });
+              
+              return result;
+            }
             
             console.log(`    ✂️ Cropping product #${detection.detection_index} from full image...`);
             const { croppedBase64 } = await cropImageToBoundingBox(imageBase64, boundingBox);
