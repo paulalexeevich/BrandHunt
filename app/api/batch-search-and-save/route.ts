@@ -251,9 +251,12 @@ export async function POST(request: NextRequest) {
               return result;
             }
             
-            console.log(`    ✂️ Cropping product #${detection.detection_index} from full image...`);
-            const { croppedBase64 } = await cropImageToBoundingBox(imageBase64, boundingBox);
-            console.log(`    ✅ Cropped to product image`);
+            console.log(`    ✂️ Cropping product #${detection.detection_index} with bounding box:`, boundingBox);
+            console.log(`    📏 Original image size: ${imageBase64.length} chars (base64)`);
+            
+            const { croppedBase64, width, height } = await cropImageToBoundingBox(imageBase64, boundingBox);
+            
+            console.log(`    ✅ Cropped to ${width}x${height}px (${croppedBase64.length} chars base64)`);
 
             // Compare ALL results in PARALLEL (same as manual filter)
             const resultsToCompare = foodgraphResults;
@@ -261,16 +264,26 @@ export async function POST(request: NextRequest) {
             console.log(`    🚀 Comparing ${resultsToCompare.length} results in parallel...`);
             
             // Run all comparisons simultaneously
-            const comparisonPromises = resultsToCompare.map(async (fgResult) => {
+            const comparisonPromises = resultsToCompare.map(async (fgResult, index) => {
               if (!fgResult.front_image_url) {
                 return { result: fgResult, isMatch: false };
               }
 
               try {
+                if (index === 0) {
+                  console.log(`    🔍 Sample comparison: Cropped product (${width}x${height}px) vs FoodGraph "${fgResult.product_name}"`);
+                  console.log(`       FoodGraph image URL: ${fgResult.front_image_url}`);
+                }
+                
                 const isMatch = await compareProductImages(
                   croppedBase64,  // Use cropped product image, not full shelf!
                   fgResult.front_image_url as string
                 );
+                
+                if (isMatch && index < 3) {
+                  console.log(`    ✨ MATCH found at index ${index}: ${fgResult.product_name}`);
+                }
+                
                 return { result: fgResult, isMatch };
               } catch (error) {
                 console.error(`    ⚠️ Comparison error for ${fgResult.product_name}:`, error);
