@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     console.log(`🚀 Found ${detections.length} products that need processing`);
     
     const CONCURRENCY_LIMIT = 3; // Process 3 products in parallel
-    const DELAY_BETWEEN_PRODUCTS = 2000; // 2 second delay between AI comparisons
+    const DELAY_BETWEEN_BATCHES = 5000; // 5 second delay between batches (for FoodGraph API rate limiting)
     const imageBase64 = image.file_path;
 
     // Create streaming response with Server-Sent Events
@@ -201,38 +201,39 @@ export async function POST(request: NextRequest) {
 
             console.log(`  [#${detection.detection_index}] AI filtering ${foodgraphResults.length} results...`);
 
-            // Compare first 20 results
+            // Compare first 20 results in PARALLEL (much faster!)
             const resultsToCompare = foodgraphResults.slice(0, 20);
-            let bestMatch = null;
-
-            for (let j = 0; j < resultsToCompare.length; j++) {
-              const fgResult = resultsToCompare[j];
-              
+            
+            console.log(`    🚀 Comparing ${resultsToCompare.length} results in parallel...`);
+            
+            // Run all comparisons simultaneously
+            const comparisonPromises = resultsToCompare.map(async (fgResult) => {
               if (!fgResult.front_image_url) {
-                continue;
+                return { result: fgResult, isMatch: false };
               }
 
               try {
-                console.log(`    [${j + 1}/${resultsToCompare.length}] Comparing: ${fgResult.product_name}`);
-                
                 const isMatch = await compareProductImages(
                   imageBase64,
                   fgResult.front_image_url as string
                 );
-
-                if (isMatch) {
-                  bestMatch = fgResult;
-                  console.log(`    ✅ MATCH FOUND: ${fgResult.product_name}`);
-                  break;
-                }
+                return { result: fgResult, isMatch };
               } catch (error) {
-                console.error(`    ⚠️ Comparison error:`, error);
+                console.error(`    ⚠️ Comparison error for ${fgResult.product_name}:`, error);
+                return { result: fgResult, isMatch: false };
               }
+            });
 
-              // Small delay between comparisons
-              if (j < resultsToCompare.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_PRODUCTS));
-              }
+            const comparisonResults = await Promise.all(comparisonPromises);
+            
+            // Find the first match
+            const matchingResult = comparisonResults.find(r => r.isMatch);
+            const bestMatch = matchingResult ? matchingResult.result : null;
+            
+            if (bestMatch) {
+              console.log(`    ✅ MATCH FOUND: ${bestMatch.product_name}`);
+            } else {
+              console.log(`    ⚠️ No matches found in ${resultsToCompare.length} results`);
             }
 
             // Step 3: Save match to DB
@@ -334,7 +335,7 @@ export async function POST(request: NextRequest) {
           // Small delay between batches to avoid rate limiting
           if (i + CONCURRENCY_LIMIT < detections.length) {
             console.log(`  ⏳ Waiting 5s before next batch...`);
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
           }
         }
 
