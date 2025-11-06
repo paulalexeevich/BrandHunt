@@ -202,6 +202,25 @@ export async function POST(request: NextRequest) {
             console.log(`  [#${detection.detection_index}] AI filtering ${foodgraphResults.length} results...`);
 
             // CRITICAL: Crop image to just this product (like manual filter does!)
+            // First, validate bounding box coordinates (check for null/undefined or NaN)
+            if (detection.y0 == null || detection.x0 == null || detection.y1 == null || detection.x1 == null ||
+                isNaN(detection.y0) || isNaN(detection.x0) || isNaN(detection.y1) || isNaN(detection.x1)) {
+              console.error(`    ❌ Invalid bounding box coordinates: y0=${detection.y0}, x0=${detection.x0}, y1=${detection.y1}, x1=${detection.x1}`);
+              result.status = 'error';
+              result.error = 'Invalid bounding box coordinates';
+              
+              sendProgress({
+                type: 'progress',
+                detectionIndex: detection.detection_index,
+                stage: 'error',
+                message: 'Invalid coordinates',
+                processed: globalIndex + 1,
+                total: detections.length
+              });
+              
+              return result;
+            }
+            
             const boundingBox = {
               y0: detection.y0,
               x0: detection.x0,
