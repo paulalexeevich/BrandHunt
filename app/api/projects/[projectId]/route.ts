@@ -31,10 +31,11 @@ export async function GET(
     // Get page and limit from query params
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const limit = parseInt(url.searchParams.get('limit') || '10'); // Reduced to 10 for better performance
     const offset = (page - 1) * limit;
 
-    // Fetch images for this project with detection counts (paginated)
+    // Fetch images for this project (paginated)
+    // Using smaller page size (10) to avoid loading too much base64 data at once
     const { data: images, error: imagesError } = await supabase
       .from('branghunt_images')
       .select(`
@@ -61,7 +62,7 @@ export async function GET(
       );
     }
 
-    console.log(`Fetched ${images?.length || 0} images for project ${projectId} (page ${page}, limit ${limit})`);
+    console.log(`Fetched ${images?.length || 0} images for project ${projectId} (page ${page}, limit ${limit}, offset ${offset})`);
 
     // Fetch detection counts for these images
     const imageIds = (images || []).map(img => img.id);

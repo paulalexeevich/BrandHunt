@@ -108,7 +108,8 @@ export default function ProjectViewPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}?page=${pageNum}&limit=50`, {
+      // Using limit=10 for faster loading (each image is 2-5MB base64)
+      const response = await fetch(`/api/projects/${projectId}?page=${pageNum}&limit=10`, {
         credentials: 'include',
       });
       if (!response.ok) {
@@ -350,7 +351,7 @@ export default function ProjectViewPage() {
             {/* Images Grid */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Images {pagination ? `(${pagination.total} total, showing ${(page - 1) * 50 + 1}-${Math.min(page * 50, pagination.total)})` : `(${images.length})`}
+                Images {pagination ? `(${pagination.total} total, showing ${(page - 1) * 10 + 1}-${Math.min(page * 10, pagination.total)})` : `(${images.length})`}
               </h2>
 
               {images.length === 0 ? (
