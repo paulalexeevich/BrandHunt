@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
             console.log(`     Comparing with result ${j + 1}/${resultsToCompare.length}...`);
             const isMatch = await compareProductImages(
               imageBase64,
-              fgResult.front_image_url
+              fgResult.front_image_url as string
             );
 
             if (isMatch) {
@@ -204,10 +204,10 @@ export async function POST(request: NextRequest) {
 
           result.status = 'success';
           result.savedMatch = {
-            productName: bestMatch.product_name || 'Unknown',
-            brandName: bestMatch.brand_name || 'Unknown',
-            gtin: bestMatch.product_gtin || 'Unknown',
-            imageUrl: bestMatch.front_image_url || ''
+            productName: (bestMatch.product_name || 'Unknown') as string,
+            brandName: (bestMatch.brand_name || 'Unknown') as string,
+            gtin: (bestMatch.product_gtin || 'Unknown') as string,
+            imageUrl: (bestMatch.front_image_url || '') as string
           };
 
           console.log(`  ✅ [${detection.detection_index}] Saved match: ${bestMatch.product_name}`);
