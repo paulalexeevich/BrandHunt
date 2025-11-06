@@ -72,13 +72,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`🚀 Processing ${detections.length} products SEQUENTIALLY (search → filter → save)...`);
+    console.log(`🚀 Found ${detections.length} products that need processing`);
+    
+    // FOR TESTING: Process only first 1 product
+    const detectionsToProcess = detections.slice(0, 1);
+    console.log(`🧪 TESTING MODE: Processing only ${detectionsToProcess.length} product(s)`);
 
     // Process detections sequentially with delays
     const results: SearchAndSaveResult[] = [];
     
-    for (let i = 0; i < detections.length; i++) {
-      const detection = detections[i];
+    for (let i = 0; i < detectionsToProcess.length; i++) {
+      const detection = detectionsToProcess[i];
       const result: SearchAndSaveResult = {
         detectionId: detection.id,
         detectionIndex: detection.detection_index,
@@ -87,7 +91,8 @@ export async function POST(request: NextRequest) {
 
       try {
         // Step 3a: Search FoodGraph (keep results in memory)
-        console.log(`  [${detection.detection_index}] (${i + 1}/${detections.length}) Step 1: Searching FoodGraph...`);
+        console.log(`\n========================================`);
+        console.log(`  [${detection.detection_index}] (${i + 1}/${detectionsToProcess.length}) Step 1: Searching FoodGraph...`);
         
         // Parse product info for comprehensive search
         let productInfo = null;
@@ -103,7 +108,8 @@ export async function POST(request: NextRequest) {
           ? `${productInfo.brand || ''} ${productInfo.productName || ''} ${productInfo.flavor || ''} ${productInfo.size || ''}`.trim()
           : detection.brand_name;
         
-        console.log(`     Searching for: ${searchDesc}`);
+        console.log(`     📝 Product Info:`, JSON.stringify(productInfo, null, 2));
+        console.log(`     🔍 Searching for: "${searchDesc}"`);
         
         // Search FoodGraph with all available details
         const searchResult = productInfo && (productInfo.productName || productInfo.flavor || productInfo.size)
@@ -120,7 +126,14 @@ export async function POST(request: NextRequest) {
         result.productName = detection.product_name || detection.brand_name;
         result.brandName = detection.brand_name;
         
-        console.log(`     ✓ Found ${foodgraphResults.length} FoodGraph results`);
+        console.log(`     ✅ Found ${foodgraphResults.length} FoodGraph results`);
+        if (foodgraphResults.length > 0) {
+          console.log(`     📦 First 3 results:`, foodgraphResults.slice(0, 3).map((r: any) => ({
+            name: r.product_name,
+            brand: r.brand_name,
+            hasImage: !!r.front_image_url
+          })));
+        }
 
         if (foodgraphResults.length === 0) {
           result.status = 'no_match';
@@ -137,7 +150,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 3b: Filter with AI (results still in memory)
-        console.log(`  [${detection.detection_index}] Step 2: AI filtering ${foodgraphResults.length} results...`);
+        console.log(`\n  [${detection.detection_index}] Step 2: AI filtering ${foodgraphResults.length} results...`);
+        console.log(`     🖼️ Using image base64 length: ${imageBase64.length} chars`);
         
         // Crop the product from the image for comparison
         const img = Buffer.from(image.file_path, 'base64');
@@ -149,6 +163,7 @@ export async function POST(request: NextRequest) {
 
         // Compare first 20 results (to avoid too many API calls)
         const resultsToCompare = foodgraphResults.slice(0, 20);
+        console.log(`     🔬 Comparing first ${resultsToCompare.length} results with AI...`);
         let bestMatch = null;
 
         for (let j = 0; j < resultsToCompare.length; j++) {
@@ -159,15 +174,19 @@ export async function POST(request: NextRequest) {
           }
 
           try {
-            console.log(`     Comparing with result ${j + 1}/${resultsToCompare.length}...`);
+            console.log(`     🔄 [${j + 1}/${resultsToCompare.length}] Comparing with: ${fgResult.product_name}`);
+            console.log(`        Image URL: ${fgResult.front_image_url?.substring(0, 60)}...`);
+            
             const isMatch = await compareProductImages(
               imageBase64,
               fgResult.front_image_url as string
             );
 
+            console.log(`        Result: ${isMatch ? '✅ MATCH!' : '❌ No match'}`);
+
             if (isMatch) {
               bestMatch = fgResult;
-              console.log(`     ✓ Found matching product: ${fgResult.product_name}`);
+              console.log(`     ✅ BEST MATCH FOUND: ${fgResult.product_name} (${fgResult.brand_name})`);
               break; // Stop at first match
             }
           } catch (error) {
@@ -183,7 +202,8 @@ export async function POST(request: NextRequest) {
 
         // Step 3c: Save only the final match to DB
         if (bestMatch) {
-          console.log(`  [${detection.detection_index}] Step 3: Saving best match to DB...`);
+          console.log(`\n  [${detection.detection_index}] Step 3: Saving best match to DB...`);
+          console.log(`     💾 Saving: ${bestMatch.product_name} (GTIN: ${bestMatch.product_gtin})`);
           
           const { error: updateError } = await supabase
             .from('branghunt_detections')
@@ -226,7 +246,7 @@ export async function POST(request: NextRequest) {
       results.push(result);
 
       // Add delay between products (10 seconds for FoodGraph API)
-      if (i < detections.length - 1) {
+      if (i < detectionsToProcess.length - 1) {
         console.log(`  ⏳ Waiting 10s before next product...`);
         await new Promise(resolve => setTimeout(resolve, 10000));
       }
@@ -240,7 +260,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       message: 'Batch search & save complete',
-      total: detections.length,
+      total: detectionsToProcess.length,
+      totalAvailable: detections.length,
       success: successCount,
       noMatch: noMatchCount,
       errors: errorCount,
