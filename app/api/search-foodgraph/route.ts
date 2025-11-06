@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
       success: true,
       productsCount: foodgraphResults.length,
       products: foodgraphResults,
+      searchTerm: searchTerm,
       message: 'FoodGraph search completed' 
     });
   } catch (error) {

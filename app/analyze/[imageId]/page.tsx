@@ -64,6 +64,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [detections, setDetections] = useState<Detection[]>([]);
   const [selectedDetection, setSelectedDetection] = useState<string | null>(null);
   const [foodgraphResults, setFoodgraphResults] = useState<FoodGraphResult[]>([]);
+  const [foodgraphSearchTerm, setFoodgraphSearchTerm] = useState<string | null>(null);
   const [productsDetected, setProductsDetected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,6 +221,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const handleBoundingBoxClick = (detectionId: string) => {
     setSelectedDetection(detectionId);
     setFoodgraphResults([]); // Clear results when switching products
+    setFoodgraphSearchTerm(null); // Clear search term when switching products
     setFilteredCount(null);
   };
 
@@ -357,8 +359,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       const data = await response.json();
       console.log('FoodGraph API response:', data);
       console.log('Products found:', data.products?.length || 0);
+      console.log('Search term used:', data.searchTerm);
       
       setFoodgraphResults(data.products || []);
+      setFoodgraphSearchTerm(data.searchTerm || null);
     } catch (err) {
       console.error('FoodGraph search error:', err);
       const errorMessage = err instanceof Error ? err.message : 'FoodGraph search failed';
@@ -1078,6 +1082,18 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           )}
                         </h4>
                       </div>
+                      
+                      {/* Display the search term used */}
+                      {foodgraphSearchTerm && (
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <span className="text-blue-600 font-semibold text-sm">🔍 Search Term:</span>
+                          </div>
+                          <div className="mt-1 text-sm text-gray-700 font-mono bg-white px-3 py-2 rounded border border-blue-100">
+                            {foodgraphSearchTerm}
+                          </div>
+                        </div>
+                      )}
                       
                       <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
                         {(() => {
