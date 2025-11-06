@@ -24,6 +24,17 @@ Previously, FoodGraph searches were inconsistent:
 
 ## Implementation Details
 
+### Function Return Type
+The `searchProducts()` function now returns an object containing both the results and the actual search term used:
+```typescript
+{
+  products: FoodGraphProduct[];  // Array of matching products
+  searchTerm: string;           // Exact search term sent to API
+}
+```
+
+This ensures the displayed search term matches exactly what was sent to FoodGraph, providing complete transparency.
+
 ### Request Body Format
 The FoodGraph API request body structure:
 ```json
@@ -88,8 +99,11 @@ To verify the changes:
 4. Check console logs to see combined search term
 5. Verify results are more accurate and specific
 
-## Commit
-- **Hash**: c733838
+## Commits
+1. **c733838** - Initial implementation combining all product fields
+2. **cf065ae** - Added documentation
+3. **97ec8c5** - Added search term display to UI
+4. **e5009e9** - Return actual search term from searchProducts function
 - **Date**: November 6, 2025
 - **Build Status**: ✅ Successful (no errors)
 
