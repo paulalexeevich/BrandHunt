@@ -47,8 +47,7 @@ export async function GET(
         status,
         detection_completed,
         detection_completed_at,
-        created_at,
-        detections:branghunt_detections(count)
+        created_at
       `)
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
@@ -64,10 +63,27 @@ export async function GET(
 
     console.log(`Fetched ${images?.length || 0} images for project ${projectId} (page ${page}, limit ${limit})`);
 
-    // Format images with proper data URIs
+    // Fetch detection counts for these images
+    const imageIds = (images || []).map(img => img.id);
+    let detectionCounts: Record<string, number> = {};
+    
+    if (imageIds.length > 0) {
+      const { data: detections } = await supabase
+        .from('branghunt_detections')
+        .select('image_id')
+        .in('image_id', imageIds);
+      
+      // Count detections per image
+      (detections || []).forEach(detection => {
+        detectionCounts[detection.image_id] = (detectionCounts[detection.image_id] || 0) + 1;
+      });
+    }
+
+    // Format images with proper data URIs and detection counts
     const formattedImages = (images || []).map(img => ({
       ...img,
-      image_data: `data:${img.mime_type};base64,${img.file_path}`
+      image_data: `data:${img.mime_type};base64,${img.file_path}`,
+      detections: [{ count: detectionCounts[img.id] || 0 }]
     }));
 
     // Calculate pagination metadata
