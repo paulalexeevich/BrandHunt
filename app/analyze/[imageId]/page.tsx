@@ -570,19 +570,23 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
   };
 
-  const handleSearchAndSaveAll = async () => {
+  const handleSearchAndSaveAll = async (concurrency?: number) => {
     setProcessingStep3(true);
     setError(null);
     setStep3Progress(null);
     setStep3Details([]);
 
     try {
-      console.log('🚀 Starting Step 3: Search & Save for All Products');
+      const concurrencyLabel = concurrency === 999999 ? 'ALL' : concurrency || 3;
+      console.log(`🚀 Starting Step 3: Search & Save for All Products (Concurrency: ${concurrencyLabel})`);
       
       const response = await fetch('/api/batch-search-and-save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageId: resolvedParams.imageId }),
+        body: JSON.stringify({ 
+          imageId: resolvedParams.imageId,
+          concurrency: concurrency
+        }),
       });
 
       if (!response.ok) {
@@ -861,21 +865,53 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         `💰 Extract Price (${needsPrice})`
                       )}
                     </button>
-                    <button
-                      onClick={handleSearchAndSaveAll}
-                      disabled={processingStep3 || needsSearch === 0}
-                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
-                      title={needsSearch === 0 ? 'All products processed' : `Search & save ${needsSearch} products (requires Step 1)`}
-                    >
-                      {processingStep3 ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Searching...
-                        </>
-                      ) : (
-                        `🔍 Search & Save (${needsSearch})`
-                      )}
-                    </button>
+                    
+                    {/* Step 3: Search & Save - Multiple Concurrency Options for Testing */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">🔍 Search & Save ({needsSearch})</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => handleSearchAndSaveAll(3)}
+                          disabled={processingStep3 || needsSearch === 0}
+                          className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-medium disabled:opacity-50 text-xs"
+                          title="Process 3 products at a time (safe)"
+                        >
+                          {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡ 3 at once'}
+                        </button>
+                        <button
+                          onClick={() => handleSearchAndSaveAll(10)}
+                          disabled={processingStep3 || needsSearch === 0}
+                          className="px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-all font-medium disabled:opacity-50 text-xs"
+                          title="Process 10 products at a time"
+                        >
+                          {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡ 10 at once'}
+                        </button>
+                        <button
+                          onClick={() => handleSearchAndSaveAll(20)}
+                          disabled={processingStep3 || needsSearch === 0}
+                          className="px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all font-medium disabled:opacity-50 text-xs"
+                          title="Process 20 products at a time"
+                        >
+                          {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡⚡ 20 at once'}
+                        </button>
+                        <button
+                          onClick={() => handleSearchAndSaveAll(50)}
+                          disabled={processingStep3 || needsSearch === 0}
+                          className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-all font-medium disabled:opacity-50 text-xs"
+                          title="Process 50 products at a time"
+                        >
+                          {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🚀 50 at once'}
+                        </button>
+                        <button
+                          onClick={() => handleSearchAndSaveAll(999999)}
+                          disabled={processingStep3 || needsSearch === 0}
+                          className="px-3 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg hover:from-red-600 hover:to-orange-600 transition-all font-bold disabled:opacity-50 text-xs col-span-2"
+                          title="Process ALL products simultaneously (maximum speed, high resource usage)"
+                        >
+                          {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🔥 ALL AT ONCE 🔥'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 );
               })()}

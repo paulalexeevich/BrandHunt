@@ -36,7 +36,7 @@ interface ProgressUpdate {
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageId } = await request.json();
+    const { imageId, concurrency } = await request.json();
 
     if (!imageId) {
       return new Response(JSON.stringify({ 
@@ -48,6 +48,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`🔍 Starting batch search & save for image ${imageId}...`);
+    if (concurrency) {
+      console.log(`⚡ Concurrency level: ${concurrency === 999999 ? 'ALL (unlimited)' : concurrency} products at a time`);
+    }
 
     // Create authenticated Supabase client
     const supabase = await createAuthenticatedSupabaseClient();
@@ -101,9 +104,12 @@ export async function POST(request: NextRequest) {
 
     console.log(`🚀 Found ${detections.length} products that need processing`);
     
-    const CONCURRENCY_LIMIT = 3; // Process 3 products in parallel
+    // Configurable concurrency: 3 (default), 10, 20, 50, or 999999 (all at once)
+    const CONCURRENCY_LIMIT = concurrency || 3;
     const DELAY_BETWEEN_BATCHES = 5000; // 5 second delay between batches (for FoodGraph API rate limiting)
     const imageBase64 = image.file_path;
+    
+    console.log(`📊 Processing with concurrency limit: ${CONCURRENCY_LIMIT === 999999 ? `ALL ${detections.length}` : CONCURRENCY_LIMIT}`);
 
     // Create streaming response with Server-Sent Events
     const encoder = new TextEncoder();
