@@ -642,6 +642,39 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   errors: data.errors || 0
                 });
               }
+
+              // Update individual detection when it completes (stage='done' or stage='error')
+              if (data.stage === 'done' || data.stage === 'error' || data.stage === 'no-match') {
+                // Reload the specific detection from database to get saved match data
+                if (data.stage === 'done') {
+                  // Find the detection ID for this index
+                  const detectionToReload = detections[data.detectionIndex];
+                  if (detectionToReload) {
+                    fetch(`/api/results/${resolvedParams.imageId}`)
+                      .then(res => res.json())
+                      .then(refreshedData => {
+                        if (refreshedData.detections) {
+                          // Update just this one detection with fresh data from DB
+                          setDetections(prev => prev.map((det, idx) => {
+                            if (idx === data.detectionIndex) {
+                              return refreshedData.detections[idx];
+                            }
+                            return det;
+                          }));
+                        }
+                      })
+                      .catch(err => console.error('Failed to refresh detection:', err));
+                  }
+                } else {
+                  // For errors/no-match, just update the fully_analyzed flag
+                  setDetections(prev => prev.map((det, idx) => {
+                    if (idx === data.detectionIndex) {
+                      return { ...det, fully_analyzed: false };
+                    }
+                    return det;
+                  }));
+                }
+              }
             } else if (data.type === 'complete') {
               console.log('✅ Step 3 complete:', data);
               setStep3Progress({
