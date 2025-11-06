@@ -62,7 +62,19 @@ export async function GET(
       );
     }
 
-    console.log(`Fetched ${images?.length || 0} images for project ${projectId} (page ${page}, limit ${limit}, offset ${offset})`);
+    console.log(`[DEBUG] Images query result: ${images?.length || 0} images`);
+    if (images?.length === 0) {
+      console.log(`[DEBUG] No images returned - possible RLS issue`);
+      console.log(`[DEBUG] Query: project_id=${projectId}, offset=${offset}, limit=${limit}`);
+      
+      // Try to fetch without project filter to debug RLS
+      const { data: testImages, error: testError } = await supabase
+        .from('branghunt_images')
+        .select('id, project_id')
+        .limit(5);
+      console.log(`[DEBUG] Test query (no filter): ${testImages?.length || 0} images accessible`);
+      console.log(`[DEBUG] Sample IDs:`, testImages?.map(img => ({ id: img.id, project_id: img.project_id })));
+    }
 
     // Fetch detection counts for these images
     const imageIds = (images || []).map(img => img.id);
