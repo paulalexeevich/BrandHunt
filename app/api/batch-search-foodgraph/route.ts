@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         console.log(`  [${detection.detection_index}] (${i + 1}/${detectionsToProcess.length}) Searching for: ${searchDesc}...`);
         
         // Search with all available product details
-        const foodgraphResults = productInfo && (productInfo.productName || productInfo.flavor || productInfo.size)
+        const searchResult = productInfo && (productInfo.productName || productInfo.flavor || productInfo.size)
           ? await searchProducts(detection.brand_name, {
               brand: productInfo.brand,
               productName: productInfo.productName,
@@ -107,6 +107,8 @@ export async function POST(request: NextRequest) {
               size: productInfo.size
             })
           : await searchProducts(detection.brand_name);
+        
+        const foodgraphResults = searchResult.products;
         
         if (foodgraphResults.length > 0) {
           // Save top 50 results to intermediate table (cache for step 4)

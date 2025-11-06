@@ -110,7 +110,7 @@ export async function searchProducts(
     flavor?: string;
     size?: string;
   }
-): Promise<FoodGraphProduct[]> {
+): Promise<{ products: FoodGraphProduct[]; searchTerm: string }> {
   const token = await authenticate();
 
   // Build comprehensive search term by combining all available fields
@@ -185,8 +185,11 @@ export async function searchProducts(
     total: data.pagination?.total
   });
   
-  // Return only first 50 products
-  return (data.results || []).slice(0, 50);
+  // Return first 50 products along with the actual search term used
+  return {
+    products: (data.results || []).slice(0, 50),
+    searchTerm: enhancedSearchTerm
+  };
 }
 
 /**

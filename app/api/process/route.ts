@@ -94,7 +94,8 @@ export async function POST(request: NextRequest) {
       // Step 3: Search FoodGraph for products
       try {
         const searchTerm = brandName !== 'Unknown' ? brandName : detection.label;
-        const products = await searchProducts(searchTerm);
+        const searchResult = await searchProducts(searchTerm);
+        const products = searchResult.products;
         
         console.log(`Found ${products.length} products for "${searchTerm}"`);
 

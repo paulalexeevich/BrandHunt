@@ -35,12 +35,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Search FoodGraph with enhanced search term including all product details
-    let products;
+    let searchResult;
     try {
       if (productInfo && (productInfo.productName || productInfo.flavor || productInfo.size)) {
         // Use enhanced search with all available product information
         console.log('Using enhanced search with product details:', productInfo);
-        products = await searchProducts(brandName, {
+        searchResult = await searchProducts(brandName, {
           brand: productInfo.brand,
           productName: productInfo.productName,
           flavor: productInfo.flavor,
@@ -48,16 +48,15 @@ export async function POST(request: NextRequest) {
         });
       } else {
         // Fallback to brand name only
-        products = await searchProducts(brandName);
+        searchResult = await searchProducts(brandName);
       }
     } catch (error) {
       console.error(`Failed to search FoodGraph:`, error);
       throw error;
     }
 
-    const searchTerm = productInfo 
-      ? `${productInfo.brand} ${productInfo.productName || ''} ${productInfo.flavor || ''}`.trim()
-      : brandName;
+    const products = searchResult.products;
+    const searchTerm = searchResult.searchTerm;
     console.log(`Found ${products.length} products for "${searchTerm}"`);
 
     // Save top 5 results

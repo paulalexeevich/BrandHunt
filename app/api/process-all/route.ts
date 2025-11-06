@@ -161,7 +161,8 @@ export async function POST(request: NextRequest) {
           if (detection.brand_name) {
             console.log(`  [${detection.detection_index}] Searching FoodGraph...`);
             
-            const foodgraphResults = await searchProducts(detection.brand_name);
+            const searchResult = await searchProducts(detection.brand_name);
+            const foodgraphResults = searchResult.products;
             
             if (foodgraphResults.length > 0) {
               // Save top 50 results to database
