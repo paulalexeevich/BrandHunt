@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     // Fetch full detection info to get all extracted product details
     const { data: detection, error: detectionError } = await supabase
       .from('branghunt_detections')
-      .select('brand_extraction_response')
+      .select('brand_extraction_response, brand_name, product_name, flavor, size')
       .eq('id', detectionId)
       .single();
 
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to fetch detection:', detectionError);
     }
 
-    // Parse product info from brand_extraction_response
+    // Parse product info from brand_extraction_response, or build from individual fields
     let productInfo = null;
     if (detection?.brand_extraction_response) {
       try {
@@ -32,6 +32,16 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error('Failed to parse brand_extraction_response:', e);
       }
+    }
+    
+    // Fallback: if no brand_extraction_response, build from individual fields
+    if (!productInfo && detection) {
+      productInfo = {
+        brand: detection.brand_name,
+        productName: detection.product_name,
+        flavor: detection.flavor,
+        size: detection.size
+      };
     }
 
     // Search FoodGraph with enhanced search term including all product details

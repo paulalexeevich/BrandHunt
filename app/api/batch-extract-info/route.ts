@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
                 size: productInfo.size,
                 sku: productInfo.sku,
                 description: productInfo.description,
+                brand_extraction_response: JSON.stringify(productInfo),
                 updated_at: new Date().toISOString()
               })
               .eq('id', detection.id);
