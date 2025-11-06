@@ -201,8 +201,8 @@ export async function POST(request: NextRequest) {
 
             console.log(`  [#${detection.detection_index}] AI filtering ${foodgraphResults.length} results...`);
 
-            // Compare first 20 results in PARALLEL (much faster!)
-            const resultsToCompare = foodgraphResults.slice(0, 20);
+            // Compare ALL results in PARALLEL (same as manual filter)
+            const resultsToCompare = foodgraphResults;
             
             console.log(`    🚀 Comparing ${resultsToCompare.length} results in parallel...`);
             
