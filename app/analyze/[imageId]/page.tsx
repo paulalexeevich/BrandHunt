@@ -732,52 +732,62 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   </button>
                 </React.Fragment>
               )}
-              {productsDetected && detections.some(d => !d.fully_analyzed) && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleExtractInfoAll}
-                    disabled={processingStep1}
-                    className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
-                  >
-                    {processingStep1 ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Extracting...
-                      </>
-                    ) : (
-                      '📋 Extract Info (All)'
-                    )}
-                  </button>
-                  <button
-                    onClick={handleExtractPriceAll}
-                    disabled={processingStep2}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
-                  >
-                    {processingStep2 ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Extracting...
-                      </>
-                    ) : (
-                      '💰 Extract Price (All)'
-                    )}
-                  </button>
-                  <button
-                    onClick={handleSearchAndSaveAll}
-                    disabled={processingStep3}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
-                  >
-                    {processingStep3 ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Searching...
-                      </>
-                    ) : (
-                      '🔍 Search & Save (All)'
-                    )}
-                  </button>
-                </div>
-              )}
+              {productsDetected && detections.some(d => !d.fully_analyzed) && (() => {
+                // Calculate eligible products for each step
+                const needsInfo = detections.filter(d => !d.brand_name).length;
+                const needsPrice = detections.filter(d => d.brand_name && (!d.price || d.price === 'Unknown')).length;
+                const needsSearch = detections.filter(d => d.brand_name && !d.fully_analyzed).length;
+                
+                return (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleExtractInfoAll}
+                      disabled={processingStep1 || needsInfo === 0}
+                      className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
+                      title={needsInfo === 0 ? 'All products have info extracted' : `Extract info for ${needsInfo} products`}
+                    >
+                      {processingStep1 ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Extracting...
+                        </>
+                      ) : (
+                        `📋 Extract Info (${needsInfo})`
+                      )}
+                    </button>
+                    <button
+                      onClick={handleExtractPriceAll}
+                      disabled={processingStep2 || needsPrice === 0}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
+                      title={needsPrice === 0 ? 'All products have prices' : `Extract price for ${needsPrice} products (requires Step 1)`}
+                    >
+                      {processingStep2 ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Extracting...
+                        </>
+                      ) : (
+                        `💰 Extract Price (${needsPrice})`
+                      )}
+                    </button>
+                    <button
+                      onClick={handleSearchAndSaveAll}
+                      disabled={processingStep3 || needsSearch === 0}
+                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
+                      title={needsSearch === 0 ? 'All products processed' : `Search & save ${needsSearch} products (requires Step 1)`}
+                    >
+                      {processingStep3 ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Searching...
+                        </>
+                      ) : (
+                        `🔍 Search & Save (${needsSearch})`
+                      )}
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
