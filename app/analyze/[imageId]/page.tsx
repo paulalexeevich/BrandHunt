@@ -40,12 +40,19 @@ interface Detection {
 
 interface FoodGraphResult {
   id: string;
+  key?: string;
+  title?: string;
   product_name: string | null;
   brand_name: string | null;
   front_image_url: string | null;
   result_rank: number;
   is_match?: boolean | null;
   match_confidence?: number | null;
+  companyBrand?: string | null;
+  companyManufacturer?: string | null;
+  measures?: string | null;
+  category?: string | null;
+  ingredients?: string;
 }
 
 interface ImageData {
@@ -385,12 +392,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       const { preFilterFoodGraphResults } = await import('@/lib/foodgraph');
       
       // Pre-filter results based on extracted product info
-      const filteredResults = preFilterFoodGraphResults(foodgraphResults, {
+      const filteredResults = preFilterFoodGraphResults(foodgraphResults as any, {
         brand: detection.brand_name || undefined,
         size: detection.size || undefined,
         flavor: detection.flavor || undefined,
         productName: detection.product_name || undefined
-      });
+      }) as any;
 
       console.log('✅ Pre-filtered results:', {
         originalCount: foodgraphResults.length,
@@ -1354,6 +1361,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           return resultsToShow.map((result, index) => {
                             const isSaved = detection.selected_foodgraph_result_id === result.id;
                             
+                            // Display FoodGraph product fields
+                            const fgBrand = (result as any).companyBrand || (result as any).brand_name || 'N/A';
+                            const fgSize = (result as any).measures || 'N/A';
+                            const fgTitle = result.product_name || result.title || 'N/A';
+                            
                             return (
                             <div 
                               key={result.id}
@@ -1380,15 +1392,52 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             <p className="text-xs text-indigo-600 font-semibold mt-1">
                               #{index + 1}
                             </p>
+                            
+                            {/* Comparison: Extracted vs FoodGraph */}
+                            <div className="mt-2 space-y-1 text-[10px] bg-blue-50 border border-blue-200 p-1.5 rounded">
+                              <div className="font-semibold text-blue-900 mb-1">Extracted → FoodGraph</div>
+                              <div className="space-y-0.5">
+                                <div>
+                                  <span className="text-gray-600">Brand:</span>
+                                  <div className="flex justify-between items-center ml-2">
+                                    <span className="font-mono text-blue-600" title={detection.brand_name || 'N/A'}>{(detection.brand_name || 'N/A').substring(0, 15)}</span>
+                                    <span className="text-gray-400">→</span>
+                                    <span className="font-mono text-purple-600" title={fgBrand}>{fgBrand.substring(0, 15)}</span>
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Size:</span>
+                                  <div className="flex justify-between items-center ml-2">
+                                    <span className="font-mono text-blue-600" title={detection.size || 'N/A'}>{(detection.size || 'N/A').substring(0, 15)}</span>
+                                    <span className="text-gray-400">→</span>
+                                    <span className="font-mono text-purple-600" title={fgSize}>{fgSize.substring(0, 15)}</span>
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Flavor:</span>
+                                  <div className="flex justify-between items-center ml-2">
+                                    <span className="font-mono text-blue-600" title={detection.flavor || 'N/A'}>{(detection.flavor || 'N/A').substring(0, 15)}</span>
+                                    <span className="text-gray-400">→</span>
+                                    <span className="font-mono text-purple-600" title={fgTitle}>{fgTitle.substring(0, 15)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
                             {(result as any).similarityScore !== undefined && (
-                              <div className="mt-1">
-                                <p className="text-xs text-orange-600 font-semibold">
-                                  Match: {Math.round((result as any).similarityScore * 100)}%
+                              <div className="mt-2">
+                                <p className="text-xs text-orange-600 font-semibold mb-1">
+                                  Total Match: {Math.round((result as any).similarityScore * 100)}%
                                 </p>
                                 {(result as any).matchReasons && (result as any).matchReasons.length > 0 && (
-                                  <p className="text-[10px] text-gray-500 truncate" title={(result as any).matchReasons.join(', ')}>
-                                    {(result as any).matchReasons[0]}
-                                  </p>
+                                  <div className="space-y-0.5">
+                                    {(result as any).matchReasons.map((reason: string, idx: number) => (
+                                      <p key={idx} className="text-[10px] text-green-600 flex items-center gap-1">
+                                        <span>✓</span>
+                                        <span>{reason}</span>
+                                      </p>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
                             )}
