@@ -371,12 +371,15 @@ function extractRetailersFromUrls(urls: string[] | undefined): string[] {
  * - Size: 35% (critical for exact product variant match)
  * - Retailer: 30% (ensures product is available at the store)
  * 
+ * Threshold: Only products with ≥90% similarity score are returned
+ * This ensures only high-confidence matches proceed to expensive AI image comparison
+ * 
  * Note: Flavor is excluded because FoodGraph doesn't provide it as a separate field.
  * 
  * @param products - FoodGraph search results to filter
  * @param extractedInfo - Product information extracted from the shelf image
  * @param storeName - Optional store/retailer name from image metadata (e.g., "Target Store #1234")
- * @returns Filtered products with similarity scores
+ * @returns Filtered products with similarity scores ≥90%
  */
 export function preFilterFoodGraphResults(
   products: FoodGraphProduct[],
@@ -526,14 +529,16 @@ export function preFilterFoodGraphResults(
     };
   });
 
-  // Filter products with similarity score > 0.3 (30% threshold)
+  // Filter products with similarity score >= 0.9 (90% threshold for AI filtering)
+  // High threshold ensures only strong matches go to expensive AI comparison
   const filtered = results
-    .filter(r => r.similarityScore > 0.3)
+    .filter(r => r.similarityScore >= 0.9)
     .sort((a, b) => b.similarityScore - a.similarityScore);
 
   console.log('✅ Pre-filter results:', {
     originalCount: products.length,
     filteredCount: filtered.length,
+    threshold: '90%',
     topScores: filtered.slice(0, 5).map(r => ({
       title: r.title,
       score: r.similarityScore.toFixed(2),
