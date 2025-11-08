@@ -9,32 +9,70 @@ interface FoodGraphAuthResponse {
 }
 
 interface FoodGraphProduct {
-  key: string;
+  key: string; // Primary GTIN/barcode
   keys?: {
     FDC_ID?: string;
     AMAZON_ASIN?: string;
     GTIN14?: string;
+    WALMART_MPN?: string;
+    WALMART_US_ITEM_ID?: string;
+    WALMART_WIN?: string;
     [key: string]: string | undefined;
   };
   title: string;
   category?: string[];
-  measures?: string;
+  measures?: string; // e.g., "34.5 oz, Jar"
   sourcePdpUrls?: string[];
+  
+  // Descriptions
+  description?: string;
+  descriptionInstructions?: string;
+  descriptionWarnings?: string;
+  
+  // Ingredients
   ingredients?: string;
+  ingredientsProp65Warning?: boolean;
+  
+  // Company Information
   companyBrand?: string;
+  companyBrandOwner?: string;
+  companySubBrand?: string;
   companyManufacturer?: string;
+  companyDistributor?: string;
+  companyCountriesOfOrigin?: string[];
+  companyAddress?: string;
+  companyEmail?: string;
+  companyPhone?: string;
+  companyWebsiteUrl?: string;
+  companyIsPrivateLabel?: boolean;
+  companyPrivateLabelType?: string; // e.g., "store brand"
+  
+  // Claims
+  claimsGlutenFree?: boolean;
+  claimsNonGmo?: boolean;
+  claimsOrganic?: boolean;
+  claimsVegan?: boolean;
+  
+  // Allergens
+  allergensContainsStatement?: string;
+  allergensMayContainStatement?: string;
+  
+  // Images
   images?: Array<{
     id: string;
-    type: string;
+    type: string; // e.g., "FRONT", "BACK", "NUTRITION"
     urls: {
       original?: string;
       desktop?: string;
       mobile?: string;
     };
   }>;
+  
+  // Metadata
   _createdAt?: number;
   _updatedAt?: number;
   _score?: number;
+  
   [key: string]: unknown;
 }
 
@@ -46,10 +84,19 @@ interface FoodGraphQueryResponse {
     maxResults: number;
     currentPageSize: number;
     total: number;
-    traceId?: string;
     nextPageUrl?: string;
+    traceId?: string;
   };
   results: FoodGraphProduct[];
+  querySearch?: {
+    updatedAtFrom?: string;
+    productFilter?: string;
+    search?: string;
+    searchIn?: {
+      or?: string[];
+    };
+    fuzzyMatch?: boolean;
+  };
 }
 
 let cachedToken: string | null = null;
