@@ -1349,7 +1349,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         ) : (
                           <>
                             📊 Pre-Filter by Brand/Size/Retailer ({foodgraphResults.length} results)
-                            <span className="ml-2 text-xs bg-orange-600 text-white px-2 py-0.5 rounded-full">≥90%</span>
+                            <span className="ml-2 text-xs bg-orange-600 text-white px-2 py-0.5 rounded-full">≥85%</span>
                           </>
                         )}
                       </button>
@@ -1380,7 +1380,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         <h4 className="font-semibold text-gray-900">
                           FoodGraph Matches ({foodgraphResults.length})
                           {preFilteredCount !== null && filteredCount === null && (
-                            <span className="ml-2 text-sm text-orange-600">→ Pre-filtered to {preFilteredCount} (≥90% match)</span>
+                            <span className="ml-2 text-sm text-orange-600">→ Pre-filtered to {preFilteredCount} (≥85% match)</span>
                           )}
                           {filteredCount !== null && (
                             <span className="ml-2 text-sm text-green-600">→ AI Filtered to {filteredCount}</span>
