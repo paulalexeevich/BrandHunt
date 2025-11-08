@@ -391,9 +391,38 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       // Import the pre-filter function
       const { preFilterFoodGraphResults } = await import('@/lib/foodgraph');
       
+      // Transform database results to match FoodGraph API format
+      // The pre-filter function expects raw FoodGraph structure (companyBrand, measures, sourcePdpUrls)
+      // But database stores transformed structure (brand_name, measures, full_data)
+      const transformedResults = foodgraphResults.map((result: any, index: number) => {
+        // If result already has full_data, use it as base and overlay with DB fields
+        if (result.full_data) {
+          return {
+            ...result.full_data,
+            // Overlay DB fields that might be missing in full_data
+            measures: result.measures || result.full_data.measures,
+            companyBrand: result.brand_name || result.full_data.companyBrand,
+            // Keep track of original index for mapping back
+            __originalIndex: index,
+            __originalId: result.id
+          };
+        }
+        // Otherwise, transform DB structure to FoodGraph structure
+        return {
+          companyBrand: result.brand_name,
+          measures: result.measures,
+          title: result.product_name,
+          sourcePdpUrls: result.full_data?.sourcePdpUrls || [],
+          category: result.category,
+          __originalIndex: index,
+          __originalId: result.id,
+          ...result // Include all other fields
+        };
+      });
+      
       // Pre-filter results based on extracted product info and retailer
       const filteredResults = preFilterFoodGraphResults(
-        foodgraphResults as any, 
+        transformedResults, 
         {
           brand: detection.brand_name || undefined,
           size: detection.size || undefined,
@@ -407,9 +436,23 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         filteredCount: filteredResults.length
       });
 
+      // Map filtered results back to original database structure
+      // Preserve database IDs and fields while adding similarity scores
+      const mappedResults = filteredResults.map((filtered: any) => {
+        // Find original result using the tracked index
+        const originalIndex = filtered.__originalIndex;
+        const original = foodgraphResults[originalIndex];
+        
+        return {
+          ...original, // Keep all original database fields (id, detection_id, etc.)
+          similarityScore: filtered.similarityScore,
+          matchReasons: filtered.matchReasons
+        };
+      });
+
       // Update the foodgraph results to show only pre-filtered ones
-      setFoodgraphResults(filteredResults);
-      setPreFilteredCount(filteredResults.length);
+      setFoodgraphResults(mappedResults);
+      setPreFilteredCount(mappedResults.length);
     } catch (err) {
       console.error('❌ Pre-filter error:', err);
       setError(err instanceof Error ? err.message : 'Pre-filter failed');
