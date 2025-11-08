@@ -391,13 +391,16 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       // Import the pre-filter function
       const { preFilterFoodGraphResults } = await import('@/lib/foodgraph');
       
-      // Pre-filter results based on extracted product info
-      const filteredResults = preFilterFoodGraphResults(foodgraphResults as any, {
-        brand: detection.brand_name || undefined,
-        size: detection.size || undefined,
-        flavor: detection.flavor || undefined,
-        productName: detection.product_name || undefined
-      }) as any;
+      // Pre-filter results based on extracted product info and retailer
+      const filteredResults = preFilterFoodGraphResults(
+        foodgraphResults as any, 
+        {
+          brand: detection.brand_name || undefined,
+          size: detection.size || undefined,
+          productName: detection.product_name || undefined
+        },
+        image?.store_name || undefined // Pass store name for retailer matching
+      ) as any;
 
       console.log('✅ Pre-filtered results:', {
         originalCount: foodgraphResults.length,

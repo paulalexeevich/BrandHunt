@@ -206,15 +206,18 @@ export async function POST(request: NextRequest) {
               total: detections.length
             });
 
-            console.log(`  [#${detection.detection_index}] Pre-filtering ${foodgraphResults.length} results by brand/size/flavor...`);
+            console.log(`  [#${detection.detection_index}] Pre-filtering ${foodgraphResults.length} results by brand/size/retailer...`);
 
-            // Apply text-based pre-filtering
-            const preFilteredResults = preFilterFoodGraphResults(foodgraphResults, {
-              brand: detection.brand_name || undefined,
-              size: detection.size || undefined,
-              flavor: detection.flavor || undefined,
-              productName: detection.product_name || undefined
-            });
+            // Apply text-based pre-filtering with retailer matching
+            const preFilteredResults = preFilterFoodGraphResults(
+              foodgraphResults, 
+              {
+                brand: detection.brand_name || undefined,
+                size: detection.size || undefined,
+                productName: detection.product_name || undefined
+              },
+              image.store_name || undefined // Pass store name for retailer matching
+            );
 
             console.log(`  ✅ Pre-filtered to ${preFilteredResults.length} results (from ${foodgraphResults.length})`);
 

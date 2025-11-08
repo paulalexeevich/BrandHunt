@@ -303,11 +303,79 @@ function extractSizeNumber(sizeStr: string): number | null {
 }
 
 /**
+ * Extract retailer name from store name string
+ * Examples: "Target Store #1234" -> "target", "Walgreens Store #6105 - Address" -> "walgreens"
+ */
+function extractRetailerFromStoreName(storeName: string): string | null {
+  if (!storeName) return null;
+  
+  const normalized = storeName.toLowerCase().trim();
+  
+  // Common retailers
+  const retailers = ['target', 'walmart', 'walgreens', 'cvs', 'kroger', 'safeway', 
+                     'albertsons', 'publix', 'whole foods', 'trader joe', 'costco', 
+                     'sam\'s club', 'aldi', 'lidl', 'food lion', 'giant', 'stop & shop'];
+  
+  for (const retailer of retailers) {
+    if (normalized.includes(retailer)) {
+      return retailer;
+    }
+  }
+  
+  // Extract first word as fallback (e.g., "Meijer Store" -> "meijer")
+  const firstWord = normalized.split(/\s+/)[0];
+  return firstWord || null;
+}
+
+/**
+ * Extract retailers from FoodGraph sourcePdpUrls
+ * Returns array of retailer names found in URLs (e.g., ["walmart", "target"])
+ */
+function extractRetailersFromUrls(urls: string[] | undefined): string[] {
+  if (!urls || urls.length === 0) return [];
+  
+  const retailers = new Set<string>();
+  
+  for (const url of urls) {
+    const urlLower = url.toLowerCase();
+    
+    // Extract domain-based retailers
+    if (urlLower.includes('walmart.com')) retailers.add('walmart');
+    if (urlLower.includes('target.com')) retailers.add('target');
+    if (urlLower.includes('walgreens.com')) retailers.add('walgreens');
+    if (urlLower.includes('cvs.com')) retailers.add('cvs');
+    if (urlLower.includes('kroger.com')) retailers.add('kroger');
+    if (urlLower.includes('safeway.com')) retailers.add('safeway');
+    if (urlLower.includes('albertsons.com')) retailers.add('albertsons');
+    if (urlLower.includes('publix.com')) retailers.add('publix');
+    if (urlLower.includes('wholefoodsmarket.com')) retailers.add('whole foods');
+    if (urlLower.includes('traderjoes.com')) retailers.add('trader joe');
+    if (urlLower.includes('costco.com')) retailers.add('costco');
+    if (urlLower.includes('samsclub.com')) retailers.add('sam\'s club');
+    if (urlLower.includes('aldi.')) retailers.add('aldi');
+    if (urlLower.includes('lidl.')) retailers.add('lidl');
+    if (urlLower.includes('foodlion.com')) retailers.add('food lion');
+    if (urlLower.includes('giantfood.com')) retailers.add('giant');
+    if (urlLower.includes('stopandshop.com')) retailers.add('stop & shop');
+  }
+  
+  return Array.from(retailers);
+}
+
+/**
  * Pre-filter FoodGraph results based on text similarity with extracted product info
- * Filters by brand, size, and flavor similarity before AI comparison
+ * Filters by brand, size, and retailer similarity before AI comparison
+ * 
+ * Scoring weights:
+ * - Brand: 35% (most critical for product identity)
+ * - Size: 35% (critical for exact product variant match)
+ * - Retailer: 30% (ensures product is available at the store)
+ * 
+ * Note: Flavor is excluded because FoodGraph doesn't provide it as a separate field.
  * 
  * @param products - FoodGraph search results to filter
  * @param extractedInfo - Product information extracted from the shelf image
+ * @param storeName - Optional store/retailer name from image metadata (e.g., "Target Store #1234")
  * @returns Filtered products with similarity scores
  */
 export function preFilterFoodGraphResults(
@@ -315,13 +383,18 @@ export function preFilterFoodGraphResults(
   extractedInfo: {
     brand?: string;
     size?: string;
-    flavor?: string;
     productName?: string;
-  }
+  },
+  storeName?: string
 ): Array<FoodGraphProduct & { similarityScore: number; matchReasons: string[] }> {
+  // Extract retailer from store name
+  const imageRetailer = storeName ? extractRetailerFromStoreName(storeName) : null;
+  
   console.log('🔍 Pre-filtering FoodGraph results:', {
     totalProducts: products.length,
-    extractedInfo
+    extractedInfo,
+    storeName,
+    imageRetailer
   });
 
   const results = products.map((product, index) => {
@@ -336,11 +409,12 @@ export function preFilterFoodGraphResults(
         companyManufacturer: product.companyManufacturer,
         measures: product.measures,
         category: product.category,
+        sourcePdpUrls: product.sourcePdpUrls,
         ingredients: product.ingredients ? 'Present' : 'Missing'
       });
     }
     
-    // Brand similarity (weight: 40%)
+    // Brand similarity (weight: 35%)
     if (extractedInfo.brand && extractedInfo.brand !== 'Unknown') {
       const brandSimilarities = [
         calculateStringSimilarity(extractedInfo.brand, product.companyBrand || ''),
@@ -361,17 +435,17 @@ export function preFilterFoodGraphResults(
             title: brandSimilarities[2]
           },
           maxSimilarity: brandSimilarity,
-          scoreContribution: brandSimilarity * 0.4
+          scoreContribution: (brandSimilarity * 0.35).toFixed(2)
         });
       }
       
-      score += brandSimilarity * 0.4;
+      score += brandSimilarity * 0.35;
       if (brandSimilarity > 0.5) {
         reasons.push(`Brand match: ${(brandSimilarity * 100).toFixed(0)}%`);
       }
     }
     
-    // Size similarity (weight: 30%)
+    // Size similarity (weight: 35%)
     if (extractedInfo.size && extractedInfo.size !== 'Unknown') {
       const extractedSize = extractSizeNumber(extractedInfo.size);
       const productSize = extractSizeNumber(product.measures || '');
@@ -394,11 +468,11 @@ export function preFilterFoodGraphResults(
           console.log('   Size numeric comparison:', {
             sizeDiff: sizeDiff.toFixed(2),
             sizeSimilarity: sizeSimilarity.toFixed(2),
-            scoreContribution: (sizeSimilarity * 0.3).toFixed(2)
+            scoreContribution: (sizeSimilarity * 0.35).toFixed(2)
           });
         }
         
-        score += sizeSimilarity * 0.3;
+        score += sizeSimilarity * 0.35;
         if (sizeSimilarity > 0.5) {
           reasons.push(`Size match: ${extractedInfo.size} ≈ ${product.measures}`);
         }
@@ -406,35 +480,33 @@ export function preFilterFoodGraphResults(
                  (extractedInfo.size.toLowerCase().includes(product.measures.toLowerCase()) ||
                   product.measures.toLowerCase().includes(extractedInfo.size.toLowerCase()))) {
         // Text-based size matching as fallback
-        score += 0.2;
+        score += 0.23; // 35% * 0.65 (partial credit for text match)
         reasons.push(`Size text match`);
         
         if (index === 0) {
-          console.log('   Size text match: +0.2');
+          console.log('   Size text match: +0.23');
         }
       }
     }
     
-    // Flavor similarity (weight: 30%)
-    if (extractedInfo.flavor && extractedInfo.flavor !== 'Unknown') {
-      const flavorSimilarity = Math.max(
-        calculateStringSimilarity(extractedInfo.flavor, product.title || ''),
-        product.ingredients ? (product.ingredients.toLowerCase().includes(extractedInfo.flavor.toLowerCase()) ? 0.6 : 0) : 0
-      );
+    // Retailer match (weight: 30%)
+    if (imageRetailer) {
+      const productRetailers = extractRetailersFromUrls(product.sourcePdpUrls);
+      const retailerMatch = productRetailers.includes(imageRetailer);
       
       if (index === 0) {
-        console.log('🌸 Flavor matching for first product:', {
-          extractedFlavor: extractedInfo.flavor,
-          titleSimilarity: calculateStringSimilarity(extractedInfo.flavor, product.title || ''),
-          ingredientsMatch: product.ingredients ? product.ingredients.toLowerCase().includes(extractedInfo.flavor.toLowerCase()) : false,
-          maxSimilarity: flavorSimilarity,
-          scoreContribution: (flavorSimilarity * 0.3).toFixed(2)
+        console.log('🏪 Retailer matching for first product:', {
+          imageRetailer,
+          sourcePdpUrls: product.sourcePdpUrls,
+          productRetailers,
+          isMatch: retailerMatch,
+          scoreContribution: retailerMatch ? '0.30' : '0.00'
         });
       }
       
-      score += flavorSimilarity * 0.3;
-      if (flavorSimilarity > 0.5) {
-        reasons.push(`Flavor match: ${(flavorSimilarity * 100).toFixed(0)}%`);
+      if (retailerMatch) {
+        score += 0.30;
+        reasons.push(`Retailer match: ${imageRetailer}`);
       }
     }
     
