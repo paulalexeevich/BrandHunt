@@ -158,6 +158,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         // No existing results, reset state
         setFoodgraphResults([]);
         setFilteredCount(null);
+        setPreFilteredCount(null); // Also reset pre-filter count
       }
     }
   }, [selectedDetection, detections]);
@@ -218,6 +219,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     setFoodgraphResults([]); // Clear results when switching products
     setFoodgraphSearchTerm(null); // Clear search term when switching products
     setFilteredCount(null);
+    setPreFilteredCount(null); // Clear pre-filter count when switching products
   };
 
   const handleExtractBrand = async (detectionId: string) => {
@@ -330,6 +332,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     console.log('Searching FoodGraph for:', detection.brand_name);
     setLoading(true);
     setError(null);
+    setPreFilteredCount(null); // Reset pre-filter count on new search
+    setFilteredCount(null); // Reset AI filter count on new search
 
     const requestBody = { 
       detectionId: selectedDetection,

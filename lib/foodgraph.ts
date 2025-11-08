@@ -277,17 +277,47 @@ export function preFilterFoodGraphResults(
     extractedInfo
   });
 
-  const results = products.map(product => {
+  const results = products.map((product, index) => {
     let score = 0;
     const reasons: string[] = [];
     
+    // Debug first product to see actual data structure
+    if (index === 0) {
+      console.log('📦 First product data structure:', {
+        title: product.title,
+        companyBrand: product.companyBrand,
+        companyManufacturer: product.companyManufacturer,
+        measures: product.measures,
+        category: product.category,
+        ingredients: product.ingredients ? 'Present' : 'Missing'
+      });
+    }
+    
     // Brand similarity (weight: 40%)
     if (extractedInfo.brand && extractedInfo.brand !== 'Unknown') {
-      const brandSimilarity = Math.max(
+      const brandSimilarities = [
         calculateStringSimilarity(extractedInfo.brand, product.companyBrand || ''),
         calculateStringSimilarity(extractedInfo.brand, product.companyManufacturer || ''),
         calculateStringSimilarity(extractedInfo.brand, product.title || '')
-      );
+      ];
+      const brandSimilarity = Math.max(...brandSimilarities);
+      
+      // Debug first product brand matching
+      if (index === 0) {
+        console.log('🏷️  Brand matching for first product:', {
+          extractedBrand: extractedInfo.brand,
+          companyBrand: product.companyBrand,
+          companyManufacturer: product.companyManufacturer,
+          similarities: {
+            companyBrand: brandSimilarities[0],
+            companyManufacturer: brandSimilarities[1],
+            title: brandSimilarities[2]
+          },
+          maxSimilarity: brandSimilarity,
+          scoreContribution: brandSimilarity * 0.4
+        });
+      }
+      
       score += brandSimilarity * 0.4;
       if (brandSimilarity > 0.5) {
         reasons.push(`Brand match: ${(brandSimilarity * 100).toFixed(0)}%`);
@@ -299,10 +329,28 @@ export function preFilterFoodGraphResults(
       const extractedSize = extractSizeNumber(extractedInfo.size);
       const productSize = extractSizeNumber(product.measures || '');
       
+      if (index === 0) {
+        console.log('📏 Size matching for first product:', {
+          extractedSize: extractedInfo.size,
+          extractedNumber: extractedSize,
+          productMeasures: product.measures,
+          productNumber: productSize
+        });
+      }
+      
       if (extractedSize !== null && productSize !== null) {
         // Consider sizes similar if within 20% of each other
         const sizeDiff = Math.abs(extractedSize - productSize) / Math.max(extractedSize, productSize);
         const sizeSimilarity = Math.max(0, 1 - sizeDiff * 5); // 0-20% diff maps to 1.0-0.0
+        
+        if (index === 0) {
+          console.log('   Size numeric comparison:', {
+            sizeDiff: sizeDiff.toFixed(2),
+            sizeSimilarity: sizeSimilarity.toFixed(2),
+            scoreContribution: (sizeSimilarity * 0.3).toFixed(2)
+          });
+        }
+        
         score += sizeSimilarity * 0.3;
         if (sizeSimilarity > 0.5) {
           reasons.push(`Size match: ${extractedInfo.size} ≈ ${product.measures}`);
@@ -313,6 +361,10 @@ export function preFilterFoodGraphResults(
         // Text-based size matching as fallback
         score += 0.2;
         reasons.push(`Size text match`);
+        
+        if (index === 0) {
+          console.log('   Size text match: +0.2');
+        }
       }
     }
     
@@ -322,10 +374,30 @@ export function preFilterFoodGraphResults(
         calculateStringSimilarity(extractedInfo.flavor, product.title || ''),
         product.ingredients ? (product.ingredients.toLowerCase().includes(extractedInfo.flavor.toLowerCase()) ? 0.6 : 0) : 0
       );
+      
+      if (index === 0) {
+        console.log('🌸 Flavor matching for first product:', {
+          extractedFlavor: extractedInfo.flavor,
+          titleSimilarity: calculateStringSimilarity(extractedInfo.flavor, product.title || ''),
+          ingredientsMatch: product.ingredients ? product.ingredients.toLowerCase().includes(extractedInfo.flavor.toLowerCase()) : false,
+          maxSimilarity: flavorSimilarity,
+          scoreContribution: (flavorSimilarity * 0.3).toFixed(2)
+        });
+      }
+      
       score += flavorSimilarity * 0.3;
       if (flavorSimilarity > 0.5) {
         reasons.push(`Flavor match: ${(flavorSimilarity * 100).toFixed(0)}%`);
       }
+    }
+    
+    // Log final score for first product
+    if (index === 0) {
+      console.log('🎯 Final score for first product:', {
+        totalScore: score.toFixed(2),
+        passesThreshold: score > 0.3,
+        reasons: reasons
+      });
     }
     
     return {
