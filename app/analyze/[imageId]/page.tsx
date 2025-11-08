@@ -1304,7 +1304,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             Pre-filtering...
                           </>
                         ) : (
-                          <>📊 Pre-Filter by Brand/Size/Flavor ({foodgraphResults.length} results)</>
+                          <>📊 Pre-Filter by Brand/Size/Retailer ({foodgraphResults.length} results)</>
                         )}
                       </button>
                     )}
@@ -1414,14 +1414,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                     <span className="font-mono text-blue-600" title={detection.size || 'N/A'}>{(detection.size || 'N/A').substring(0, 15)}</span>
                                     <span className="text-gray-400">→</span>
                                     <span className="font-mono text-purple-600" title={fgSize}>{fgSize.substring(0, 15)}</span>
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">Flavor:</span>
-                                  <div className="flex justify-between items-center ml-2">
-                                    <span className="font-mono text-blue-600" title={detection.flavor || 'N/A'}>{(detection.flavor || 'N/A').substring(0, 15)}</span>
-                                    <span className="text-gray-400">→</span>
-                                    <span className="font-mono text-purple-600" title={fgTitle}>{fgTitle.substring(0, 15)}</span>
                                   </div>
                                 </div>
                               </div>
