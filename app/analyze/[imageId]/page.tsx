@@ -1365,9 +1365,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             const isSaved = detection.selected_foodgraph_result_id === result.id;
                             
                             // Display FoodGraph product fields
-                            const fgBrand = (result as any).companyBrand || (result as any).brand_name || 'N/A';
-                            const fgSize = (result as any).measures || 'N/A';
-                            const fgTitle = result.product_name || result.title || 'N/A';
+                            // Try to get from direct fields first, then from full_data JSON
+                            const fgBrand = (result as any).companyBrand || (result as any).brand_name || (result as any).full_data?.companyBrand || 'N/A';
+                            const fgSize = (result as any).measures || (result as any).full_data?.measures || 'N/A';
+                            const fgTitle = result.product_name || result.title || (result as any).full_data?.title || 'N/A';
                             
                             return (
                             <div 

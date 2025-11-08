@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
           product_name: product.title || null,
           brand_name: product.companyBrand || null,
           category: Array.isArray(product.category) ? product.category.join(', ') : null,
+          measures: product.measures || null,
           front_image_url: frontImageUrl,
           full_data: product,
         })
