@@ -1370,6 +1370,37 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             const fgSize = (result as any).measures || (result as any).full_data?.measures || 'N/A';
                             const fgTitle = result.product_name || result.title || (result as any).full_data?.title || 'N/A';
                             
+                            // Extract retailers for comparison
+                            const imageRetailer = image?.store_name ? extractRetailerFromStoreName(image.store_name) : null;
+                            const fgUrls = (result as any).full_data?.sourcePdpUrls || [];
+                            const fgRetailers = extractRetailersFromUrls(fgUrls);
+                            const retailerMatch = imageRetailer && fgRetailers.includes(imageRetailer);
+                            
+                            // Helper functions for retailer extraction (inline for now)
+                            function extractRetailerFromStoreName(storeName: string): string | null {
+                              if (!storeName) return null;
+                              const normalized = storeName.toLowerCase().trim();
+                              const retailers = ['target', 'walmart', 'walgreens', 'cvs', 'kroger'];
+                              for (const retailer of retailers) {
+                                if (normalized.includes(retailer)) return retailer;
+                              }
+                              return normalized.split(/\s+/)[0] || null;
+                            }
+                            
+                            function extractRetailersFromUrls(urls: string[]): string[] {
+                              if (!urls || urls.length === 0) return [];
+                              const retailers = new Set<string>();
+                              for (const url of urls) {
+                                const urlLower = url.toLowerCase();
+                                if (urlLower.includes('walmart.com')) retailers.add('walmart');
+                                if (urlLower.includes('target.com')) retailers.add('target');
+                                if (urlLower.includes('walgreens.com')) retailers.add('walgreens');
+                                if (urlLower.includes('cvs.com')) retailers.add('cvs');
+                                if (urlLower.includes('kroger.com')) retailers.add('kroger');
+                              }
+                              return Array.from(retailers);
+                            }
+                            
                             return (
                             <div 
                               key={result.id}
@@ -1417,6 +1448,20 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                     <span className="font-mono text-purple-600" title={fgSize}>{fgSize.substring(0, 15)}</span>
                                   </div>
                                 </div>
+                                {imageRetailer && (
+                                  <div>
+                                    <span className="text-gray-600">Retailer:</span>
+                                    <div className="flex justify-between items-center ml-2">
+                                      <span className="font-mono text-blue-600 capitalize" title={imageRetailer}>{imageRetailer}</span>
+                                      <span className="text-gray-400">→</span>
+                                      <span className={`font-mono font-semibold capitalize ${retailerMatch ? 'text-green-600' : 'text-red-500'}`} title={fgRetailers.join(', ') || 'No retailers'}>
+                                        {fgRetailers.length > 0 ? fgRetailers.join(', ') : 'None'}
+                                        {retailerMatch && ' ✓'}
+                                        {!retailerMatch && fgRetailers.length > 0 && ' ✗'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                             
