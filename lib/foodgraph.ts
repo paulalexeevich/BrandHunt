@@ -214,3 +214,141 @@ export function getFrontImageUrl(product: FoodGraphProduct): string | null {
 
   return null;
 }
+
+/**
+ * Calculate similarity score between two strings (0-1 scale)
+ * Uses simple case-insensitive comparison and substring matching
+ */
+function calculateStringSimilarity(str1: string, str2: string): number {
+  if (!str1 || !str2) return 0;
+  
+  const s1 = str1.toLowerCase().trim();
+  const s2 = str2.toLowerCase().trim();
+  
+  // Exact match
+  if (s1 === s2) return 1.0;
+  
+  // One contains the other
+  if (s1.includes(s2) || s2.includes(s1)) return 0.8;
+  
+  // Check word overlap
+  const words1 = s1.split(/\s+/);
+  const words2 = s2.split(/\s+/);
+  const commonWords = words1.filter(w => words2.includes(w) && w.length > 2);
+  
+  if (commonWords.length > 0) {
+    const overlapScore = commonWords.length / Math.max(words1.length, words2.length);
+    return 0.5 + (overlapScore * 0.3); // 0.5-0.8 range for word overlap
+  }
+  
+  return 0;
+}
+
+/**
+ * Extract size numbers from string for comparison (e.g., "8 oz" -> 8, "2.5 lbs" -> 2.5)
+ */
+function extractSizeNumber(sizeStr: string): number | null {
+  if (!sizeStr || sizeStr === 'Unknown') return null;
+  
+  // Match numbers including decimals
+  const match = sizeStr.match(/(\d+\.?\d*)/);
+  return match ? parseFloat(match[1]) : null;
+}
+
+/**
+ * Pre-filter FoodGraph results based on text similarity with extracted product info
+ * Filters by brand, size, and flavor similarity before AI comparison
+ * 
+ * @param products - FoodGraph search results to filter
+ * @param extractedInfo - Product information extracted from the shelf image
+ * @returns Filtered products with similarity scores
+ */
+export function preFilterFoodGraphResults(
+  products: FoodGraphProduct[],
+  extractedInfo: {
+    brand?: string;
+    size?: string;
+    flavor?: string;
+    productName?: string;
+  }
+): Array<FoodGraphProduct & { similarityScore: number; matchReasons: string[] }> {
+  console.log('🔍 Pre-filtering FoodGraph results:', {
+    totalProducts: products.length,
+    extractedInfo
+  });
+
+  const results = products.map(product => {
+    let score = 0;
+    const reasons: string[] = [];
+    
+    // Brand similarity (weight: 40%)
+    if (extractedInfo.brand && extractedInfo.brand !== 'Unknown') {
+      const brandSimilarity = Math.max(
+        calculateStringSimilarity(extractedInfo.brand, product.companyBrand || ''),
+        calculateStringSimilarity(extractedInfo.brand, product.companyManufacturer || ''),
+        calculateStringSimilarity(extractedInfo.brand, product.title || '')
+      );
+      score += brandSimilarity * 0.4;
+      if (brandSimilarity > 0.5) {
+        reasons.push(`Brand match: ${(brandSimilarity * 100).toFixed(0)}%`);
+      }
+    }
+    
+    // Size similarity (weight: 30%)
+    if (extractedInfo.size && extractedInfo.size !== 'Unknown') {
+      const extractedSize = extractSizeNumber(extractedInfo.size);
+      const productSize = extractSizeNumber(product.measures || '');
+      
+      if (extractedSize !== null && productSize !== null) {
+        // Consider sizes similar if within 20% of each other
+        const sizeDiff = Math.abs(extractedSize - productSize) / Math.max(extractedSize, productSize);
+        const sizeSimilarity = Math.max(0, 1 - sizeDiff * 5); // 0-20% diff maps to 1.0-0.0
+        score += sizeSimilarity * 0.3;
+        if (sizeSimilarity > 0.5) {
+          reasons.push(`Size match: ${extractedInfo.size} ≈ ${product.measures}`);
+        }
+      } else if (product.measures && 
+                 (extractedInfo.size.toLowerCase().includes(product.measures.toLowerCase()) ||
+                  product.measures.toLowerCase().includes(extractedInfo.size.toLowerCase()))) {
+        // Text-based size matching as fallback
+        score += 0.2;
+        reasons.push(`Size text match`);
+      }
+    }
+    
+    // Flavor similarity (weight: 30%)
+    if (extractedInfo.flavor && extractedInfo.flavor !== 'Unknown') {
+      const flavorSimilarity = Math.max(
+        calculateStringSimilarity(extractedInfo.flavor, product.title || ''),
+        product.ingredients ? (product.ingredients.toLowerCase().includes(extractedInfo.flavor.toLowerCase()) ? 0.6 : 0) : 0
+      );
+      score += flavorSimilarity * 0.3;
+      if (flavorSimilarity > 0.5) {
+        reasons.push(`Flavor match: ${(flavorSimilarity * 100).toFixed(0)}%`);
+      }
+    }
+    
+    return {
+      ...product,
+      similarityScore: score,
+      matchReasons: reasons
+    };
+  });
+
+  // Filter products with similarity score > 0.3 (30% threshold)
+  const filtered = results
+    .filter(r => r.similarityScore > 0.3)
+    .sort((a, b) => b.similarityScore - a.similarityScore);
+
+  console.log('✅ Pre-filter results:', {
+    originalCount: products.length,
+    filteredCount: filtered.length,
+    topScores: filtered.slice(0, 5).map(r => ({
+      title: r.title,
+      score: r.similarityScore.toFixed(2),
+      reasons: r.matchReasons
+    }))
+  });
+
+  return filtered;
+}

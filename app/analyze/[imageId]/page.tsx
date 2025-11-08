@@ -72,6 +72,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [deleting, setDeleting] = useState(false);
   const [filtering, setFiltering] = useState(false);
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
+  const [preFiltering, setPreFiltering] = useState(false);
+  const [preFilteredCount, setPreFilteredCount] = useState<number | null>(null);
   const [showProductLabels, setShowProductLabels] = useState(true);
   const [extractingPrice, setExtractingPrice] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
@@ -362,6 +364,43 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       setError(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePreFilter = async () => {
+    if (!selectedDetection) return;
+
+    const detection = detections.find(d => d.id === selectedDetection);
+    if (!detection) return;
+
+    setPreFiltering(true);
+    setError(null);
+
+    try {
+      // Import the pre-filter function
+      const { preFilterFoodGraphResults } = await import('@/lib/foodgraph');
+      
+      // Pre-filter results based on extracted product info
+      const filteredResults = preFilterFoodGraphResults(foodgraphResults, {
+        brand: detection.brand_name || undefined,
+        size: detection.size || undefined,
+        flavor: detection.flavor || undefined,
+        productName: detection.product_name || undefined
+      });
+
+      console.log('✅ Pre-filtered results:', {
+        originalCount: foodgraphResults.length,
+        filteredCount: filteredResults.length
+      });
+
+      // Update the foodgraph results to show only pre-filtered ones
+      setFoodgraphResults(filteredResults);
+      setPreFilteredCount(filteredResults.length);
+    } catch (err) {
+      console.error('❌ Pre-filter error:', err);
+      setError(err instanceof Error ? err.message : 'Pre-filter failed');
+    } finally {
+      setPreFiltering(false);
     }
   };
 
@@ -1114,8 +1153,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       <span className={`px-2 py-1 rounded ${(foodgraphResults.length > 0 || detection.fully_analyzed) ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
                         {(foodgraphResults.length > 0 || detection.fully_analyzed) ? '✓' : '○'} Search
                       </span>
+                      <span className={`px-2 py-1 rounded ${(preFilteredCount !== null || detection.fully_analyzed) ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                        {(preFilteredCount !== null || detection.fully_analyzed) ? '✓' : '○'} Pre-Filter
+                      </span>
                       <span className={`px-2 py-1 rounded ${(filteredCount !== null || detection.fully_analyzed) ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {(filteredCount !== null || detection.fully_analyzed) ? '✓' : '○'} Filter
+                        {(filteredCount !== null || detection.fully_analyzed) ? '✓' : '○'} AI Filter
                       </span>
                                 </div>
                 </div>
@@ -1236,7 +1278,24 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </button>
                     )}
                     
-                    {foodgraphResults.length > 0 && filteredCount === null && !detection.fully_analyzed && (
+                    {foodgraphResults.length > 0 && preFilteredCount === null && !detection.fully_analyzed && (
+                      <button
+                        onClick={handlePreFilter}
+                        disabled={preFiltering}
+                        className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
+                      >
+                        {preFiltering ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Pre-filtering...
+                          </>
+                        ) : (
+                          <>📊 Pre-Filter by Brand/Size/Flavor ({foodgraphResults.length} results)</>
+                        )}
+                      </button>
+                    )}
+                    
+                    {preFilteredCount !== null && filteredCount === null && !detection.fully_analyzed && (
                       <button
                         onClick={handleFilterResults}
                         disabled={filtering}
@@ -1260,8 +1319,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-gray-900">
                           FoodGraph Matches ({foodgraphResults.length})
+                          {preFilteredCount !== null && filteredCount === null && (
+                            <span className="ml-2 text-sm text-orange-600">→ Pre-filtered to {preFilteredCount}</span>
+                          )}
                           {filteredCount !== null && (
-                            <span className="ml-2 text-sm text-green-600">→ Filtered to {filteredCount}</span>
+                            <span className="ml-2 text-sm text-green-600">→ AI Filtered to {filteredCount}</span>
                           )}
                         </h4>
                       </div>
@@ -1314,6 +1376,18 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             <p className="text-xs text-indigo-600 font-semibold mt-1">
                               #{index + 1}
                             </p>
+                            {(result as any).similarityScore !== undefined && (
+                              <div className="mt-1">
+                                <p className="text-xs text-orange-600 font-semibold">
+                                  Match: {Math.round((result as any).similarityScore * 100)}%
+                                </p>
+                                {(result as any).matchReasons && (result as any).matchReasons.length > 0 && (
+                                  <p className="text-[10px] text-gray-500 truncate" title={(result as any).matchReasons.join(', ')}>
+                                    {(result as any).matchReasons[0]}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                                 {isSaved ? (
                                   <div className="mt-2 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded text-center flex items-center justify-center gap-1">
                                     <CheckCircle className="w-3 h-3" />

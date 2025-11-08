@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
-import { searchProducts, getFrontImageUrl } from '@/lib/foodgraph';
+import { searchProducts, getFrontImageUrl, preFilterFoodGraphResults } from '@/lib/foodgraph';
 import { compareProductImages, cropImageToBoundingBox } from '@/lib/gemini';
 
 interface SearchAndSaveResult {
@@ -22,9 +22,10 @@ interface SearchAndSaveResult {
 interface ProgressUpdate {
   type: 'progress' | 'complete';
   detectionIndex?: number;
-  stage?: 'searching' | 'filtering' | 'saving' | 'done' | 'error';
+  stage?: 'searching' | 'prefiltering' | 'filtering' | 'saving' | 'done' | 'error';
   message?: string;
   resultsFound?: number;
+  preFilteredCount?: number;
   currentProduct?: string;
   processed?: number;
   total?: number;
@@ -194,18 +195,65 @@ export async function POST(request: NextRequest) {
               return result;
             }
 
-            // Step 2: Filter with AI
+            // Step 2: Pre-filter by text similarity (brand, size, flavor)
             sendProgress({
               type: 'progress',
               detectionIndex: detection.detection_index,
-              stage: 'filtering',
-              message: `AI filtering ${foodgraphResults.length} results...`,
+              stage: 'prefiltering',
+              message: `Pre-filtering ${foodgraphResults.length} results...`,
               resultsFound: foodgraphResults.length,
               processed: globalIndex + 1,
               total: detections.length
             });
 
-            console.log(`  [#${detection.detection_index}] AI filtering ${foodgraphResults.length} results...`);
+            console.log(`  [#${detection.detection_index}] Pre-filtering ${foodgraphResults.length} results by brand/size/flavor...`);
+
+            // Apply text-based pre-filtering
+            const preFilteredResults = preFilterFoodGraphResults(foodgraphResults, {
+              brand: detection.brand_name || undefined,
+              size: detection.size || undefined,
+              flavor: detection.flavor || undefined,
+              productName: detection.product_name || undefined
+            });
+
+            console.log(`  ✅ Pre-filtered to ${preFilteredResults.length} results (from ${foodgraphResults.length})`);
+
+            sendProgress({
+              type: 'progress',
+              detectionIndex: detection.detection_index,
+              stage: 'prefiltering',
+              message: `Pre-filtered to ${preFilteredResults.length} results`,
+              preFilteredCount: preFilteredResults.length,
+              processed: globalIndex + 1,
+              total: detections.length
+            });
+
+            if (preFilteredResults.length === 0) {
+              result.status = 'no_match';
+              result.error = 'No matches after pre-filtering';
+              sendProgress({
+                type: 'progress',
+                detectionIndex: detection.detection_index,
+                stage: 'error',
+                message: 'No matches after pre-filter',
+                processed: globalIndex + 1,
+                total: detections.length
+              });
+              return result;
+            }
+
+            // Step 3: Filter with AI
+            sendProgress({
+              type: 'progress',
+              detectionIndex: detection.detection_index,
+              stage: 'filtering',
+              message: `AI filtering ${preFilteredResults.length} results...`,
+              resultsFound: preFilteredResults.length,
+              processed: globalIndex + 1,
+              total: detections.length
+            });
+
+            console.log(`  [#${detection.detection_index}] AI filtering ${preFilteredResults.length} pre-filtered results...`);
 
             // CRITICAL: Crop image to just this product (like manual filter does!)
             // Extract bounding box from JSONB column or individual columns
@@ -264,8 +312,8 @@ export async function POST(request: NextRequest) {
             
             console.log(`    ✅ Cropped to ${width}x${height}px (${croppedBase64.length} chars base64)`);
 
-            // Compare ALL results in PARALLEL (same as manual filter)
-            const resultsToCompare = foodgraphResults;
+            // Compare pre-filtered results in PARALLEL (much faster than comparing all results)
+            const resultsToCompare = preFilteredResults;
             
             console.log(`    🚀 Comparing ${resultsToCompare.length} results in parallel...`);
             
