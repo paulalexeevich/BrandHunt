@@ -419,6 +419,7 @@ export function preFilterFoodGraphResults(
     }
     
     // Brand similarity (weight: 35%)
+    // Only apply brand scoring if brand is known (not undefined/null/Unknown)
     if (extractedInfo.brand && extractedInfo.brand !== 'Unknown') {
       const brandSimilarities = [
         calculateStringSimilarity(extractedInfo.brand, product.companyBrand || ''),
@@ -447,9 +448,17 @@ export function preFilterFoodGraphResults(
       if (brandSimilarity > 0.5) {
         reasons.push(`Brand match: ${(brandSimilarity * 100).toFixed(0)}%`);
       }
+    } else if (index === 0) {
+      // Log when brand is skipped (Unknown or missing)
+      console.log('🏷️  Brand matching skipped:', {
+        reason: !extractedInfo.brand ? 'Brand not extracted' : 'Brand is Unknown',
+        brandValue: extractedInfo.brand,
+        note: 'Brand weight (35%) not applied to scoring'
+      });
     }
     
     // Size similarity (weight: 35%)
+    // Only apply size scoring if size is known (not undefined/null/Unknown)
     if (extractedInfo.size && extractedInfo.size !== 'Unknown') {
       const extractedSize = extractSizeNumber(extractedInfo.size);
       const productSize = extractSizeNumber(product.measures || '');
@@ -491,6 +500,13 @@ export function preFilterFoodGraphResults(
           console.log('   Size text match: +0.23');
         }
       }
+    } else if (index === 0) {
+      // Log when size is skipped (Unknown or missing)
+      console.log('📏 Size matching skipped:', {
+        reason: !extractedInfo.size ? 'Size not extracted' : 'Size is Unknown',
+        sizeValue: extractedInfo.size,
+        note: 'Size weight (35%) not applied to scoring'
+      });
     }
     
     // Retailer match (weight: 30%)
