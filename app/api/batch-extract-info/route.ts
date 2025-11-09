@@ -70,72 +70,87 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`📦 Extracting info for ${detections.length} products in parallel...`);
+    console.log(`📦 Extracting info for ${detections.length} products with concurrency control...`);
 
-    // Process all detections in parallel
-    const results: ExtractionResult[] = await Promise.all(
-      detections.map(async (detection) => {
-        const result: ExtractionResult = {
-          detectionId: detection.id,
-          detectionIndex: detection.detection_index,
-          status: 'error'
-        };
+    // Process detections with concurrency limit to avoid rate limiting
+    const CONCURRENCY_LIMIT = 5; // Process 5 products at a time
+    const results: ExtractionResult[] = [];
 
-        try {
-          console.log(`  [${detection.detection_index}] Extracting product info...`);
-          
-          const productInfo = await extractProductInfo(
-            image.file_path,
-            image.mime_type || 'image/jpeg',
-            detection.bounding_box
-          );
+    for (let i = 0; i < detections.length; i += CONCURRENCY_LIMIT) {
+      const batch = detections.slice(i, i + CONCURRENCY_LIMIT);
+      console.log(`  🔄 Processing batch ${Math.floor(i / CONCURRENCY_LIMIT) + 1}/${Math.ceil(detections.length / CONCURRENCY_LIMIT)} (${batch.length} products)...`);
 
-          if (productInfo.brand) {
-            // Save to database immediately
-            const { error: updateError } = await supabase
-              .from('branghunt_detections')
-              .update({
-                brand_name: productInfo.brand,
-                product_name: productInfo.productName,
+      const batchResults = await Promise.all(
+        batch.map(async (detection) => {
+          const result: ExtractionResult = {
+            detectionId: detection.id,
+            detectionIndex: detection.detection_index,
+            status: 'error'
+          };
+
+          try {
+            console.log(`  [${detection.detection_index}] Extracting product info...`);
+            
+            const productInfo = await extractProductInfo(
+              image.file_path,
+              image.mime_type || 'image/jpeg',
+              detection.bounding_box
+            );
+
+            if (productInfo.brand) {
+              // Save to database immediately
+              const { error: updateError } = await supabase
+                .from('branghunt_detections')
+                .update({
+                  brand_name: productInfo.brand,
+                  product_name: productInfo.productName,
+                  category: productInfo.category,
+                  flavor: productInfo.flavor,
+                  size: productInfo.size,
+                  sku: productInfo.sku,
+                  description: productInfo.description,
+                  brand_extraction_response: JSON.stringify(productInfo),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', detection.id);
+
+              if (updateError) {
+                throw new Error(`Database update failed: ${updateError.message}`);
+              }
+
+              result.status = 'success';
+              result.productInfo = {
+                brand: productInfo.brand,
+                productName: productInfo.productName,
                 category: productInfo.category,
                 flavor: productInfo.flavor,
                 size: productInfo.size,
                 sku: productInfo.sku,
-                description: productInfo.description,
-                brand_extraction_response: JSON.stringify(productInfo),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', detection.id);
+                description: productInfo.description
+              };
 
-            if (updateError) {
-              throw new Error(`Database update failed: ${updateError.message}`);
+              console.log(`  ✅ [${detection.detection_index}] Info extracted and saved`);
+            } else {
+              result.error = 'No brand information found';
             }
 
-            result.status = 'success';
-            result.productInfo = {
-              brand: productInfo.brand,
-              productName: productInfo.productName,
-              category: productInfo.category,
-              flavor: productInfo.flavor,
-              size: productInfo.size,
-              sku: productInfo.sku,
-              description: productInfo.description
-            };
-
-            console.log(`  ✅ [${detection.detection_index}] Info extracted and saved`);
-          } else {
-            result.error = 'No brand information found';
+          } catch (error) {
+            console.error(`  ❌ [${detection.detection_index}] Error:`, error);
+            result.error = error instanceof Error ? error.message : 'Unknown error';
+            result.status = 'error';
           }
 
-        } catch (error) {
-          console.error(`  ❌ [${detection.detection_index}] Error:`, error);
-          result.error = error instanceof Error ? error.message : 'Unknown error';
-          result.status = 'error';
-        }
+          return result;
+        })
+      );
 
-        return result;
-      })
-    );
+      results.push(...batchResults);
+
+      // Small delay between batches to avoid rate limiting
+      if (i + CONCURRENCY_LIMIT < detections.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay between batches
+      }
+    }
 
     const successCount = results.filter(r => r.status === 'success').length;
     const errorCount = results.filter(r => r.status === 'error').length;
