@@ -94,7 +94,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [deleting, setDeleting] = useState(false);
   const [filtering, setFiltering] = useState(false);
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
-  const [showingBestNonMatch, setShowingBestNonMatch] = useState(false);
+  const [showingAllWithConfidence, setShowingAllWithConfidence] = useState(false);
   const [preFiltering, setPreFiltering] = useState(false);
   const [preFilteredCount, setPreFilteredCount] = useState<number | null>(null);
   const [showProductLabels, setShowProductLabels] = useState(true);
@@ -541,10 +541,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       const data = await response.json();
       console.log('Filter results:', data);
       
-      // Update the results with filtered ones
+      // Update the results with filtered ones (now includes ALL with confidence scores)
       setFoodgraphResults(data.filteredResults || []);
       setFilteredCount(data.totalFiltered);
-      setShowingBestNonMatch(data.showingBestNonMatch || false);
+      setShowingAllWithConfidence(data.showingAllWithConfidence || false);
       
     } catch (err) {
       console.error('Filter error:', err);
@@ -1523,24 +1523,23 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           {preFilteredCount !== null && filteredCount === null && (
                             <span className="ml-2 text-sm text-orange-600">→ Pre-filtered to {preFilteredCount} (≥85% match)</span>
                           )}
-                          {filteredCount !== null && !showingBestNonMatch && (
-                            <span className="ml-2 text-sm text-green-600">→ AI Filtered to {filteredCount}</span>
-                          )}
-                          {showingBestNonMatch && (
-                            <span className="ml-2 text-sm text-yellow-600">→ Best match (below 70% threshold)</span>
+                          {filteredCount !== null && (
+                            <span className="ml-2 text-sm text-green-600">
+                              → {filteredCount} passed 70% AI threshold {filteredCount === 0 && '(showing all with scores)'}
+                            </span>
                           )}
                         </h4>
                       </div>
                       
-                      {/* Warning when showing below-threshold result */}
-                      {showingBestNonMatch && (
-                        <div className="mb-3 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                      {/* Info banner when showing all with confidence */}
+                      {showingAllWithConfidence && (
+                        <div className="mb-3 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
                           <div className="flex items-start gap-2">
-                            <span className="text-yellow-600 text-lg">⚠️</span>
+                            <span className="text-blue-600 text-lg">ℹ️</span>
                             <div className="flex-1">
-                              <p className="text-sm font-semibold text-yellow-800">No confident matches found</p>
-                              <p className="text-xs text-yellow-700 mt-1">
-                                All products scored below 70% confidence. Showing the closest match for reference.
+                              <p className="text-sm font-semibold text-blue-800">Showing all results with AI confidence scores</p>
+                              <p className="text-xs text-blue-700 mt-1">
+                                Results with green checkmark (✓) passed the 70% confidence threshold. Sorted by confidence (highest first).
                               </p>
                             </div>
                           </div>
@@ -1561,14 +1560,14 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       
                       <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
                         {(() => {
-                          // If filtered, show only matched results. 
-                          // EXCEPTION: If showingBestNonMatch, show all (which will be just the 1 best match)
+                          // If AI filtered, show all results (with confidence scores). Otherwise show first 50
                           const resultsToShow = filteredCount !== null
-                            ? (showingBestNonMatch ? foodgraphResults : foodgraphResults.filter(r => r.is_match == true))
+                            ? foodgraphResults // Show all (already sorted by confidence from backend)
                             : foodgraphResults.slice(0, 50);
                           
                           return resultsToShow.map((result, index) => {
                             const isSaved = detection.selected_foodgraph_result_id === result.id;
+                            const passedThreshold = result.is_match === true; // Passed 70% AI confidence
                             
                             // Display FoodGraph product fields
                             // Try to get from direct fields first, then from full_data JSON
@@ -1610,8 +1609,27 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             return (
                             <div 
                               key={result.id}
-                              className={`bg-white rounded-lg border-2 ${isSaved ? 'border-green-500 ring-2 ring-green-300' : 'border-gray-200'} overflow-hidden hover:border-indigo-400 transition-colors`}
+                              className={`bg-white rounded-lg border-2 ${
+                                isSaved ? 'border-green-500 ring-2 ring-green-300' : 
+                                passedThreshold && filteredCount !== null ? 'border-green-400 bg-green-50' : 
+                                'border-gray-200'
+                              } overflow-hidden hover:border-indigo-400 transition-colors relative`}
                             >
+                          {/* Pass/Fail badge (only show after AI filtering) */}
+                          {filteredCount !== null && (
+                            <div className="absolute top-2 right-2 z-10">
+                              {passedThreshold ? (
+                                <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                  ✓ PASS
+                                </span>
+                              ) : (
+                                <span className="px-2 py-1 bg-gray-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                  ✗ FAIL
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          
                           {result.front_image_url ? (
                             <img
                               src={result.front_image_url}
@@ -1691,14 +1709,23 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             
                             {/* AI Match Confidence */}
                             {result.match_confidence !== undefined && result.match_confidence !== null && filteredCount !== null && (
-                              <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded">
+                              <div className={`mt-2 p-2 rounded border ${
+                                passedThreshold ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-300'
+                              }`}>
                                 <div className="flex items-center justify-between mb-1">
-                                  <p className="text-xs text-purple-900 font-semibold">
-                                    🤖 AI Confidence
+                                  <p className={`text-xs font-semibold ${
+                                    passedThreshold ? 'text-green-900' : 'text-gray-900'
+                                  }`}>
+                                    🤖 Visual {passedThreshold ? 'Match' : 'Comparison'}
                                   </p>
-                                  <p className="text-sm font-bold text-purple-700">
-                                    {Math.round(result.match_confidence * 100)}%
-                                  </p>
+                                  <div className="flex items-center gap-1">
+                                    <p className={`text-sm font-bold ${
+                                      passedThreshold ? 'text-green-700' : 'text-gray-700'
+                                    }`}>
+                                      {Math.round(result.match_confidence * 100)}%
+                                    </p>
+                                    {passedThreshold && <span className="text-green-600 text-xs">✓</span>}
+                                  </div>
                                 </div>
                                 {(result as any).match_reason && (
                                   <p className="text-[10px] text-gray-600 italic leading-tight">
