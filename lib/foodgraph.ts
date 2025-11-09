@@ -367,12 +367,17 @@ function extractRetailersFromUrls(urls: string[] | undefined): string[] {
  * Pre-filter FoodGraph results based on text similarity with extracted product info
  * Filters by brand, size, and retailer similarity before AI comparison
  * 
- * Scoring weights:
+ * Scoring weights (when available):
  * - Brand: 35% (most critical for product identity)
  * - Size: 35% (critical for exact product variant match)
  * - Retailer: 30% (ensures product is available at the store)
  * 
- * Threshold: Only products with ≥85% similarity score are returned
+ * Score normalization: Scores are normalized based on which fields are available.
+ * If size is "Unknown", scoring uses only brand + retailer (normalized to 100%).
+ * Example: Brand 80% + Retailer match = 0.28 + 0.30 = 0.58 raw score
+ *          Normalized: 0.58 / 0.65 (max possible) = 89% → passes 85% threshold
+ * 
+ * Threshold: Only products with ≥85% normalized similarity score are returned
  * This ensures only high-confidence matches proceed to expensive AI image comparison
  * 
  * Note: Flavor is excluded because FoodGraph doesn't provide it as a separate field.
@@ -380,7 +385,7 @@ function extractRetailersFromUrls(urls: string[] | undefined): string[] {
  * @param products - FoodGraph search results to filter
  * @param extractedInfo - Product information extracted from the shelf image
  * @param storeName - Optional store/retailer name from image metadata (e.g., "Target Store #1234")
- * @returns Filtered products with similarity scores ≥85%
+ * @returns Filtered products with normalized similarity scores ≥85%
  */
 export function preFilterFoodGraphResults(
   products: FoodGraphProduct[],
@@ -403,7 +408,18 @@ export function preFilterFoodGraphResults(
 
   const results = products.map((product, index) => {
     let score = 0;
+    let maxPossibleScore = 0; // Track maximum possible score based on available fields
     const reasons: string[] = [];
+    
+    // Determine which fields are available for scoring
+    const hasBrand = extractedInfo.brand && extractedInfo.brand !== 'Unknown';
+    const hasSize = extractedInfo.size && extractedInfo.size !== 'Unknown';
+    const hasRetailer = !!imageRetailer;
+    
+    // Calculate max possible score based on available fields
+    if (hasBrand) maxPossibleScore += 0.35;
+    if (hasSize) maxPossibleScore += 0.35;
+    if (hasRetailer) maxPossibleScore += 0.30;
     
     // Debug first product to see actual data structure
     if (index === 0) {
@@ -415,6 +431,13 @@ export function preFilterFoodGraphResults(
         category: product.category,
         sourcePdpUrls: product.sourcePdpUrls,
         ingredients: product.ingredients ? 'Present' : 'Missing'
+      });
+      console.log('🎲 Available fields for scoring:', {
+        hasBrand,
+        hasSize,
+        hasRetailer,
+        maxPossibleScore: maxPossibleScore.toFixed(2),
+        note: 'Score will be normalized based on available fields'
       });
     }
     
@@ -530,24 +553,32 @@ export function preFilterFoodGraphResults(
       }
     }
     
+    // Normalize score based on available fields
+    // If size is unknown, normalize score to 0-1 range based on brand+retailer only
+    const normalizedScore = maxPossibleScore > 0 ? score / maxPossibleScore : 0;
+    
     // Log final score for first product
     if (index === 0) {
       console.log('🎯 Final score for first product:', {
-        totalScore: score.toFixed(2),
-        passesThreshold: score > 0.3,
+        rawScore: score.toFixed(2),
+        maxPossible: maxPossibleScore.toFixed(2),
+        normalizedScore: normalizedScore.toFixed(2),
+        normalizedPercent: (normalizedScore * 100).toFixed(0) + '%',
+        passesThreshold: normalizedScore >= 0.85,
         reasons: reasons
       });
     }
     
     return {
       ...product,
-      similarityScore: score,
+      similarityScore: normalizedScore, // Store normalized score (0-1)
       matchReasons: reasons
     };
   });
 
   // Filter products with similarity score >= 0.85 (85% threshold for AI filtering)
   // High threshold ensures only strong matches go to expensive AI comparison
+  // Scores are normalized, so 85% threshold applies to available fields only
   const filtered = results
     .filter(r => r.similarityScore >= 0.85)
     .sort((a, b) => b.similarityScore - a.similarityScore);
@@ -555,10 +586,15 @@ export function preFilterFoodGraphResults(
   console.log('✅ Pre-filter results:', {
     originalCount: products.length,
     filteredCount: filtered.length,
-    threshold: '85%',
+    threshold: '85% (normalized)',
+    fieldsUsed: {
+      brand: extractedInfo.brand && extractedInfo.brand !== 'Unknown',
+      size: extractedInfo.size && extractedInfo.size !== 'Unknown',
+      retailer: !!imageRetailer
+    },
     topScores: filtered.slice(0, 5).map(r => ({
       title: r.title,
-      score: r.similarityScore.toFixed(2),
+      score: (r.similarityScore * 100).toFixed(0) + '%',
       reasons: r.matchReasons
     }))
   });
