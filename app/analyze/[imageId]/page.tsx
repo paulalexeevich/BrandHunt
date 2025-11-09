@@ -1667,6 +1667,25 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 )}
                               </div>
                             )}
+                            
+                            {/* AI Match Confidence */}
+                            {result.match_confidence !== undefined && result.match_confidence !== null && filteredCount !== null && (
+                              <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-xs text-purple-900 font-semibold">
+                                    🤖 AI Confidence
+                                  </p>
+                                  <p className="text-sm font-bold text-purple-700">
+                                    {Math.round(result.match_confidence * 100)}%
+                                  </p>
+                                </div>
+                                {(result as any).match_reason && (
+                                  <p className="text-[10px] text-gray-600 italic leading-tight">
+                                    {(result as any).match_reason}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                                 {isSaved ? (
                                   <div className="mt-2 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded text-center flex items-center justify-center gap-1">
                                     <CheckCircle className="w-3 h-3" />
