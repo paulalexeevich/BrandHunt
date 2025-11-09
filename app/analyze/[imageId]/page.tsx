@@ -94,6 +94,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [deleting, setDeleting] = useState(false);
   const [filtering, setFiltering] = useState(false);
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
+  const [showingBestNonMatch, setShowingBestNonMatch] = useState(false);
   const [preFiltering, setPreFiltering] = useState(false);
   const [preFilteredCount, setPreFilteredCount] = useState<number | null>(null);
   const [showProductLabels, setShowProductLabels] = useState(true);
@@ -543,6 +544,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       // Update the results with filtered ones
       setFoodgraphResults(data.filteredResults || []);
       setFilteredCount(data.totalFiltered);
+      setShowingBestNonMatch(data.showingBestNonMatch || false);
       
     } catch (err) {
       console.error('Filter error:', err);
@@ -1521,11 +1523,29 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           {preFilteredCount !== null && filteredCount === null && (
                             <span className="ml-2 text-sm text-orange-600">→ Pre-filtered to {preFilteredCount} (≥85% match)</span>
                           )}
-                          {filteredCount !== null && (
+                          {filteredCount !== null && !showingBestNonMatch && (
                             <span className="ml-2 text-sm text-green-600">→ AI Filtered to {filteredCount}</span>
+                          )}
+                          {showingBestNonMatch && (
+                            <span className="ml-2 text-sm text-yellow-600">→ Best match (below 70% threshold)</span>
                           )}
                         </h4>
                       </div>
+                      
+                      {/* Warning when showing below-threshold result */}
+                      {showingBestNonMatch && (
+                        <div className="mb-3 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                          <div className="flex items-start gap-2">
+                            <span className="text-yellow-600 text-lg">⚠️</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-yellow-800">No confident matches found</p>
+                              <p className="text-xs text-yellow-700 mt-1">
+                                All products scored below 70% confidence. Showing the closest match for reference.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Display the search term used */}
                       {foodgraphSearchTerm && (

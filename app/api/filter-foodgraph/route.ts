@@ -117,16 +117,33 @@ export async function POST(request: NextRequest) {
     // Filter to only matching results
     const matchingResults = updatedResults.filter(r => r.is_match);
 
-    // De-duplicate: Keep only the first result (highest rank) since FoodGraph returns duplicates
-    // If multiple products match, they're likely the same product with duplicate entries
-    const uniqueResults = matchingResults.length > 0 ? [matchingResults[0]] : [];
-
-    console.log(`✅ Image filtering complete: ${matchingResults.length}/${foodgraphResults.length} products matched, ${uniqueResults.length} unique shown`);
+    let uniqueResults;
+    let showingBestNonMatch = false;
+    
+    if (matchingResults.length > 0) {
+      // De-duplicate: Keep only the first result (highest rank) since FoodGraph returns duplicates
+      // If multiple products match, they're likely the same product with duplicate entries
+      uniqueResults = [matchingResults[0]];
+      console.log(`✅ Image filtering complete: ${matchingResults.length}/${foodgraphResults.length} products matched, ${uniqueResults.length} unique shown`);
+    } else {
+      // No matches found - show the TOP 1 result with highest confidence anyway
+      // This helps users see the closest match even if it didn't pass threshold
+      const sortedByConfidence = [...updatedResults].sort((a, b) => b.match_confidence - a.match_confidence);
+      uniqueResults = sortedByConfidence.length > 0 ? [sortedByConfidence[0]] : [];
+      showingBestNonMatch = true;
+      
+      if (uniqueResults.length > 0) {
+        console.log(`⚠️ No matches passed threshold. Showing best result: "${uniqueResults[0].product_name}" (confidence: ${Math.round(uniqueResults[0].match_confidence * 100)}%)`);
+      } else {
+        console.log(`❌ No results to show`);
+      }
+    }
 
     return NextResponse.json({
-      filteredResults: uniqueResults, // Return only the top match (de-duplicated)
-      totalFiltered: uniqueResults.length,
-      totalOriginal: foodgraphResults.length
+      filteredResults: uniqueResults, // Return top match or best non-match
+      totalFiltered: matchingResults.length, // Actual matches that passed threshold
+      totalOriginal: foodgraphResults.length,
+      showingBestNonMatch // Flag to indicate we're showing a below-threshold result
     });
 
   } catch (error) {
