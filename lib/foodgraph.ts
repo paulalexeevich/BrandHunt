@@ -381,6 +381,10 @@ function extractRetailersFromUrls(urls: string[] | undefined): string[] {
  * Threshold: Only products with ≥85% normalized similarity score are returned
  * This ensures only high-confidence matches proceed to expensive AI image comparison
  * 
+ * Fallback logic: If zero results pass the threshold with size matching enabled,
+ * automatically retries WITHOUT size matching (brand + retailer only).
+ * This helps when size extraction is incorrect or FoodGraph has different size formats.
+ * 
  * Note: Flavor is excluded because FoodGraph doesn't provide it as a separate field.
  * 
  * @param products - FoodGraph search results to filter
@@ -408,22 +412,30 @@ export function preFilterFoodGraphResults(
     imageRetailer
   });
 
-  const results = products.map((product, index) => {
+  // Inner function to perform the actual filtering
+  // The forceExcludeSize parameter allows fallback without size matching
+  const performFiltering = (forceExcludeSize = false): Array<FoodGraphProduct & { similarityScore: number; matchReasons: string[] }> => {
+    const results = products.map((product, index) => {
     let score = 0;
     let maxPossibleScore = 0; // Track maximum possible score based on available fields
     const reasons: string[] = [];
     
     // Determine which fields are available for scoring
     const hasBrand = extractedInfo.brand && extractedInfo.brand !== 'Unknown';
-    // Only use size if confidence >= 80% (0.8)
-    const hasSize = extractedInfo.size && 
+    // Only use size if confidence >= 80% (0.8) AND not forced to exclude
+    const hasSize = !forceExcludeSize && 
+                    extractedInfo.size && 
                     extractedInfo.size !== 'Unknown' && 
                     (!extractedInfo.sizeConfidence || extractedInfo.sizeConfidence >= 0.8);
     const hasRetailer = !!imageRetailer;
     
     // Log size confidence filtering (only for first product)
-    if (index === 0 && extractedInfo.size && extractedInfo.size !== 'Unknown' && extractedInfo.sizeConfidence) {
-      console.log(`📏 Size confidence check: ${(extractedInfo.sizeConfidence * 100).toFixed(0)}% - ${extractedInfo.sizeConfidence >= 0.8 ? '✅ Using size' : '❌ Ignoring low-confidence size'}`);
+    if (index === 0) {
+      if (forceExcludeSize) {
+        console.log('📏 Size matching DISABLED (fallback mode - zero results with size matching)');
+      } else if (extractedInfo.size && extractedInfo.size !== 'Unknown' && extractedInfo.sizeConfidence) {
+        console.log(`📏 Size confidence check: ${(extractedInfo.sizeConfidence * 100).toFixed(0)}% - ${extractedInfo.sizeConfidence >= 0.8 ? '✅ Using size' : '❌ Ignoring low-confidence size'}`);
+      }
     }
     
     // Calculate max possible score based on available fields
@@ -444,10 +456,10 @@ export function preFilterFoodGraphResults(
       });
       console.log('🎲 Available fields for scoring:', {
         hasBrand,
-        hasSize,
+        hasSize: hasSize && !forceExcludeSize,
         hasRetailer,
         maxPossibleScore: maxPossibleScore.toFixed(2),
-        note: 'Score will be normalized based on available fields'
+        note: forceExcludeSize ? 'SIZE EXCLUDED (fallback mode)' : 'Score will be normalized based on available fields'
       });
     }
     
@@ -535,9 +547,10 @@ export function preFilterFoodGraphResults(
         }
       }
     } else if (index === 0) {
-      // Log when size is skipped (low confidence or missing)
+      // Log when size is skipped (low confidence, missing, or forced exclusion)
       console.log('📏 Size matching skipped:', {
-        reason: !extractedInfo.size ? 'Size not extracted' : 
+        reason: forceExcludeSize ? 'Force excluded (fallback mode)' :
+                !extractedInfo.size ? 'Size not extracted' : 
                 extractedInfo.size === 'Unknown' ? 'Size is Unknown' :
                 extractedInfo.sizeConfidence && extractedInfo.sizeConfidence < 0.8 ? `Low confidence (${(extractedInfo.sizeConfidence * 100).toFixed(0)}%)` : 
                 'Unknown reason',
@@ -605,28 +618,57 @@ export function preFilterFoodGraphResults(
     };
   });
 
-  // Filter products with similarity score >= 0.85 (85% threshold for AI filtering)
-  // High threshold ensures only strong matches go to expensive AI comparison
-  // Scores are normalized, so 85% threshold applies to available fields only
-  const filtered = results
-    .filter(r => r.similarityScore >= 0.85)
-    .sort((a, b) => b.similarityScore - a.similarityScore);
+    // Filter products with similarity score >= 0.85 (85% threshold for AI filtering)
+    // High threshold ensures only strong matches go to expensive AI comparison
+    // Scores are normalized, so 85% threshold applies to available fields only
+    const filtered = results
+      .filter(r => r.similarityScore >= 0.85)
+      .sort((a, b) => b.similarityScore - a.similarityScore);
 
-  console.log('✅ Pre-filter results:', {
-    originalCount: products.length,
-    filteredCount: filtered.length,
-    threshold: '85% (normalized)',
-    fieldsUsed: {
-      brand: extractedInfo.brand && extractedInfo.brand !== 'Unknown',
-      size: extractedInfo.size && extractedInfo.size !== 'Unknown',
-      retailer: !!imageRetailer
-    },
-    topScores: filtered.slice(0, 5).map(r => ({
-      title: r.title,
-      score: (r.similarityScore * 100).toFixed(0) + '%',
-      reasons: r.matchReasons
-    }))
-  });
+    console.log('✅ Pre-filter results:', {
+      originalCount: products.length,
+      filteredCount: filtered.length,
+      threshold: '85% (normalized)',
+      mode: forceExcludeSize ? 'FALLBACK (no size)' : 'NORMAL',
+      fieldsUsed: {
+        brand: extractedInfo.brand && extractedInfo.brand !== 'Unknown',
+        size: !forceExcludeSize && extractedInfo.size && extractedInfo.size !== 'Unknown',
+        retailer: !!imageRetailer
+      },
+      topScores: filtered.slice(0, 5).map(r => ({
+        title: r.title,
+        score: (r.similarityScore * 100).toFixed(0) + '%',
+        reasons: r.matchReasons
+      }))
+    });
 
-  return filtered;
+    return filtered;
+  }; // End of performFiltering inner function
+
+  // First attempt: Try with all available fields (including size if available)
+  const initialResults = performFiltering(false);
+  
+  // Fallback logic: If zero results and size was used, retry without size
+  if (initialResults.length === 0) {
+    // Check if size was actually being used in the initial attempt
+    const sizeWasUsed = extractedInfo.size && 
+                        extractedInfo.size !== 'Unknown' && 
+                        (!extractedInfo.sizeConfidence || extractedInfo.sizeConfidence >= 0.8);
+    
+    if (sizeWasUsed) {
+      console.log('⚠️  FALLBACK TRIGGERED: Zero results with size matching. Retrying WITHOUT size criteria...');
+      const fallbackResults = performFiltering(true);
+      
+      if (fallbackResults.length > 0) {
+        console.log(`✅ Fallback successful: Found ${fallbackResults.length} matches using brand + retailer only`);
+        return fallbackResults;
+      } else {
+        console.log('❌ Fallback also returned zero results');
+      }
+    } else {
+      console.log('ℹ️  Zero results but size was not used in matching (already excluded or unavailable)');
+    }
+  }
+  
+  return initialResults;
 }
