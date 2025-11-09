@@ -162,6 +162,7 @@ export async function searchProducts(
 
   // Build comprehensive search term by combining all available fields
   // Priority: brand + productName + flavor + size (all combined into one string)
+  // Exclude fields that are undefined, null, empty, or "Unknown"
   let enhancedSearchTerm = searchTerm;
   if (options) {
     const parts = [
@@ -169,7 +170,7 @@ export async function searchProducts(
       options.productName, 
       options.flavor, 
       options.size
-    ].filter(Boolean);
+    ].filter(part => part && part !== 'Unknown');
     
     if (parts.length > 0) {
       // Combine all parts into single comprehensive search string
