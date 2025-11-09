@@ -63,26 +63,27 @@ export async function POST(request: NextRequest) {
     const comparisonPromises = foodgraphResults.map(async (result) => {
       if (!result.front_image_url) {
         console.log(`⚠️ No image URL for result ${result.id}, keeping it`);
-        return { result, isMatch: true, confidence: 0.0, reason: 'No image URL' };
+        return { result, isMatch: true, confidence: 0.0, visualSimilarity: 0.0, reason: 'No image URL' };
       }
 
       try {
         const comparisonDetails = await compareProductImages(
           croppedImageBase64,
           result.front_image_url,
-          true // Get detailed results with confidence and reason
+          true // Get detailed results with confidence, visualSimilarity, and reason
         );
-        console.log(`   ✅ Result ${result.product_name}: ${comparisonDetails.isMatch ? 'MATCH' : 'NO MATCH'} (confidence: ${comparisonDetails.confidence}) - ${comparisonDetails.reason}`);
+        console.log(`   ✅ Result ${result.product_name}: ${comparisonDetails.isMatch ? 'MATCH' : 'NO MATCH'} (confidence: ${comparisonDetails.confidence}, visual similarity: ${comparisonDetails.visualSimilarity}) - ${comparisonDetails.reason}`);
         return { 
           result, 
           isMatch: comparisonDetails.isMatch,
           confidence: comparisonDetails.confidence,
+          visualSimilarity: comparisonDetails.visualSimilarity,
           reason: comparisonDetails.reason
         };
       } catch (error) {
         console.error(`Error comparing result ${result.id}:`, error);
         // On error, keep the result
-        return { result, isMatch: true, confidence: 0.0, reason: 'Comparison error' };
+        return { result, isMatch: true, confidence: 0.0, visualSimilarity: 0.0, reason: 'Comparison error' };
       }
     });
 
@@ -91,12 +92,13 @@ export async function POST(request: NextRequest) {
 
     // Update database with is_match status for ALL results
     console.log(`💾 Updating ${comparisonResults.length} results in database...`);
-    const updatePromises = comparisonResults.map(async ({ result, isMatch, confidence, reason }) => {
+    const updatePromises = comparisonResults.map(async ({ result, isMatch, confidence, visualSimilarity, reason }) => {
       const { error: updateError } = await supabase
         .from('branghunt_foodgraph_results')
         .update({ 
           is_match: isMatch,
-          match_confidence: confidence // Use actual AI confidence score
+          match_confidence: confidence, // AI's confidence in its assessment
+          visual_similarity: visualSimilarity // How similar the images look (0-1)
         })
         .eq('id', result.id);
       
@@ -108,6 +110,7 @@ export async function POST(request: NextRequest) {
         ...result, 
         is_match: isMatch, 
         match_confidence: confidence,
+        visual_similarity: visualSimilarity,
         match_reason: reason 
       };
     });
@@ -125,7 +128,8 @@ export async function POST(request: NextRequest) {
     
     // Log top 3 for debugging
     sortedByConfidence.slice(0, 3).forEach((r, i) => {
-      console.log(`   ${i + 1}. ${r.product_name} - ${r.is_match ? '✓ PASS' : '✗ FAIL'} (${Math.round(r.match_confidence * 100)}%)`);
+      const visualSim = r.visual_similarity !== undefined ? `, visual: ${Math.round(r.visual_similarity * 100)}%` : '';
+      console.log(`   ${i + 1}. ${r.product_name} - ${r.is_match ? '✓ PASS' : '✗ FAIL'} (confidence: ${Math.round(r.match_confidence * 100)}%${visualSim})`);
     });
 
     return NextResponse.json({

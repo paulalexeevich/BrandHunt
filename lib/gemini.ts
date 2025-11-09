@@ -563,12 +563,12 @@ export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string,
   returnDetails: true
-): Promise<{ isMatch: boolean; confidence: number; reason: string }>;
+): Promise<{ isMatch: boolean; confidence: number; visualSimilarity: number; reason: string }>;
 export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string,
   returnDetails?: boolean
-): Promise<boolean | { isMatch: boolean; confidence: number; reason: string }> {
+): Promise<boolean | { isMatch: boolean; confidence: number; visualSimilarity: number; reason: string }> {
   const model = genAI.getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
@@ -591,10 +591,24 @@ Return a JSON object with this structure:
 {
   "isMatch": true or false,
   "confidence": 0.0 to 1.0,
+  "visualSimilarity": 0.0 to 1.0,
   "reason": "Brief explanation of why they match or don't match"
 }
 
-Important: Only return true if you are confident these are the SAME product (same brand, same product, same variant). Different flavors or sizes of the same brand should return false.
+CRITICAL DEFINITIONS:
+- isMatch: true only if SAME product (brand, type, variant all match). Different flavors/sizes = false.
+- confidence: How certain you are about the isMatch decision (0.0 = uncertain, 1.0 = very certain)
+- visualSimilarity: How similar the images LOOK overall (0.0 = completely different, 1.0 = nearly identical)
+  * Same product, same packaging = 0.9-1.0
+  * Same brand, different variant (e.g. stick vs spray) = 0.5-0.8
+  * Same brand, different product line = 0.3-0.5
+  * Different brands = 0.0-0.3
+
+Examples:
+- Same product, clear match: {isMatch: true, confidence: 0.95, visualSimilarity: 0.95}
+- Same brand, stick vs spray: {isMatch: false, confidence: 1.0, visualSimilarity: 0.65}
+- Same brand, different scent: {isMatch: false, confidence: 0.9, visualSimilarity: 0.85}
+- Different brands: {isMatch: false, confidence: 1.0, visualSimilarity: 0.2}
 `;
 
   try {
@@ -638,14 +652,21 @@ Important: Only return true if you are confident these are the SAME product (sam
     }
     cleanedText = cleanedText.trim();
 
-    const comparison = JSON.parse(cleanedText) as { isMatch: boolean; confidence: number; reason: string };
-    console.log(`🔍 Image comparison: ${comparison.isMatch ? 'MATCH' : 'NO MATCH'} (confidence: ${comparison.confidence}) - ${comparison.reason}`);
+    const comparison = JSON.parse(cleanedText) as { 
+      isMatch: boolean; 
+      confidence: number; 
+      visualSimilarity: number;
+      reason: string 
+    };
+    
+    console.log(`🔍 Image comparison: ${comparison.isMatch ? 'MATCH' : 'NO MATCH'} (confidence: ${comparison.confidence}, visual similarity: ${comparison.visualSimilarity}) - ${comparison.reason}`);
     
     // If returnDetails is true, return the full comparison object
     if (returnDetails) {
       return {
         isMatch: comparison.isMatch && comparison.confidence >= 0.7,
         confidence: comparison.confidence,
+        visualSimilarity: comparison.visualSimilarity || 0,
         reason: comparison.reason
       };
     }
@@ -659,6 +680,7 @@ Important: Only return true if you are confident these are the SAME product (sam
       return {
         isMatch: true,
         confidence: 0.0,
+        visualSimilarity: 0.0,
         reason: 'Error during comparison'
       };
     }
