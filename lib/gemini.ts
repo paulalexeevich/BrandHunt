@@ -596,7 +596,7 @@ Return a JSON object with this structure:
 }
 
 CRITICAL DEFINITIONS:
-- isMatch: true only if SAME product (brand, type, variant all match). Different flavors/sizes = false.
+- isMatch: true only if both product images are IDENTICAL (all small details are the same and in the same position). Different flavors/sizes = false.
 - confidence: How certain you are about the isMatch decision (0.0 = uncertain, 1.0 = very certain)
 - visualSimilarity: How similar the images LOOK overall (0.0 = completely different, 1.0 = nearly identical)
   * Same product, same packaging = 0.9-1.0
