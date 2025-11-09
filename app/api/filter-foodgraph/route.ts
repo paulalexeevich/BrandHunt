@@ -63,19 +63,26 @@ export async function POST(request: NextRequest) {
     const comparisonPromises = foodgraphResults.map(async (result) => {
       if (!result.front_image_url) {
         console.log(`⚠️ No image URL for result ${result.id}, keeping it`);
-        return { result, isMatch: true };
+        return { result, isMatch: true, confidence: 0.0, reason: 'No image URL' };
       }
 
       try {
-        const isMatch = await compareProductImages(
+        const comparisonDetails = await compareProductImages(
           croppedImageBase64,
-          result.front_image_url
+          result.front_image_url,
+          true // Get detailed results with confidence and reason
         );
-        return { result, isMatch };
+        console.log(`   ✅ Result ${result.product_name}: ${comparisonDetails.isMatch ? 'MATCH' : 'NO MATCH'} (confidence: ${comparisonDetails.confidence}) - ${comparisonDetails.reason}`);
+        return { 
+          result, 
+          isMatch: comparisonDetails.isMatch,
+          confidence: comparisonDetails.confidence,
+          reason: comparisonDetails.reason
+        };
       } catch (error) {
         console.error(`Error comparing result ${result.id}:`, error);
         // On error, keep the result
-        return { result, isMatch: true };
+        return { result, isMatch: true, confidence: 0.0, reason: 'Comparison error' };
       }
     });
 
@@ -84,12 +91,12 @@ export async function POST(request: NextRequest) {
 
     // Update database with is_match status for ALL results
     console.log(`💾 Updating ${comparisonResults.length} results in database...`);
-    const updatePromises = comparisonResults.map(async ({ result, isMatch }) => {
+    const updatePromises = comparisonResults.map(async ({ result, isMatch, confidence, reason }) => {
       const { error: updateError } = await supabase
         .from('branghunt_foodgraph_results')
         .update({ 
           is_match: isMatch,
-          match_confidence: isMatch ? 0.95 : 0.0 // High confidence for matches
+          match_confidence: confidence // Use actual AI confidence score
         })
         .eq('id', result.id);
       
@@ -97,7 +104,12 @@ export async function POST(request: NextRequest) {
         console.error(`Failed to update result ${result.id}:`, updateError);
       }
       
-      return { ...result, is_match: isMatch, match_confidence: isMatch ? 0.95 : 0.0 };
+      return { 
+        ...result, 
+        is_match: isMatch, 
+        match_confidence: confidence,
+        match_reason: reason 
+      };
     });
 
     const updatedResults = await Promise.all(updatePromises);

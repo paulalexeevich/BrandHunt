@@ -558,7 +558,17 @@ Only return the JSON object, nothing else.
 export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string
-): Promise<boolean> {
+): Promise<boolean>;
+export async function compareProductImages(
+  originalImageBase64: string,
+  foodgraphImageUrl: string,
+  returnDetails: true
+): Promise<{ isMatch: boolean; confidence: number; reason: string }>;
+export async function compareProductImages(
+  originalImageBase64: string,
+  foodgraphImageUrl: string,
+  returnDetails?: boolean
+): Promise<boolean | { isMatch: boolean; confidence: number; reason: string }> {
   const model = genAI.getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
@@ -631,11 +641,27 @@ Important: Only return true if you are confident these are the SAME product (sam
     const comparison = JSON.parse(cleanedText) as { isMatch: boolean; confidence: number; reason: string };
     console.log(`🔍 Image comparison: ${comparison.isMatch ? 'MATCH' : 'NO MATCH'} (confidence: ${comparison.confidence}) - ${comparison.reason}`);
     
+    // If returnDetails is true, return the full comparison object
+    if (returnDetails) {
+      return {
+        isMatch: comparison.isMatch && comparison.confidence >= 0.7,
+        confidence: comparison.confidence,
+        reason: comparison.reason
+      };
+    }
+    
     // Return true if it's a match with high confidence (>= 0.7)
     return comparison.isMatch && comparison.confidence >= 0.7;
   } catch (error) {
     console.error('Failed to compare images:', error);
     // On error, don't filter out the product
+    if (returnDetails) {
+      return {
+        isMatch: true,
+        confidence: 0.0,
+        reason: 'Error during comparison'
+      };
+    }
     return true;
   }
 }
