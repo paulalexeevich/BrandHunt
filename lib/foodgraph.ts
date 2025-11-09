@@ -265,13 +265,14 @@ export function getFrontImageUrl(product: FoodGraphProduct): string | null {
 
 /**
  * Calculate similarity score between two strings (0-1 scale)
- * Uses simple case-insensitive comparison and substring matching
+ * Uses case-insensitive comparison with punctuation stripping and substring matching
  */
 function calculateStringSimilarity(str1: string, str2: string): number {
   if (!str1 || !str2) return 0;
   
-  const s1 = str1.toLowerCase().trim();
-  const s2 = str2.toLowerCase().trim();
+  // Normalize: lowercase, trim, and remove punctuation
+  const s1 = str1.toLowerCase().trim().replace(/[^\w\s]/g, '');
+  const s2 = str2.toLowerCase().trim().replace(/[^\w\s]/g, '');
   
   // Exact match
   if (s1 === s2) return 1.0;
@@ -280,9 +281,9 @@ function calculateStringSimilarity(str1: string, str2: string): number {
   if (s1.includes(s2) || s2.includes(s1)) return 0.8;
   
   // Check word overlap
-  const words1 = s1.split(/\s+/);
-  const words2 = s2.split(/\s+/);
-  const commonWords = words1.filter(w => words2.includes(w) && w.length > 2);
+  const words1 = s1.split(/\s+/).filter(w => w.length > 2);
+  const words2 = s2.split(/\s+/).filter(w => w.length > 2);
+  const commonWords = words1.filter(w => words2.includes(w));
   
   if (commonWords.length > 0) {
     const overlapScore = commonWords.length / Math.max(words1.length, words2.length);
