@@ -1561,9 +1561,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       
                       <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
                         {(() => {
-                          // If filtered, show only matched results. Otherwise show all (up to 50)
+                          // If filtered, show only matched results. 
+                          // EXCEPTION: If showingBestNonMatch, show all (which will be just the 1 best match)
                           const resultsToShow = filteredCount !== null
-                            ? foodgraphResults.filter(r => r.is_match == true) // Use loose equality to match true/1/"true"
+                            ? (showingBestNonMatch ? foodgraphResults : foodgraphResults.filter(r => r.is_match == true))
                             : foodgraphResults.slice(0, 50);
                           
                           return resultsToShow.map((result, index) => {
