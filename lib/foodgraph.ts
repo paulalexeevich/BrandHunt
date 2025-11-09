@@ -394,6 +394,7 @@ export function preFilterFoodGraphResults(
     brand?: string;
     size?: string;
     productName?: string;
+    sizeConfidence?: number;
   },
   storeName?: string
 ): Array<FoodGraphProduct & { similarityScore: number; matchReasons: string[] }> {
@@ -414,8 +415,16 @@ export function preFilterFoodGraphResults(
     
     // Determine which fields are available for scoring
     const hasBrand = extractedInfo.brand && extractedInfo.brand !== 'Unknown';
-    const hasSize = extractedInfo.size && extractedInfo.size !== 'Unknown';
+    // Only use size if confidence >= 80% (0.8)
+    const hasSize = extractedInfo.size && 
+                    extractedInfo.size !== 'Unknown' && 
+                    (!extractedInfo.sizeConfidence || extractedInfo.sizeConfidence >= 0.8);
     const hasRetailer = !!imageRetailer;
+    
+    // Log size confidence filtering (only for first product)
+    if (index === 0 && extractedInfo.size && extractedInfo.size !== 'Unknown' && extractedInfo.sizeConfidence) {
+      console.log(`📏 Size confidence check: ${(extractedInfo.sizeConfidence * 100).toFixed(0)}% - ${extractedInfo.sizeConfidence >= 0.8 ? '✅ Using size' : '❌ Ignoring low-confidence size'}`);
+    }
     
     // Calculate max possible score based on available fields
     if (hasBrand) maxPossibleScore += 0.35;

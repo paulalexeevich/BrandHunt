@@ -441,7 +441,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         {
           brand: detection.brand_name || undefined,
           size: detection.size || undefined,
-          productName: detection.product_name || undefined
+          productName: detection.product_name || undefined,
+          sizeConfidence: detection.size_confidence || undefined
         },
         image?.store_name || undefined // Pass store name for retailer matching
       ) as any;
