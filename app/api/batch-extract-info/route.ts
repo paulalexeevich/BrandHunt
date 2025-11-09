@@ -7,6 +7,9 @@ interface ExtractionResult {
   detectionIndex: number;
   status: 'success' | 'error';
   productInfo?: {
+    isProduct: boolean;
+    detailsVisible: boolean;
+    extractionNotes?: string;
     brand: string;
     productName: string;
     category: string;
@@ -14,6 +17,13 @@ interface ExtractionResult {
     size: string;
     sku: string;
     description: string;
+    brandConfidence: number;
+    productNameConfidence: number;
+    categoryConfidence: number;
+    flavorConfidence: number;
+    sizeConfidence: number;
+    skuConfidence: number;
+    descriptionConfidence: number;
   };
   error?: string;
 }
@@ -90,42 +100,63 @@ export async function POST(request: NextRequest) {
             detection.bounding_box
           );
 
-          if (productInfo.brand) {
-            // Save to database immediately
-            const { error: updateError } = await supabase
-              .from('branghunt_detections')
-              .update({
-                brand_name: productInfo.brand,
-                product_name: productInfo.productName,
-                category: productInfo.category,
-                flavor: productInfo.flavor,
-                size: productInfo.size,
-                sku: productInfo.sku,
-                description: productInfo.description,
-                brand_extraction_response: JSON.stringify(productInfo),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', detection.id);
-
-            if (updateError) {
-              throw new Error(`Database update failed: ${updateError.message}`);
-            }
-
-            result.status = 'success';
-            result.productInfo = {
-              brand: productInfo.brand,
-              productName: productInfo.productName,
+          // Save to database immediately (regardless of isProduct status)
+          const { error: updateError } = await supabase
+            .from('branghunt_detections')
+            .update({
+              // Classification fields
+              is_product: productInfo.isProduct,
+              details_visible: productInfo.detailsVisible,
+              extraction_notes: productInfo.extractionNotes || null,
+              // Product fields
+              brand_name: productInfo.brand,
+              product_name: productInfo.productName,
               category: productInfo.category,
               flavor: productInfo.flavor,
               size: productInfo.size,
               sku: productInfo.sku,
-              description: productInfo.description
-            };
+              description: productInfo.description,
+              // Confidence scores
+              brand_confidence: productInfo.brandConfidence,
+              product_name_confidence: productInfo.productNameConfidence,
+              category_confidence: productInfo.categoryConfidence,
+              flavor_confidence: productInfo.flavorConfidence,
+              size_confidence: productInfo.sizeConfidence,
+              sku_confidence: productInfo.skuConfidence,
+              description_confidence: productInfo.descriptionConfidence,
+              // Metadata
+              brand_extraction_response: JSON.stringify(productInfo),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', detection.id);
 
-            console.log(`  ✅ [${detection.detection_index}] Info extracted and saved`);
-          } else {
-            result.error = 'No brand information found';
+          if (updateError) {
+            throw new Error(`Database update failed: ${updateError.message}`);
           }
+
+          result.status = 'success';
+          result.productInfo = {
+            isProduct: productInfo.isProduct,
+            detailsVisible: productInfo.detailsVisible,
+            extractionNotes: productInfo.extractionNotes,
+            brand: productInfo.brand,
+            productName: productInfo.productName,
+            category: productInfo.category,
+            flavor: productInfo.flavor,
+            size: productInfo.size,
+            sku: productInfo.sku,
+            description: productInfo.description,
+            brandConfidence: productInfo.brandConfidence,
+            productNameConfidence: productInfo.productNameConfidence,
+            categoryConfidence: productInfo.categoryConfidence,
+            flavorConfidence: productInfo.flavorConfidence,
+            sizeConfidence: productInfo.sizeConfidence,
+            skuConfidence: productInfo.skuConfidence,
+            descriptionConfidence: productInfo.descriptionConfidence
+          };
+
+          console.log(`  ✅ [${detection.detection_index}] Info extracted and saved (isProduct: ${productInfo.isProduct}, detailsVisible: ${productInfo.detailsVisible})`);
+
 
         } catch (error) {
           console.error(`  ❌ [${detection.detection_index}] Error:`, error);

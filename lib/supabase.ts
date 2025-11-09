@@ -38,6 +38,11 @@ export interface BranghuntDetection {
   };
   label: string | null; // Initial detection label
   confidence_score: number | null;
+  // Classification fields
+  is_product: boolean | null; // Whether this is actually a product
+  details_visible: boolean | null; // Whether product details are visible
+  extraction_notes: string | null; // Notes about extraction quality/issues
+  // Product fields
   brand_name: string | null;
   category: string | null;
   sku: string | null;
@@ -45,6 +50,15 @@ export interface BranghuntDetection {
   flavor: string | null; // Flavor or variant
   size: string | null; // Size or weight
   description: string | null; // Product description
+  // Confidence scores
+  brand_confidence: number | null;
+  product_name_confidence: number | null;
+  category_confidence: number | null;
+  flavor_confidence: number | null;
+  size_confidence: number | null;
+  description_confidence: number | null;
+  sku_confidence: number | null;
+  // Price fields
   price: string | null; // Extracted price value
   price_currency: string | null; // Currency code (USD, EUR, etc.)
   price_confidence: number | null; // Confidence score for price extraction

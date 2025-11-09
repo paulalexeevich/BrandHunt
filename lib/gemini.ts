@@ -9,13 +9,28 @@ export interface DetectedProduct {
 }
 
 export interface ProductInfo {
+  // Classification fields
+  isProduct: boolean;
+  detailsVisible: boolean;
+  extractionNotes?: string;
+  
+  // Product fields
   brand: string;
-  category: string;
-  sku: string;
   productName: string;
-  description: string;
+  category: string;
   flavor: string;
   size: string;
+  description: string;
+  sku: string;
+  
+  // Confidence scores (0.0 to 1.0)
+  brandConfidence: number;
+  productNameConfidence: number;
+  categoryConfidence: number;
+  flavorConfidence: number;
+  sizeConfidence: number;
+  descriptionConfidence: number;
+  skuConfidence: number;
 }
 
 /**
@@ -153,9 +168,13 @@ export async function extractProductInfo(
   });
 
   const prompt = `
-Analyze this product image and extract ALL visible information.
+Analyze this image and extract product information.
 
-Extract the following information:
+FIRST, determine classification:
+1. Is this actually a product? (vs shelf fixture, price tag, empty space, or non-product item)
+2. Are product details clearly visible? (can you read brand, product name, or other text?)
+
+THEN, extract the following information:
 1. Brand name (manufacturer/brand, e.g., "Tru Fru", "Reese's", "bettergoods")
 2. Product name (full product name as written on package, e.g., "Frozen Fruit Strawberries", "Peanut Butter Cups")
 3. Category (e.g., "Frozen Food", "Dairy", "Snacks", "Candy")
@@ -164,18 +183,41 @@ Extract the following information:
 6. Description (brief product description from package, e.g., "Dark Chocolate Covered Strawberries")
 7. SKU/Barcode (any product code, UPC, or barcode visible)
 
-Return a JSON object with this exact structure:
+For EACH extracted field, provide a confidence score from 0.0 to 1.0:
+- 1.0 = Completely certain, text is clearly visible and readable
+- 0.8 = Very confident, minor uncertainty
+- 0.6 = Moderately confident, some guessing involved
+- 0.4 = Low confidence, mostly guessing
+- 0.2 = Very uncertain
+- 0.0 = Unknown/not visible
+
+Return a JSON object with this EXACT structure:
 {
-  "brand": "brand name",
-  "productName": "full product name",
-  "category": "category name",
-  "flavor": "flavor or variant",
-  "size": "size or weight",
-  "description": "product description",
-  "sku": "product code or barcode"
+  "isProduct": true or false,
+  "detailsVisible": true or false,
+  "extractionNotes": "Brief note explaining classification or extraction issues (e.g., 'Not a product - price tag only', 'Product too far/blurry', 'Clear view of all details')",
+  "brand": "brand name or Unknown",
+  "brandConfidence": 0.0 to 1.0,
+  "productName": "full product name or Unknown",
+  "productNameConfidence": 0.0 to 1.0,
+  "category": "category name or Unknown",
+  "categoryConfidence": 0.0 to 1.0,
+  "flavor": "flavor or variant or Unknown",
+  "flavorConfidence": 0.0 to 1.0,
+  "size": "size or weight or Unknown",
+  "sizeConfidence": 0.0 to 1.0,
+  "description": "product description or Unknown",
+  "descriptionConfidence": 0.0 to 1.0,
+  "sku": "product code/barcode or Unknown",
+  "skuConfidence": 0.0 to 1.0
 }
 
-If you cannot determine any field, use "Unknown" for that field.
+Important Guidelines:
+- If isProduct = false, set all confidence scores to 0.0 and all fields to "Unknown"
+- If detailsVisible = false, you can still set isProduct = true, but confidence scores should be low (0.0-0.4)
+- Use Unknown for any field you cannot determine
+- Be honest about confidence - lower scores for partially visible or unclear text
+
 Only return the JSON object, nothing else.
 `;
 
@@ -219,15 +261,25 @@ Only return the JSON object, nothing else.
     return productInfo;
   } catch (error) {
     console.error('Failed to parse Gemini response:', cleanedText);
-    // Fallback to simple extraction
+    // Fallback when parsing fails
     return {
+      isProduct: false,
+      detailsVisible: false,
+      extractionNotes: 'Failed to parse AI response',
       brand: 'Unknown',
-      category: 'Unknown',
-      sku: 'Unknown',
+      brandConfidence: 0,
       productName: 'Unknown',
-      description: 'Unknown',
+      productNameConfidence: 0,
+      category: 'Unknown',
+      categoryConfidence: 0,
       flavor: 'Unknown',
-      size: 'Unknown'
+      flavorConfidence: 0,
+      size: 'Unknown',
+      sizeConfidence: 0,
+      description: 'Unknown',
+      descriptionConfidence: 0,
+      sku: 'Unknown',
+      skuConfidence: 0
     };
   }
 }
