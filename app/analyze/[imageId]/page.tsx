@@ -1537,9 +1537,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           <div className="flex items-start gap-2">
                             <span className="text-blue-600 text-lg">ℹ️</span>
                             <div className="flex-1">
-                              <p className="text-sm font-semibold text-blue-800">Showing all results with AI confidence scores</p>
+                              <p className="text-sm font-semibold text-blue-800">Sorted by Visual Match % (highest first)</p>
                               <p className="text-xs text-blue-700 mt-1">
-                                Results with green checkmark (✓) passed the 70% confidence threshold. Sorted by confidence (highest first).
+                                Results with green checkmark (✓) passed the 70% confidence threshold. Large percentage shows visual similarity.
                               </p>
                             </div>
                           </div>
@@ -1642,6 +1642,22 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             </div>
                           )}
                               <div className="p-2">
+                                {/* Visual Match Percentage - Prominent Display */}
+                                {filteredCount !== null && result.match_confidence !== undefined && (
+                                  <div className="mb-2 flex items-center justify-between">
+                                    <span className={`text-lg font-bold ${
+                                      passedThreshold ? 'text-green-600' : 'text-gray-600'
+                                    }`}>
+                                      {Math.round(result.match_confidence * 100)}%
+                                    </span>
+                                    <span className={`text-[10px] font-semibold ${
+                                      passedThreshold ? 'text-green-600' : 'text-gray-500'
+                                    }`}>
+                                      Visual Match
+                                    </span>
+                                  </div>
+                                )}
+                                
                                 <p className="text-xs font-semibold text-gray-900 truncate" title={result.product_name || 'Unnamed'}>
                               {result.product_name || 'Unnamed Product'}
                             </p>
