@@ -491,9 +491,9 @@ export function preFilterFoodGraphResults(
     }
     
     // Size similarity (weight: 35%)
-    // Only apply size scoring if size is known (not undefined/null/Unknown)
-    if (extractedInfo.size && extractedInfo.size !== 'Unknown') {
-      const extractedSize = extractSizeNumber(extractedInfo.size);
+    // CRITICAL: Only apply size scoring if hasSize is true (confidence >= 80%)
+    if (hasSize) {
+      const extractedSize = extractSizeNumber(extractedInfo.size!);
       const productSize = extractSizeNumber(product.measures || '');
       
       if (index === 0) {
@@ -501,7 +501,8 @@ export function preFilterFoodGraphResults(
           extractedSize: extractedInfo.size,
           extractedNumber: extractedSize,
           productMeasures: product.measures,
-          productNumber: productSize
+          productNumber: productSize,
+          sizeConfidence: extractedInfo.sizeConfidence ? (extractedInfo.sizeConfidence * 100).toFixed(0) + '%' : 'N/A'
         });
       }
       
@@ -522,7 +523,7 @@ export function preFilterFoodGraphResults(
         if (sizeSimilarity > 0.5) {
           reasons.push(`Size match: ${extractedInfo.size} ≈ ${product.measures}`);
         }
-      } else if (product.measures && 
+      } else if (product.measures && extractedInfo.size &&
                  (extractedInfo.size.toLowerCase().includes(product.measures.toLowerCase()) ||
                   product.measures.toLowerCase().includes(extractedInfo.size.toLowerCase()))) {
         // Text-based size matching as fallback
@@ -534,15 +535,20 @@ export function preFilterFoodGraphResults(
         }
       }
     } else if (index === 0) {
-      // Log when size is skipped (Unknown or missing)
+      // Log when size is skipped (low confidence or missing)
       console.log('📏 Size matching skipped:', {
-        reason: !extractedInfo.size ? 'Size not extracted' : 'Size is Unknown',
+        reason: !extractedInfo.size ? 'Size not extracted' : 
+                extractedInfo.size === 'Unknown' ? 'Size is Unknown' :
+                extractedInfo.sizeConfidence && extractedInfo.sizeConfidence < 0.8 ? `Low confidence (${(extractedInfo.sizeConfidence * 100).toFixed(0)}%)` : 
+                'Unknown reason',
         sizeValue: extractedInfo.size,
-        note: 'Size weight (35%) not applied to scoring'
+        sizeConfidence: extractedInfo.sizeConfidence ? (extractedInfo.sizeConfidence * 100).toFixed(0) + '%' : 'N/A',
+        note: 'Size weight (35%) NOT applied to scoring'
       });
     }
     
     // Retailer match (weight: 30%)
+    // CRITICAL: If we know the store, REQUIRE retailer match
     if (imageRetailer) {
       const productRetailers = extractRetailersFromUrls(product.sourcePdpUrls);
       const retailerMatch = productRetailers.includes(imageRetailer);
@@ -553,19 +559,32 @@ export function preFilterFoodGraphResults(
           sourcePdpUrls: product.sourcePdpUrls,
           productRetailers,
           isMatch: retailerMatch,
-          scoreContribution: retailerMatch ? '0.30' : '0.00'
+          scoreContribution: retailerMatch ? '0.30' : '0.00 (EXCLUDES product)'
         });
       }
       
       if (retailerMatch) {
         score += 0.30;
         reasons.push(`Retailer match: ${imageRetailer}`);
+      } else if (productRetailers.length > 0) {
+        // Product has retailers but none match - this is a wrong-store product
+        // Return score of 0 to exclude it from results
+        if (index === 0) {
+          console.log('   ❌ RETAILER MISMATCH - Product excluded (has retailers but wrong ones)');
+        }
+        return {
+          ...product,
+          similarityScore: 0, // Zero score excludes from results
+          matchReasons: [`Wrong retailer: ${productRetailers.join(', ')} (need ${imageRetailer})`]
+        };
       }
+      // If product has no retailer info (productRetailers.length === 0), don't add score but don't exclude
     }
     
     // Normalize score based on available fields
     // If size is unknown, normalize score to 0-1 range based on brand+retailer only
-    const normalizedScore = maxPossibleScore > 0 ? score / maxPossibleScore : 0;
+    // CRITICAL: Cap at 1.0 (100%) to prevent scoring bugs
+    const normalizedScore = maxPossibleScore > 0 ? Math.min(1.0, score / maxPossibleScore) : 0;
     
     // Log final score for first product
     if (index === 0) {
@@ -581,7 +600,7 @@ export function preFilterFoodGraphResults(
     
     return {
       ...product,
-      similarityScore: normalizedScore, // Store normalized score (0-1)
+      similarityScore: normalizedScore, // Store normalized score (0-1), capped at 1.0
       matchReasons: reasons
     };
   });
