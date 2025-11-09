@@ -1,8 +1,9 @@
-# Gemini API Rate Limiting Fix
+# Gemini API Rate Limiting Analysis (REVERTED)
 
 **Date**: November 9, 2025  
-**Issue**: Extract Info and Extract Price batch operations became slow  
-**Root Cause**: Google Gemini API rate limiting when processing too many parallel requests
+**Status**: REVERTED - Concurrency control was unnecessary  
+**Issue**: Extract Info and Extract Price batch operations were slow  
+**Root Cause**: Initially suspected API rate limiting, but actual quota is 2000 req/min
 
 ## Problem
 
@@ -112,11 +113,29 @@ The concurrency limit can be adjusted by changing the `CONCURRENCY_LIMIT` consta
 - Main fix: Implementation of concurrency control
 - Pattern applies to any batch operation calling external APIs
 
+## REVERT (November 9, 2025)
+
+**Discovery**: The Gemini API quota is **2000 requests per minute**, not the low quota initially suspected.
+
+**Impact of Concurrency Control**:
+- **Unnecessary delays**: Processing 30 products took 60-75 seconds with batching
+- **Slower than needed**: With 2000 req/min quota, all products can process in parallel
+- **Artificial bottleneck**: Batching of 5 added 1-second delays that weren't needed
+
+**Solution**: Reverted to unlimited parallel processing using `Promise.all()`
+
+**New Expected Performance**:
+- **30 products**: 10-15 seconds (all parallel, no delays)
+- **50 products**: 15-20 seconds (all parallel, no delays)
+- **100 products**: 25-30 seconds (well under 2000 req/min quota)
+
+**Key Learning**: Always verify actual API quota before implementing rate limiting. The 2000 req/min quota means we can process hundreds of products simultaneously without issues.
+
 ## Future Considerations
 
-If performance needs to be faster:
-1. Consider upgrading to Gemini API with higher rate limits
-2. Cache extraction results to avoid re-processing
-3. Implement adaptive concurrency based on API response times
-4. Use exponential backoff on rate limit errors
+With 2000 req/min quota:
+1. No rate limiting needed for typical workloads (50-100 products per image)
+2. Could process 10+ images simultaneously if needed
+3. Only implement concurrency control if processing 500+ products at once
+4. Cache extraction results to avoid re-processing
 
