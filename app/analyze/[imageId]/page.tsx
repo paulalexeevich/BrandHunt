@@ -17,6 +17,11 @@ interface Detection {
   detection_index: number;
   bounding_box: BoundingBox;
   label: string | null;
+  // Classification fields
+  is_product: boolean | null;
+  details_visible: boolean | null;
+  extraction_notes: string | null;
+  // Product fields
   brand_name: string | null;
   category: string | null;
   sku: string | null;
@@ -24,9 +29,19 @@ interface Detection {
   flavor: string | null;
   size: string | null;
   description: string | null;
+  // Confidence scores
+  brand_confidence: number | null;
+  product_name_confidence: number | null;
+  category_confidence: number | null;
+  flavor_confidence: number | null;
+  size_confidence: number | null;
+  description_confidence: number | null;
+  sku_confidence: number | null;
+  // Price fields
   price: string | null;
   price_currency: string | null;
   price_confidence: number | null;
+  // FoodGraph match fields
   selected_foodgraph_gtin: string | null;
   selected_foodgraph_product_name: string | null;
   selected_foodgraph_brand_name: string | null;
@@ -1229,6 +1244,34 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         <h4 className="font-semibold text-green-900">Extracted Information</h4>
                       </div>
                       
+                      {/* Classification Badges */}
+                      {(detection.is_product !== null || detection.details_visible !== null) && (
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          {detection.is_product === false && (
+                            <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium">
+                              ❌ Not a Product
+                            </span>
+                          )}
+                          {detection.is_product === true && detection.details_visible === false && (
+                            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs font-medium">
+                              ⚠️ Details Not Visible
+                            </span>
+                          )}
+                          {detection.is_product === true && detection.details_visible === true && (
+                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
+                              ✅ Valid Product
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Extraction Notes */}
+                      {detection.extraction_notes && (
+                        <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                          💡 {detection.extraction_notes}
+                        </div>
+                      )}
+                      
                       {/* FoodGraph Match - Show if saved */}
                       {detection.fully_analyzed && detection.selected_foodgraph_image_url && (
                         <div className="mb-4 p-3 bg-blue-50 border-2 border-blue-300 rounded-lg">
@@ -1257,21 +1300,109 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       {/* Extracted Data from Image */}
                       <div className="space-y-2 text-sm">
                         {detection.product_name && (
-                          <div><span className="font-semibold text-gray-700">Product:</span> <span className="text-indigo-600 font-semibold">{detection.product_name}</span></div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="font-semibold text-gray-700">Product:</span> <span className="text-indigo-600 font-semibold">{detection.product_name}</span>
+                            </div>
+                            {detection.product_name_confidence !== null && detection.product_name_confidence > 0 && (
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                                detection.product_name_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
+                                detection.product_name_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
+                                detection.product_name_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
+                                detection.product_name_confidence >= 0.3 ? 'bg-orange-100 text-orange-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {Math.round(detection.product_name_confidence * 100)}%
+                              </span>
+                            )}
+                          </div>
                         )}
-                        <div><span className="font-semibold text-gray-700">Brand:</span> {detection.brand_name}</div>
-                        {detection.category && <div><span className="font-semibold text-gray-700">Category:</span> {detection.category}</div>}
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="font-semibold text-gray-700">Brand:</span> {detection.brand_name}
+                          </div>
+                          {detection.brand_confidence !== null && detection.brand_confidence > 0 && (
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                              detection.brand_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
+                              detection.brand_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
+                              detection.brand_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
+                              detection.brand_confidence >= 0.3 ? 'bg-orange-100 text-orange-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {Math.round(detection.brand_confidence * 100)}%
+                            </span>
+                          )}
+                        </div>
+                        {detection.category && (
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="font-semibold text-gray-700">Category:</span> {detection.category}
+                            </div>
+                            {detection.category_confidence !== null && detection.category_confidence > 0 && (
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                                detection.category_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
+                                detection.category_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
+                                detection.category_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
+                                detection.category_confidence >= 0.3 ? 'bg-orange-100 text-orange-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {Math.round(detection.category_confidence * 100)}%
+                              </span>
+                            )}
+                          </div>
+                        )}
                         {detection.flavor && detection.flavor !== 'Unknown' && (
-                          <div><span className="font-semibold text-gray-700">Flavor:</span> <span className="text-purple-600">{detection.flavor}</span></div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="font-semibold text-gray-700">Flavor:</span> <span className="text-purple-600">{detection.flavor}</span>
+                            </div>
+                            {detection.flavor_confidence !== null && detection.flavor_confidence > 0 && (
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                                detection.flavor_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
+                                detection.flavor_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
+                                detection.flavor_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
+                                detection.flavor_confidence >= 0.3 ? 'bg-orange-100 text-orange-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {Math.round(detection.flavor_confidence * 100)}%
+                              </span>
+                            )}
+                          </div>
                         )}
                         {detection.size && detection.size !== 'Unknown' && (
-                          <div><span className="font-semibold text-gray-700">Size:</span> <span className="text-blue-600">{detection.size}</span></div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="font-semibold text-gray-700">Size:</span> <span className="text-blue-600">{detection.size}</span>
+                            </div>
+                            {detection.size_confidence !== null && detection.size_confidence > 0 && (
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                                detection.size_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
+                                detection.size_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
+                                detection.size_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
+                                detection.size_confidence >= 0.3 ? 'bg-orange-100 text-orange-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {Math.round(detection.size_confidence * 100)}%
+                              </span>
+                            )}
+                          </div>
                         )}
                         {detection.price && detection.price !== 'Unknown' && (
-                          <div><span className="font-semibold text-gray-700">Price:</span> <span className="text-green-700 font-bold">{detection.price_currency === 'USD' ? '$' : detection.price_currency}{detection.price}</span>
-                          {detection.price_confidence && detection.price_confidence > 0 && (
-                            <span className="text-xs text-gray-500 ml-1">({Math.round(detection.price_confidence * 100)}%)</span>
-                          )}
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="font-semibold text-gray-700">Price:</span> <span className="text-green-700 font-bold">{detection.price_currency === 'USD' ? '$' : detection.price_currency}{detection.price}</span>
+                            </div>
+                            {detection.price_confidence && detection.price_confidence > 0 && (
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                                detection.price_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
+                                detection.price_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
+                                detection.price_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
+                                detection.price_confidence >= 0.3 ? 'bg-orange-100 text-orange-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {Math.round(detection.price_confidence * 100)}%
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
