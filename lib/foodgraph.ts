@@ -144,7 +144,7 @@ async function authenticate(): Promise<string> {
 
 /**
  * Search FoodGraph catalog for products using query endpoint
- * Returns first 50 results with fuzzy matching enabled
+ * Returns first 100 results with fuzzy matching enabled
  * 
  * @param searchTerm - Can be a simple brand name or a more detailed product description
  * @param options - Optional additional search parameters
@@ -232,9 +232,9 @@ export async function searchProducts(
     total: data.pagination?.total
   });
   
-  // Return first 50 products along with the actual search term used
+  // Return first 100 products along with the actual search term used
   return {
-    products: (data.results || []).slice(0, 50),
+    products: (data.results || []).slice(0, 100),
     searchTerm: enhancedSearchTerm
   };
 }
