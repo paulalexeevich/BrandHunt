@@ -517,13 +517,18 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       
       const croppedImageBase64 = canvas.toDataURL('image/jpeg').split(',')[1];
 
+      // Extract IDs of pre-filtered results to ensure AI only processes these
+      const preFilteredResultIds = foodgraphResults.map(r => r.id);
+      console.log(`🎯 Sending ${preFilteredResultIds.length} pre-filtered result IDs to AI filter`);
+
       // Call the filter API
       const response = await fetch('/api/filter-foodgraph', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           detectionId: selectedDetection,
-          croppedImageBase64
+          croppedImageBase64,
+          preFilteredResultIds // Pass the pre-filtered result IDs
         }),
       });
 

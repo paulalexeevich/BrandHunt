@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
     const searchTerm = searchResult.searchTerm;
     console.log(`Found ${products.length} products for "${searchTerm}"`);
 
-    // Save top 5 results
+    // Save ALL results to database (typically ~100 results from FoodGraph API)
+    // Pre-filtering and AI filtering will narrow these down later
     const foodgraphResults = [];
     for (let rank = 0; rank < products.length; rank++) {
       const product = products[rank];

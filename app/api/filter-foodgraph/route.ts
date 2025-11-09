@@ -4,7 +4,7 @@ import { compareProductImages } from '@/lib/gemini';
 
 export async function POST(request: NextRequest) {
   try {
-    const { detectionId, croppedImageBase64 } = await request.json();
+    const { detectionId, croppedImageBase64, preFilteredResultIds } = await request.json();
 
     if (!detectionId || !croppedImageBase64) {
       return NextResponse.json({ 
@@ -15,13 +15,31 @@ export async function POST(request: NextRequest) {
     // Create authenticated Supabase client
     const supabase = await createAuthenticatedSupabaseClient();
 
-    // Fetch only top 50 FoodGraph results for this detection (matching what's displayed)
-    const { data: foodgraphResults, error: fetchError } = await supabase
-      .from('branghunt_foodgraph_results')
-      .select('*')
-      .eq('detection_id', detectionId)
-      .order('result_rank')
-      .limit(50);
+    // Fetch ONLY the pre-filtered results (if provided), otherwise fallback to top 50
+    let foodgraphResults;
+    let fetchError;
+    
+    if (preFilteredResultIds && preFilteredResultIds.length > 0) {
+      // Fetch only the specific pre-filtered results
+      console.log(`🔍 Fetching ${preFilteredResultIds.length} pre-filtered results for AI comparison...`);
+      const { data, error } = await supabase
+        .from('branghunt_foodgraph_results')
+        .select('*')
+        .in('id', preFilteredResultIds);
+      foodgraphResults = data;
+      fetchError = error;
+    } else {
+      // Fallback: Fetch top 50 if no pre-filter was applied
+      console.log(`⚠️ No pre-filtered results provided, fetching top 50...`);
+      const { data, error } = await supabase
+        .from('branghunt_foodgraph_results')
+        .select('*')
+        .eq('detection_id', detectionId)
+        .order('result_rank')
+        .limit(50);
+      foodgraphResults = data;
+      fetchError = error;
+    }
 
     if (fetchError) {
       console.error('Error fetching FoodGraph results:', fetchError);
