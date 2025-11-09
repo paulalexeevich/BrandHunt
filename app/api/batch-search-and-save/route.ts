@@ -171,7 +171,8 @@ export async function POST(request: NextRequest) {
               product_name: product.title,
               brand_name: product.companyBrand || null,
               product_gtin: product.keys?.GTIN14 || product.key || null,
-              category: Array.isArray(product.category) ? product.category.join(', ') : product.category,
+              // Keep category as array for type compatibility with FoodGraphProduct
+              category: product.category,
               front_image_url: getFrontImageUrl(product)
             }));
 
