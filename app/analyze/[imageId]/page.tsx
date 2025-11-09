@@ -1537,9 +1537,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           <div className="flex items-start gap-2">
                             <span className="text-blue-600 text-lg">ℹ️</span>
                             <div className="flex-1">
-                              <p className="text-sm font-semibold text-blue-800">Sorted by Visual Match % (highest first)</p>
+                              <p className="text-sm font-semibold text-blue-800">Matches shown first, then non-matches</p>
                               <p className="text-xs text-blue-700 mt-1">
-                                Results with green checkmark (✓) passed the 70% confidence threshold. Large percentage shows visual similarity.
+                                Green ✓ PASS = Visual match (≥70% confidence). Gray ✗ FAIL = No match (different variant/type).
                               </p>
                             </div>
                           </div>
@@ -1645,16 +1645,25 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 {/* Visual Match Percentage - Prominent Display */}
                                 {filteredCount !== null && result.match_confidence !== undefined && (
                                   <div className="mb-2 flex items-center justify-between">
-                                    <span className={`text-lg font-bold ${
-                                      passedThreshold ? 'text-green-600' : 'text-gray-600'
-                                    }`}>
-                                      {Math.round(result.match_confidence * 100)}%
-                                    </span>
-                                    <span className={`text-[10px] font-semibold ${
-                                      passedThreshold ? 'text-green-600' : 'text-gray-500'
-                                    }`}>
-                                      Visual Match
-                                    </span>
+                                    {passedThreshold ? (
+                                      <>
+                                        <span className="text-lg font-bold text-green-600">
+                                          {Math.round(result.match_confidence * 100)}%
+                                        </span>
+                                        <span className="text-[10px] font-semibold text-green-600">
+                                          MATCH
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-lg font-bold text-red-600">
+                                          NO MATCH
+                                        </span>
+                                        <span className="text-[10px] font-semibold text-gray-500">
+                                          {Math.round(result.match_confidence * 100)}% confident
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
                                 )}
                                 
@@ -1723,25 +1732,22 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               </div>
                             )}
                             
-                            {/* AI Match Confidence */}
+                            {/* AI Assessment Details */}
                             {result.match_confidence !== undefined && result.match_confidence !== null && filteredCount !== null && (
                               <div className={`mt-2 p-2 rounded border ${
-                                passedThreshold ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-300'
+                                passedThreshold ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
                               }`}>
                                 <div className="flex items-center justify-between mb-1">
                                   <p className={`text-xs font-semibold ${
-                                    passedThreshold ? 'text-green-900' : 'text-gray-900'
+                                    passedThreshold ? 'text-green-900' : 'text-red-900'
                                   }`}>
-                                    🤖 Visual {passedThreshold ? 'Match' : 'Comparison'}
+                                    🤖 AI Assessment
                                   </p>
-                                  <div className="flex items-center gap-1">
-                                    <p className={`text-sm font-bold ${
-                                      passedThreshold ? 'text-green-700' : 'text-gray-700'
-                                    }`}>
-                                      {Math.round(result.match_confidence * 100)}%
-                                    </p>
-                                    {passedThreshold && <span className="text-green-600 text-xs">✓</span>}
-                                  </div>
+                                  <p className={`text-[10px] font-semibold ${
+                                    passedThreshold ? 'text-green-700' : 'text-red-700'
+                                  }`}>
+                                    {passedThreshold ? `${Math.round(result.match_confidence * 100)}% Match` : 'No Match'}
+                                  </p>
                                 </div>
                                 {(result as any).match_reason && (
                                   <p className="text-[10px] text-gray-600 italic leading-tight">
