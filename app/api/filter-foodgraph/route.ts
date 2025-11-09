@@ -120,20 +120,25 @@ export async function POST(request: NextRequest) {
     // Count how many passed the threshold
     const matchingResults = updatedResults.filter(r => r.is_match);
     
-    // Return ALL results with their confidence scores, sorted by confidence
-    const sortedByConfidence = [...updatedResults].sort((a, b) => b.match_confidence - a.match_confidence);
+    // Sort by visual similarity (highest first) so users see closest matches first
+    // This shows visually similar products even if they're different variants
+    const sortedBySimilarity = [...updatedResults].sort((a, b) => {
+      const simA = a.visual_similarity ?? 0;
+      const simB = b.visual_similarity ?? 0;
+      return simB - simA; // Descending order (highest similarity first)
+    });
     
     console.log(`✅ Image filtering complete: ${matchingResults.length}/${foodgraphResults.length} products passed 70% threshold`);
-    console.log(`   Showing all ${sortedByConfidence.length} results with confidence scores`);
+    console.log(`   Showing all ${sortedBySimilarity.length} results sorted by visual similarity`);
     
     // Log top 3 for debugging
-    sortedByConfidence.slice(0, 3).forEach((r, i) => {
+    sortedBySimilarity.slice(0, 3).forEach((r, i) => {
       const visualSim = r.visual_similarity !== undefined ? `, visual: ${Math.round(r.visual_similarity * 100)}%` : '';
       console.log(`   ${i + 1}. ${r.product_name} - ${r.is_match ? '✓ PASS' : '✗ FAIL'} (confidence: ${Math.round(r.match_confidence * 100)}%${visualSim})`);
     });
 
     return NextResponse.json({
-      filteredResults: sortedByConfidence, // Return ALL results sorted by confidence
+      filteredResults: sortedBySimilarity, // Return ALL results sorted by visual similarity
       totalFiltered: matchingResults.length, // How many passed 70% threshold
       totalOriginal: foodgraphResults.length,
       showingAllWithConfidence: true // New flag indicating we're showing all results with scores

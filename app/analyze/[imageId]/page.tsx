@@ -1537,9 +1537,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           <div className="flex items-start gap-2">
                             <span className="text-blue-600 text-lg">ℹ️</span>
                             <div className="flex-1">
-                              <p className="text-sm font-semibold text-blue-800">Matches shown first, then non-matches</p>
+                              <p className="text-sm font-semibold text-blue-800">Sorted by visual similarity (highest first)</p>
                               <p className="text-xs text-blue-700 mt-1">
-                                Green ✓ PASS = Visual match (≥70% confidence). Gray ✗ FAIL = No match (different variant/type).
+                                Green ✓ PASS = Visual match (≥70% confidence). Gray ✗ FAIL = No match (different variant/type). 
+                                Check Visual Similarity % to see how close each option is.
                               </p>
                             </div>
                           </div>
