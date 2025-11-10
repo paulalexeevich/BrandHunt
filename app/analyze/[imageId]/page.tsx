@@ -158,12 +158,29 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
   }, [image]);
 
+  // Track foodgraphResults state changes
+  useEffect(() => {
+    console.log(`📊 foodgraphResults state changed: ${foodgraphResults.length} results`, {
+      filteredCount,
+      preFilteredCount,
+      selectedDetection
+    });
+  }, [foodgraphResults, filteredCount, preFilteredCount, selectedDetection]);
+
   // Load FoodGraph results when a detection is selected
   useEffect(() => {
     if (selectedDetection && detections.length > 0) {
       const detection = detections.find(d => d.id === selectedDetection);
-      if (detection && detection.foodgraph_results) {
+      console.log(`🔄 useEffect - Selected detection changed:`, {
+        selectedDetection,
+        has_detection: !!detection,
+        has_results: !!detection?.foodgraph_results,
+        results_length: detection?.foodgraph_results?.length || 0
+      });
+      
+      if (detection && detection.foodgraph_results && detection.foodgraph_results.length > 0) {
         // Load existing FoodGraph results
+        console.log(`📦 useEffect - Loading ${detection.foodgraph_results.length} FoodGraph results`);
         setFoodgraphResults(detection.foodgraph_results);
         
         // Check if results have been filtered (is_match exists on any result)
@@ -178,10 +195,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           ).length;
           setFilteredCount(matchedCount);
         } else {
-          setFilteredCount(null);
+          setFilteredCount(detection.foodgraph_results.length);
         }
+        setPreFilteredCount(detection.foodgraph_results.length);
       } else {
         // No existing results, reset state
+        console.log(`🔄 useEffect - No FoodGraph results, clearing state`);
         setFoodgraphResults([]);
         setFilteredCount(null);
         setPreFilteredCount(null); // Also reset pre-filter count
@@ -198,6 +217,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       if (data.detections && data.detections.length > 0) {
         setDetections(data.detections);
         setProductsDetected(true);
+        
+        // Log detections with foodgraph results
+        const detectionsWithResults = data.detections.filter((d: Detection) => d.foodgraph_results && d.foodgraph_results.length > 0);
+        console.log(`📊 Loaded ${data.detections.length} detections, ${detectionsWithResults.length} have FoodGraph results`);
+        detectionsWithResults.forEach((d: Detection) => {
+          console.log(`   - Detection #${d.detection_index}: ${d.foodgraph_results?.length} results, fully_analyzed=${d.fully_analyzed}`);
+        });
       }
     } catch (error) {
       console.error('Failed to fetch image:', error);
@@ -245,6 +271,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     
     // Load existing foodgraph_results from the detection if available
     const detection = detections.find(d => d.id === detectionId);
+    console.log(`🔍 Clicked on detection:`, {
+      id: detection?.id,
+      detection_index: detection?.detection_index,
+      fully_analyzed: detection?.fully_analyzed,
+      has_foodgraph_results: !!detection?.foodgraph_results,
+      foodgraph_results_length: detection?.foodgraph_results?.length || 0,
+      foodgraph_results_sample: detection?.foodgraph_results?.[0]
+    });
+    
     if (detection && detection.foodgraph_results && detection.foodgraph_results.length > 0) {
       // Detection has saved FoodGraph results (e.g., from batch processing)
       console.log(`📦 Loading ${detection.foodgraph_results.length} saved FoodGraph results for product #${detection.detection_index}`);
@@ -252,8 +287,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       // Set filtered count to indicate AI filtering was done during batch processing
       setFilteredCount(detection.foodgraph_results.length);
       setPreFilteredCount(detection.foodgraph_results.length);
+      console.log(`✅ State updated - foodgraphResults should now have ${detection.foodgraph_results.length} items`);
     } else {
       // No saved results, clear state for manual workflow
+      console.log(`⚠️ No saved FoodGraph results found - clearing state`);
       setFoodgraphResults([]);
       setFoodgraphSearchTerm(null);
       setFilteredCount(null);
