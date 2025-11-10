@@ -173,43 +173,76 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
 
   // Load FoodGraph results when a detection is selected
   useEffect(() => {
-    if (selectedDetection && detections.length > 0) {
-      const detection = detections.find(d => d.id === selectedDetection);
-      console.log(`🔄 useEffect - Selected detection changed:`, {
-        selectedDetection,
-        has_detection: !!detection,
-        has_results: !!detection?.foodgraph_results,
-        results_length: detection?.foodgraph_results?.length || 0
-      });
-      
-      if (detection && detection.foodgraph_results && detection.foodgraph_results.length > 0) {
-        // Load existing FoodGraph results
-        console.log(`📦 useEffect - Loading ${detection.foodgraph_results.length} FoodGraph results`);
-        setFoodgraphResults(detection.foodgraph_results);
+    const loadFoodGraphResults = async () => {
+      if (selectedDetection && detections.length > 0) {
+        const detection = detections.find(d => d.id === selectedDetection);
+        console.log(`🔄 useEffect - Selected detection changed:`, {
+          selectedDetection,
+          has_detection: !!detection,
+          has_results: !!detection?.foodgraph_results,
+          results_length: detection?.foodgraph_results?.length || 0
+        });
         
-        // Check if results have been filtered (is_match exists on any result)
-        const hasFilteredResults = detection.foodgraph_results.some((r: any) => 
-          r.hasOwnProperty('is_match')
-        );
-        
-        if (hasFilteredResults) {
-          // Count how many matched
-          const matchedCount = detection.foodgraph_results.filter((r: any) => 
-            r.is_match === true
-          ).length;
-          setFilteredCount(matchedCount);
+        if (detection && detection.foodgraph_results && detection.foodgraph_results.length > 0) {
+          // Load existing FoodGraph results
+          console.log(`📦 useEffect - Loading ${detection.foodgraph_results.length} FoodGraph results from cache`);
+          setFoodgraphResults(detection.foodgraph_results);
+          
+          // Check if results have been filtered (is_match exists on any result)
+          const hasFilteredResults = detection.foodgraph_results.some((r: any) => 
+            r.hasOwnProperty('is_match')
+          );
+          
+          if (hasFilteredResults) {
+            // Count how many matched
+            const matchedCount = detection.foodgraph_results.filter((r: any) => 
+              r.is_match === true
+            ).length;
+            setFilteredCount(matchedCount);
+          } else {
+            setFilteredCount(detection.foodgraph_results.length);
+          }
+          setPreFilteredCount(detection.foodgraph_results.length);
+        } else if (detection && detection.fully_analyzed) {
+          // Detection is fully analyzed but results weren't loaded - fetch them on demand
+          console.log(`📥 Fetching FoodGraph results on-demand for detection ${detection.id}`);
+          try {
+            const response = await fetch(`/api/foodgraph-results/${detection.id}`);
+            if (response.ok) {
+              const data = await response.json();
+              console.log(`📦 Loaded ${data.results?.length || 0} FoodGraph results on-demand`);
+              
+              // Update the detection in state with the loaded results
+              setDetections(prev => prev.map(d => 
+                d.id === detection.id ? { ...d, foodgraph_results: data.results } : d
+              ));
+              
+              if (data.results && data.results.length > 0) {
+                setFoodgraphResults(data.results);
+                const hasFilteredResults = data.results.some((r: any) => r.hasOwnProperty('is_match'));
+                if (hasFilteredResults) {
+                  const matchedCount = data.results.filter((r: any) => r.is_match === true).length;
+                  setFilteredCount(matchedCount);
+                } else {
+                  setFilteredCount(data.results.length);
+                }
+                setPreFilteredCount(data.results.length);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to fetch FoodGraph results:', error);
+          }
         } else {
-          setFilteredCount(detection.foodgraph_results.length);
+          // No existing results, reset state
+          console.log(`🔄 useEffect - No FoodGraph results, clearing state`);
+          setFoodgraphResults([]);
+          setFilteredCount(null);
+          setPreFilteredCount(null); // Also reset pre-filter count
         }
-        setPreFilteredCount(detection.foodgraph_results.length);
-      } else {
-        // No existing results, reset state
-        console.log(`🔄 useEffect - No FoodGraph results, clearing state`);
-        setFoodgraphResults([]);
-        setFilteredCount(null);
-        setPreFilteredCount(null); // Also reset pre-filter count
       }
-    }
+    };
+    
+    loadFoodGraphResults();
   }, [selectedDetection, detections]);
 
   const fetchImage = async () => {
