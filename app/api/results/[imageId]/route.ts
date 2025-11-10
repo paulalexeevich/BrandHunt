@@ -41,47 +41,57 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch detections' }, { status: 500 });
     }
 
-    // Fetch FoodGraph results for all detections in ONE query (optimized)
-    const resultsStart = Date.now();
-    const detectionIds = (detections || []).map(d => d.id);
-    
-    const { data: allFoodgraphResults, error: resultsError } = await supabase
-      .from('branghunt_foodgraph_results')
-      .select('*')
-      .in('detection_id', detectionIds)
-      .order('result_rank', { ascending: true });
-    
-    console.log(`⏱️ FoodGraph results fetched: ${Date.now() - resultsStart}ms (${allFoodgraphResults?.length || 0} results)`);
+    // Check if we should include FoodGraph results (opt-in for performance)
+    const url = new URL(request.url);
+    const includeFoodGraphResults = url.searchParams.get('includeFoodGraphResults') === 'true';
 
-    if (resultsError) {
-      console.error('Failed to fetch FoodGraph results:', resultsError);
-    }
+    let detectionsWithResults = detections || [];
 
-    // Group results by detection_id
-    const resultsByDetection = (allFoodgraphResults || []).reduce((acc, result) => {
-      if (!acc[result.detection_id]) {
-        acc[result.detection_id] = [];
-      }
-      acc[result.detection_id].push(result);
-      return acc;
-    }, {} as Record<string, typeof allFoodgraphResults>);
-
-    // Attach results to detections
-    const detectionsWithResults = (detections || []).map((detection) => {
-      const foodgraphResults = resultsByDetection[detection.id] || [];
+    if (includeFoodGraphResults) {
+      // Fetch FoodGraph results for all detections in ONE query (optimized)
+      const resultsStart = Date.now();
+      const detectionIds = (detections || []).map(d => d.id);
       
-      // Log detections with results for debugging
-      if (foodgraphResults.length > 0) {
-        console.log(`📦 Detection #${detection.detection_index}: ${foodgraphResults.length} FoodGraph results, fully_analyzed=${detection.fully_analyzed}`);
+      const { data: allFoodgraphResults, error: resultsError } = await supabase
+        .from('branghunt_foodgraph_results')
+        .select('*')
+        .in('detection_id', detectionIds)
+        .order('result_rank', { ascending: true });
+      
+      console.log(`⏱️ FoodGraph results fetched: ${Date.now() - resultsStart}ms (${allFoodgraphResults?.length || 0} results)`);
+
+      if (resultsError) {
+        console.error('Failed to fetch FoodGraph results:', resultsError);
       }
 
-      return { ...detection, foodgraph_results: foodgraphResults };
-    });
+      // Group results by detection_id
+      const resultsByDetection = (allFoodgraphResults || []).reduce((acc, result) => {
+        if (!acc[result.detection_id]) {
+          acc[result.detection_id] = [];
+        }
+        acc[result.detection_id].push(result);
+        return acc;
+      }, {} as Record<string, typeof allFoodgraphResults>);
+
+      // Attach results to detections
+      detectionsWithResults = (detections || []).map((detection) => {
+        const foodgraphResults = resultsByDetection[detection.id] || [];
+        
+        // Log detections with results for debugging
+        if (foodgraphResults.length > 0) {
+          console.log(`📦 Detection #${detection.detection_index}: ${foodgraphResults.length} FoodGraph results, fully_analyzed=${detection.fully_analyzed}`);
+        }
+
+        return { ...detection, foodgraph_results: foodgraphResults };
+      });
+      
+      const withResults = detectionsWithResults.filter(d => d.foodgraph_results && d.foodgraph_results.length > 0);
+      console.log(`📊 API Response: ${detectionsWithResults.length} total detections, ${withResults.length} have FoodGraph results`);
+    } else {
+      console.log(`📊 API Response: ${detectionsWithResults.length} total detections (FoodGraph results NOT included for performance)`);
+    }
     
-    // Log summary
-    const withResults = detectionsWithResults.filter(d => d.foodgraph_results && d.foodgraph_results.length > 0);
     const totalTime = Date.now() - startTime;
-    console.log(`📊 API Response: ${detectionsWithResults.length} total detections, ${withResults.length} have FoodGraph results`);
     console.log(`⏱️ 🎯 TOTAL API TIME: ${totalTime}ms`);
 
     return NextResponse.json({ 
