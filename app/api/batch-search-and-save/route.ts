@@ -460,6 +460,7 @@ export async function POST(request: NextRequest) {
                 match_status: comparison.matchStatus || 'not_match',
                 match_confidence: comparison.details?.confidence || 0,
                 visual_similarity: comparison.details?.visualSimilarity || 0,
+                match_reason: comparison.details?.reason || null,
               };
             });
 
