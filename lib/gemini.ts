@@ -616,33 +616,33 @@ matchStatus - THREE possible values:
    - Same packaging design
    - All details match perfectly
    
-2. "almost_same" - Products are VERY SIMILAR but not identical:
-   - Same brand, same product name
-   - Visual design/packaging is almost identical
-   - BUT different size (e.g., 8oz vs 12oz)
-   - OR different flavor (e.g., Original vs Mint)
-   - OR minor packaging variation (old vs new design)
-   - These are close variants of the same product line
+2. "almost_same" - Same EXACT product with minor packaging variations:
+   - MUST match: brand, product name, flavor/variant, package type
+   - Very close or same size (within similar range, even if unclear/blurry)
+   - Almost identical visual design
+   - Same meaning in claims/benefits (wording may differ)
+   - Only differences: packaging refresh, claim text updates, regional variations
+   - Example: Same product with "Doctor Recommended" vs "Spray Protection" claim
    
-3. "not_match" - Products are different:
-   - Different brands
-   - OR different product types
-   - OR completely different product lines
-   - Not close enough to be the same product
+3. "not_match" - Different products:
+   - Different flavor/variant (e.g., "Complete Clean" vs "Light & Fresh") = NOT_MATCH
+   - Significantly different size (e.g., 3.8oz vs 10oz) = NOT_MATCH
+   - Different product types/lines = NOT_MATCH
+   - Different brands = NOT_MATCH
 
 confidence: How certain you are about the matchStatus decision (0.0 = uncertain, 1.0 = very certain)
 
 visualSimilarity: How similar the images LOOK overall (0.0 = completely different, 1.0 = nearly identical)
   * Identical products = 0.9-1.0
-  * Almost same (close variants) = 0.7-0.9
-  * Same brand, different product line = 0.3-0.6
+  * Almost same (packaging updates) = 0.7-0.9
+  * Same brand, different variant = 0.3-0.6
   * Different brands = 0.0-0.3
 
 Examples:
-- Exact same product: {matchStatus: "identical", confidence: 0.95, visualSimilarity: 0.95, reason: "Same brand, product, size, and flavor"}
-- Same product, different size: {matchStatus: "almost_same", confidence: 0.9, visualSimilarity: 0.85, reason: "Same Tide detergent, but 50oz vs 100oz"}
-- Same brand, different scent: {matchStatus: "almost_same", confidence: 0.9, visualSimilarity: 0.8, reason: "Same Dove deodorant line, but Fresh vs Powder scent"}
-- Different product type: {matchStatus: "not_match", confidence: 1.0, visualSimilarity: 0.4, reason: "Both Dove brand, but deodorant vs body wash"}
+- Exact same: {matchStatus: "identical", confidence: 0.95, visualSimilarity: 0.95, reason: "Same brand, product, size, and flavor"}
+- Packaging refresh: {matchStatus: "almost_same", confidence: 0.9, visualSimilarity: 0.85, reason: "Same Secret Complete Clean 3.8oz, minor claim text difference"}
+- Different variant: {matchStatus: "not_match", confidence: 0.95, visualSimilarity: 0.7, reason: "Same brand/size but different scent: Fresh vs Powder"}
+- Different size: {matchStatus: "not_match", confidence: 0.95, visualSimilarity: 0.75, reason: "Same Tide detergent flavor, but 50oz vs 100oz"}
 - Different brands: {matchStatus: "not_match", confidence: 1.0, visualSimilarity: 0.2, reason: "Different brands entirely"}
 `;
 
