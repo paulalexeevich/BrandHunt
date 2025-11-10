@@ -2108,6 +2108,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             const fgBrand = (result as any).companyBrand || (result as any).brand_name || (result as any).full_data?.companyBrand || 'N/A';
                             const fgSize = (result as any).measures || (result as any).full_data?.measures || 'N/A';
                             const fgTitle = result.product_name || result.title || (result as any).full_data?.title || 'N/A';
+                            const fgGtin = result.key || (result as any).full_data?.keys?.GTIN14 || (result as any).gtin || null;
+                            const matchReason = (result as any).match_reason || null;
                             
                             // Extract retailers for comparison
                             const imageRetailer = image?.store_name ? extractRetailerFromStoreName(image.store_name) : null;
@@ -2210,34 +2212,28 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                   <p className="text-xs text-gray-600 truncate">
                                     {result.brand_name || 'Unknown Brand'}
                                   </p>
-                                  {/* Match status inline - only after AI filtering */}
-                                  {filteredCount !== null && (
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[10px] text-indigo-600 font-semibold">
-                                        #{index + 1}
+                                  {/* Index number */}
+                                  <p className="text-[10px] text-indigo-600 font-semibold">
+                                    #{index + 1}
+                                  </p>
+                                  
+                                  {/* GTIN/UPC Code */}
+                                  {fgGtin && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <span className="text-[10px] text-gray-500">UPC:</span>
+                                      <span className="text-[10px] font-mono text-blue-600 font-semibold">
+                                        {fgGtin}
                                       </span>
-                                      {matchStatus === 'identical' && (
-                                        <span className="text-[10px] font-semibold text-green-600">
-                                          ✓ IDENTICAL
-                                        </span>
-                                      )}
-                                      {matchStatus === 'almost_same' && (
-                                        <span className="text-[10px] font-semibold text-yellow-600">
-                                          ≈ ALMOST SAME
-                                        </span>
-                                      )}
-                                      {!passedThreshold && matchStatus !== 'identical' && matchStatus !== 'almost_same' && (
-                                        <span className="text-[10px] font-semibold text-gray-500">
-                                          NO MATCH
-                                        </span>
-                                      )}
                                     </div>
                                   )}
-                                  {/* Show index when not AI filtered */}
-                                  {filteredCount === null && (
-                                    <p className="text-[10px] text-indigo-600 font-semibold">
-                                      #{index + 1}
-                                    </p>
+                                  
+                                  {/* AI Reasoning - only after AI filtering */}
+                                  {matchReason && filteredCount !== null && (
+                                    <div className="mt-1 p-1.5 bg-purple-50 border border-purple-200 rounded">
+                                      <p className="text-[10px] text-purple-900 leading-tight italic">
+                                        🤖 {matchReason}
+                                      </p>
+                                    </div>
                                   )}
                                 </div>
                             
