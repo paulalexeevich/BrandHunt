@@ -1804,8 +1804,26 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </div>
 
                   {/* FoodGraph Results */}
-                  {foodgraphResults.length > 0 && !detection.fully_analyzed && (
+                  {foodgraphResults.length > 0 && (
                     <div>
+                      {/* Show banner for saved products indicating which was selected */}
+                      {detection.fully_analyzed && detection.selected_foodgraph_result_id && (
+                        <div className="mb-4 p-3 bg-green-50 border-l-4 border-green-500 rounded">
+                          <div className="flex items-start gap-2">
+                            <span className="text-green-600 text-lg">✓</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-green-800">
+                                Batch Processing Complete - Match Saved
+                              </p>
+                              <p className="text-xs text-green-700 mt-1">
+                                The result marked with "🎯 SELECTED" below was automatically chosen and saved during batch processing. 
+                                You can review all available options and their scores to verify the selection quality.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-gray-900">
                           FoodGraph Matches ({foodgraphResults.length})
@@ -1949,6 +1967,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 'border-gray-200'
                               } overflow-hidden hover:border-indigo-400 transition-colors relative`}
                             >
+                          {/* SELECTED badge (for batch-processed saved products) */}
+                          {detection.fully_analyzed && result.id === detection.selected_foodgraph_result_id && (
+                            <div className="absolute top-2 left-2 z-10">
+                              <span className="px-2 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold rounded-full flex items-center gap-1 shadow-lg">
+                                🎯 SELECTED
+                              </span>
+                            </div>
+                          )}
+
                           {/* Match Status badge (only show after AI filtering) */}
                           {filteredCount !== null && (
                             <div className="absolute top-2 right-2 z-10">
