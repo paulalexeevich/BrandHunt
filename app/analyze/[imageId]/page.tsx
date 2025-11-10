@@ -1548,7 +1548,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             <div className="flex-1">
                               <p className="text-sm font-semibold text-blue-800">Sorted by visual similarity (highest first)</p>
                               <p className="text-xs text-blue-700 mt-1">
-                                Green ✓ PASS = Visual match (≥70% confidence). Gray ✗ FAIL = No match (different variant/type). 
+                                Green ✓ IDENTICAL = Exact same product. 
+                                Yellow ≈ ALMOST SAME = Close variant (different size/flavor). 
+                                Gray ✗ FAIL = No match. 
                                 Check Visual Similarity % to see how close each option is.
                               </p>
                             </div>
@@ -1617,6 +1619,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           return resultsToShow.map((result, index) => {
                             const isSaved = detection.selected_foodgraph_result_id === result.id;
                             const passedThreshold = result.is_match === true; // Passed 70% AI confidence
+                            const matchStatus = (result as any).match_status as string | undefined; // Three-tier status: identical, almost_same, not_match
                             
                             // Display FoodGraph product fields
                             // Try to get from direct fields first, then from full_data JSON
@@ -1660,14 +1663,24 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               key={result.id}
                               className={`bg-white rounded-lg border-2 ${
                                 isSaved ? 'border-green-500 ring-2 ring-green-300' : 
+                                matchStatus === 'identical' && filteredCount !== null ? 'border-green-400 bg-green-50' :
+                                matchStatus === 'almost_same' && filteredCount !== null ? 'border-yellow-400 bg-yellow-50' :
                                 passedThreshold && filteredCount !== null ? 'border-green-400 bg-green-50' : 
                                 'border-gray-200'
                               } overflow-hidden hover:border-indigo-400 transition-colors relative`}
                             >
-                          {/* Pass/Fail badge (only show after AI filtering) */}
+                          {/* Match Status badge (only show after AI filtering) */}
                           {filteredCount !== null && (
                             <div className="absolute top-2 right-2 z-10">
-                              {passedThreshold ? (
+                              {matchStatus === 'identical' ? (
+                                <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                  ✓ IDENTICAL
+                                </span>
+                              ) : matchStatus === 'almost_same' ? (
+                                <span className="px-2 py-1 bg-yellow-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                  ≈ ALMOST SAME
+                                </span>
+                              ) : passedThreshold ? (
                                 <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
                                   ✓ PASS
                                 </span>
@@ -1691,10 +1704,28 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             </div>
                           )}
                               <div className="p-2">
-                                {/* Visual Match Percentage - Prominent Display */}
+                                {/* Visual Match Status - Prominent Display */}
                                 {filteredCount !== null && result.match_confidence !== undefined && (
                                   <div className="mb-2 flex items-center justify-between">
-                                    {passedThreshold ? (
+                                    {matchStatus === 'identical' ? (
+                                      <>
+                                        <span className="text-lg font-bold text-green-600">
+                                          {Math.round(result.match_confidence * 100)}%
+                                        </span>
+                                        <span className="text-[10px] font-semibold text-green-600">
+                                          IDENTICAL
+                                        </span>
+                                      </>
+                                    ) : matchStatus === 'almost_same' ? (
+                                      <>
+                                        <span className="text-lg font-bold text-yellow-600">
+                                          {Math.round(result.match_confidence * 100)}%
+                                        </span>
+                                        <span className="text-[10px] font-semibold text-yellow-600">
+                                          ALMOST SAME
+                                        </span>
+                                      </>
+                                    ) : passedThreshold ? (
                                       <>
                                         <span className="text-lg font-bold text-green-600">
                                           {Math.round(result.match_confidence * 100)}%
@@ -1784,18 +1815,26 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 {/* AI Assessment Details */}
                 {result.match_confidence !== undefined && result.match_confidence !== null && filteredCount !== null && (
                   <div className={`mt-2 p-2 rounded border ${
+                    matchStatus === 'identical' ? 'bg-green-50 border-green-300' :
+                    matchStatus === 'almost_same' ? 'bg-yellow-50 border-yellow-300' :
                     passedThreshold ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
                   }`}>
                     <div className="flex items-center justify-between mb-1">
                       <p className={`text-xs font-semibold ${
+                        matchStatus === 'identical' ? 'text-green-900' :
+                        matchStatus === 'almost_same' ? 'text-yellow-900' :
                         passedThreshold ? 'text-green-900' : 'text-red-900'
                       }`}>
                         🤖 AI Assessment
                       </p>
                       <p className={`text-[10px] font-semibold ${
+                        matchStatus === 'identical' ? 'text-green-700' :
+                        matchStatus === 'almost_same' ? 'text-yellow-700' :
                         passedThreshold ? 'text-green-700' : 'text-red-700'
                       }`}>
-                        {passedThreshold ? `${Math.round(result.match_confidence * 100)}% Match` : 'No Match'}
+                        {matchStatus === 'identical' ? 'Identical' :
+                         matchStatus === 'almost_same' ? 'Almost Same' :
+                         passedThreshold ? `${Math.round(result.match_confidence * 100)}% Match` : 'No Match'}
                       </p>
                     </div>
                     {/* Visual Similarity Score */}
