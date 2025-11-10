@@ -212,9 +212,18 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   }, [selectedDetection, detections]);
 
   const fetchImage = async () => {
+    const fetchStart = Date.now();
+    console.log(`🚀 Starting fetch for image ${resolvedParams.imageId}`);
+    
     try {
       const response = await fetch(`/api/results/${resolvedParams.imageId}`);
+      const fetchTime = Date.now() - fetchStart;
+      console.log(`⏱️ API fetch completed in ${fetchTime}ms`);
+      
+      const parseStart = Date.now();
       const data = await response.json();
+      console.log(`⏱️ JSON parse completed in ${Date.now() - parseStart}ms`);
+      
       setImage(data.image);
       
       if (data.detections && data.detections.length > 0) {
@@ -228,8 +237,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           console.log(`   - Detection #${d.detection_index}: ${d.foodgraph_results?.length} results, fully_analyzed=${d.fully_analyzed}`);
         });
       }
+      
+      const totalTime = Date.now() - fetchStart;
+      console.log(`⏱️ 🎯 TOTAL FRONTEND TIME: ${totalTime}ms`);
     } catch (error) {
       console.error('Failed to fetch image:', error);
+      const totalTime = Date.now() - fetchStart;
+      console.error(`⏱️ ❌ Failed after ${totalTime}ms`);
     }
   };
 
