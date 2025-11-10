@@ -242,10 +242,23 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   
   const handleBoundingBoxClick = (detectionId: string) => {
     setSelectedDetection(detectionId);
-    setFoodgraphResults([]); // Clear results when switching products
-    setFoodgraphSearchTerm(null); // Clear search term when switching products
-    setFilteredCount(null);
-    setPreFilteredCount(null); // Clear pre-filter count when switching products
+    
+    // Load existing foodgraph_results from the detection if available
+    const detection = detections.find(d => d.id === detectionId);
+    if (detection && detection.foodgraph_results && detection.foodgraph_results.length > 0) {
+      // Detection has saved FoodGraph results (e.g., from batch processing)
+      console.log(`📦 Loading ${detection.foodgraph_results.length} saved FoodGraph results for product #${detection.detection_index}`);
+      setFoodgraphResults(detection.foodgraph_results);
+      // Set filtered count to indicate AI filtering was done during batch processing
+      setFilteredCount(detection.foodgraph_results.length);
+      setPreFilteredCount(detection.foodgraph_results.length);
+    } else {
+      // No saved results, clear state for manual workflow
+      setFoodgraphResults([]);
+      setFoodgraphSearchTerm(null);
+      setFilteredCount(null);
+      setPreFilteredCount(null);
+    }
   };
 
   const handleExtractBrand = async (detectionId: string) => {
