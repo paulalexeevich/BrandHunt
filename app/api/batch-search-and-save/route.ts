@@ -353,6 +353,47 @@ export async function POST(request: NextRequest) {
 
             const comparisonResults = await Promise.all(comparisonPromises);
             
+            // SAVE INTERMEDIATE RESULTS TO DATABASE
+            // This allows users to review complex cases with multiple matches
+            console.log(`  [#${detection.detection_index}] Saving ${comparisonResults.length} FoodGraph results to database...`);
+            
+            const foodgraphInserts = comparisonResults.map((comparison, index) => {
+              const fgResult = comparison.result;
+              return {
+                detection_id: detection.id,
+                search_term: searchTerm || `${detection.brand_name} ${detection.product_name || ''}`.trim(),
+                result_rank: index + 1,
+                product_gtin: fgResult.product_gtin || fgResult.key || null,
+                product_name: fgResult.product_name || fgResult.title || null,
+                brand_name: fgResult.brand_name || fgResult.companyBrand || null,
+                category: fgResult.category || null,
+                measures: fgResult.measures || null,
+                front_image_url: fgResult.front_image_url || null,
+                full_data: fgResult,
+                match_status: comparison.matchStatus || 'not_match',
+                match_confidence: comparison.details?.confidence || 0,
+                visual_similarity: comparison.details?.visualSimilarity || 0,
+              };
+            });
+
+            // Delete existing results for this detection (in case of re-processing)
+            await supabase
+              .from('branghunt_foodgraph_results')
+              .delete()
+              .eq('detection_id', detection.id);
+
+            // Insert all results
+            const { error: insertError } = await supabase
+              .from('branghunt_foodgraph_results')
+              .insert(foodgraphInserts);
+
+            if (insertError) {
+              console.error(`    ⚠️ Failed to save FoodGraph results:`, insertError);
+              // Don't fail the entire operation, just log the error
+            } else {
+              console.log(`    ✅ Saved ${foodgraphInserts.length} FoodGraph results to database`);
+            }
+            
             // CONSOLIDATION LOGIC: Check for identical and almost_same matches
             const identicalMatches = comparisonResults.filter(r => r.matchStatus === 'identical');
             const almostSameMatches = comparisonResults.filter(r => r.matchStatus === 'almost_same');
@@ -361,9 +402,10 @@ export async function POST(request: NextRequest) {
             
             let bestMatch = null;
             let consolidationApplied = false;
+            let needsManualReview = false;
             
             if (identicalMatches.length > 0) {
-              // Use first identical match
+              // Use first identical match - high confidence
               bestMatch = identicalMatches[0].result;
               console.log(`    ✅ Using IDENTICAL match: ${bestMatch.product_name}`);
             } else if (almostSameMatches.length === 1) {
@@ -372,11 +414,15 @@ export async function POST(request: NextRequest) {
               consolidationApplied = true;
               console.log(`    🔄 CONSOLIDATION: Promoting single "almost_same" match: ${bestMatch.product_name}`);
             } else if (almostSameMatches.length > 1) {
-              console.log(`    ⚠️ Multiple "almost_same" matches (${almostSameMatches.length}) - no consolidation applied`);
+              // Multiple almost_same matches - needs manual review
+              needsManualReview = true;
+              console.log(`    👤 MANUAL REVIEW NEEDED: ${almostSameMatches.length} "almost_same" matches - saved to DB for user review`);
             }
             
             if (bestMatch) {
               console.log(`    ✅ MATCH FOUND: ${bestMatch.product_name}`);
+            } else if (needsManualReview) {
+              console.log(`    ⏸️ Awaiting manual review: ${almostSameMatches.length} possible matches saved`);
             } else {
               console.log(`    ⚠️ No matches found in ${resultsToCompare.length} results`);
             }
@@ -429,7 +475,24 @@ export async function POST(request: NextRequest) {
               });
 
               console.log(`  ✅ [#${detection.detection_index}] Complete`);
+            } else if (needsManualReview) {
+              // Multiple almost_same matches - requires user review
+              result.status = 'no_match'; // Keep as no_match so it shows in statistics
+              result.error = `Manual review needed: ${almostSameMatches.length} similar matches found`;
+              result.resultsSearched = comparisonResults.length;
+              
+              sendProgress({
+                type: 'progress',
+                detectionIndex: detection.detection_index,
+                stage: 'done',
+                message: `⏸️ Manual review: ${almostSameMatches.length} matches`,
+                processed: globalIndex + 1,
+                total: detections.length
+              });
+
+              console.log(`  ⏸️ [#${detection.detection_index}] Awaiting manual review`);
             } else {
+              // No matches found at all
               result.status = 'no_match';
               result.error = 'No matching product found after AI filtering';
               
