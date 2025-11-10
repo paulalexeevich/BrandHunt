@@ -555,6 +555,15 @@ Only return the JSON object, nothing else.
  * Compare two product images to determine if they are the same product
  * Returns true if the products are visually identical/similar, false otherwise
  */
+export type MatchStatus = 'identical' | 'almost_same' | 'not_match';
+
+export interface ProductComparisonDetails {
+  matchStatus: MatchStatus;
+  confidence: number;
+  visualSimilarity: number;
+  reason: string;
+}
+
 export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string
@@ -563,12 +572,12 @@ export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string,
   returnDetails: true
-): Promise<{ isMatch: boolean; confidence: number; visualSimilarity: number; reason: string }>;
+): Promise<ProductComparisonDetails>;
 export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string,
   returnDetails?: boolean
-): Promise<boolean | { isMatch: boolean; confidence: number; visualSimilarity: number; reason: string }> {
+): Promise<boolean | ProductComparisonDetails> {
   const model = genAI.getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
@@ -578,37 +587,63 @@ export async function compareProductImages(
   });
 
   const prompt = `
-Compare these two product images and determine if they show the SAME product.
+Compare these two product images and determine their match status.
 
 Consider these factors:
 1. Brand name and logo
 2. Product name and type
 3. Packaging design and colors
 4. Flavor/variant information
-5. Overall visual appearance
+5. Size information
+6. Overall visual appearance
 
 Return a JSON object with this structure:
 {
-  "isMatch": true or false,
+  "matchStatus": "identical" or "almost_same" or "not_match",
   "confidence": 0.0 to 1.0,
   "visualSimilarity": 0.0 to 1.0,
-  "reason": "Brief explanation of why they match or don't match"
+  "reason": "Brief explanation of the match status"
 }
 
 CRITICAL DEFINITIONS:
-- isMatch: true only if both product images are IDENTICAL (all small details are the same and in the same position). Different flavors/sizes = false.
-- confidence: How certain you are about the isMatch decision (0.0 = uncertain, 1.0 = very certain)
-- visualSimilarity: How similar the images LOOK overall (0.0 = completely different, 1.0 = nearly identical)
-  * Same product, same packaging = 0.9-1.0
-  * Same brand, different variant (e.g. stick vs spray) = 0.5-0.8
-  * Same brand, different product line = 0.3-0.5
+
+matchStatus - THREE possible values:
+
+1. "identical" - Both products are EXACTLY the same:
+   - Same brand, same product name
+   - Same flavor/variant
+   - Same size/quantity
+   - Same packaging design
+   - All details match perfectly
+   
+2. "almost_same" - Products are VERY SIMILAR but not identical:
+   - Same brand, same product name
+   - Visual design/packaging is almost identical
+   - BUT different size (e.g., 8oz vs 12oz)
+   - OR different flavor (e.g., Original vs Mint)
+   - OR minor packaging variation (old vs new design)
+   - These are close variants of the same product line
+   
+3. "not_match" - Products are different:
+   - Different brands
+   - OR different product types
+   - OR completely different product lines
+   - Not close enough to be the same product
+
+confidence: How certain you are about the matchStatus decision (0.0 = uncertain, 1.0 = very certain)
+
+visualSimilarity: How similar the images LOOK overall (0.0 = completely different, 1.0 = nearly identical)
+  * Identical products = 0.9-1.0
+  * Almost same (close variants) = 0.7-0.9
+  * Same brand, different product line = 0.3-0.6
   * Different brands = 0.0-0.3
 
 Examples:
-- Same product, clear match: {isMatch: true, confidence: 0.95, visualSimilarity: 0.95}
-- Same brand, stick vs spray: {isMatch: false, confidence: 1.0, visualSimilarity: 0.65}
-- Same brand, different scent: {isMatch: false, confidence: 0.9, visualSimilarity: 0.85}
-- Different brands: {isMatch: false, confidence: 1.0, visualSimilarity: 0.2}
+- Exact same product: {matchStatus: "identical", confidence: 0.95, visualSimilarity: 0.95, reason: "Same brand, product, size, and flavor"}
+- Same product, different size: {matchStatus: "almost_same", confidence: 0.9, visualSimilarity: 0.85, reason: "Same Tide detergent, but 50oz vs 100oz"}
+- Same brand, different scent: {matchStatus: "almost_same", confidence: 0.9, visualSimilarity: 0.8, reason: "Same Dove deodorant line, but Fresh vs Powder scent"}
+- Different product type: {matchStatus: "not_match", confidence: 1.0, visualSimilarity: 0.4, reason: "Both Dove brand, but deodorant vs body wash"}
+- Different brands: {matchStatus: "not_match", confidence: 1.0, visualSimilarity: 0.2, reason: "Different brands entirely"}
 `;
 
   try {
@@ -653,32 +688,32 @@ Examples:
     cleanedText = cleanedText.trim();
 
     const comparison = JSON.parse(cleanedText) as { 
-      isMatch: boolean; 
+      matchStatus: MatchStatus;
       confidence: number; 
       visualSimilarity: number;
       reason: string 
     };
     
-    console.log(`🔍 Image comparison: ${comparison.isMatch ? 'MATCH' : 'NO MATCH'} (confidence: ${comparison.confidence}, visual similarity: ${comparison.visualSimilarity}) - ${comparison.reason}`);
+    console.log(`🔍 Image comparison: ${comparison.matchStatus.toUpperCase()} (confidence: ${comparison.confidence}, visual similarity: ${comparison.visualSimilarity}) - ${comparison.reason}`);
     
     // If returnDetails is true, return the full comparison object
     if (returnDetails) {
       return {
-        isMatch: comparison.isMatch && comparison.confidence >= 0.7,
+        matchStatus: comparison.matchStatus,
         confidence: comparison.confidence,
         visualSimilarity: comparison.visualSimilarity || 0,
         reason: comparison.reason
       };
     }
     
-    // Return true if it's a match with high confidence (>= 0.7)
-    return comparison.isMatch && comparison.confidence >= 0.7;
+    // For backward compatibility: return true only for 'identical' matches with high confidence
+    return comparison.matchStatus === 'identical' && comparison.confidence >= 0.7;
   } catch (error) {
     console.error('Failed to compare images:', error);
-    // On error, don't filter out the product
+    // On error, don't filter out the product - treat as 'almost_same' to allow manual review
     if (returnDetails) {
       return {
-        isMatch: true,
+        matchStatus: 'almost_same',
         confidence: 0.0,
         visualSimilarity: 0.0,
         reason: 'Error during comparison'

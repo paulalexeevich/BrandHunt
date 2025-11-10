@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
-import { compareProductImages } from '@/lib/gemini';
+import { compareProductImages, MatchStatus } from '@/lib/gemini';
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,43 +62,71 @@ export async function POST(request: NextRequest) {
     // Compare each FoodGraph result image with the cropped product image
     const comparisonPromises = foodgraphResults.map(async (result) => {
       if (!result.front_image_url) {
-        console.log(`⚠️ No image URL for result ${result.id}, keeping it`);
-        return { result, isMatch: true, confidence: 0.0, visualSimilarity: 0.0, reason: 'No image URL' };
+        console.log(`⚠️ No image URL for result ${result.id}, treating as not_match`);
+        return { result, matchStatus: 'not_match' as MatchStatus, confidence: 0.0, visualSimilarity: 0.0, reason: 'No image URL' };
       }
 
       try {
         const comparisonDetails = await compareProductImages(
           croppedImageBase64,
           result.front_image_url,
-          true // Get detailed results with confidence, visualSimilarity, and reason
+          true // Get detailed results with matchStatus, confidence, visualSimilarity, and reason
         );
-        console.log(`   ✅ Result ${result.product_name}: ${comparisonDetails.isMatch ? 'MATCH' : 'NO MATCH'} (confidence: ${comparisonDetails.confidence}, visual similarity: ${comparisonDetails.visualSimilarity}) - ${comparisonDetails.reason}`);
+        console.log(`   ✅ Result ${result.product_name}: ${comparisonDetails.matchStatus.toUpperCase()} (confidence: ${comparisonDetails.confidence}, visual similarity: ${comparisonDetails.visualSimilarity}) - ${comparisonDetails.reason}`);
         return { 
           result, 
-          isMatch: comparisonDetails.isMatch,
+          matchStatus: comparisonDetails.matchStatus,
           confidence: comparisonDetails.confidence,
           visualSimilarity: comparisonDetails.visualSimilarity,
           reason: comparisonDetails.reason
         };
       } catch (error) {
         console.error(`Error comparing result ${result.id}:`, error);
-        // On error, keep the result
-        return { result, isMatch: true, confidence: 0.0, visualSimilarity: 0.0, reason: 'Comparison error' };
+        // On error, treat as not_match to be safe
+        return { result, matchStatus: 'not_match' as MatchStatus, confidence: 0.0, visualSimilarity: 0.0, reason: 'Comparison error' };
       }
     });
 
     // Wait for all comparisons to complete
     const comparisonResults = await Promise.all(comparisonPromises);
 
-    // Update database with is_match status for ALL results
+    // CONSOLIDATION LOGIC: Check for identical and almost_same matches
+    const identicalMatches = comparisonResults.filter(r => r.matchStatus === 'identical');
+    const almostSameMatches = comparisonResults.filter(r => r.matchStatus === 'almost_same');
+    
+    console.log(`📊 Match status breakdown:`);
+    console.log(`   - Identical: ${identicalMatches.length}`);
+    console.log(`   - Almost Same: ${almostSameMatches.length}`);
+    console.log(`   - Not Match: ${comparisonResults.length - identicalMatches.length - almostSameMatches.length}`);
+    
+    // Consolidation: If NO identical matches but exactly ONE almost_same match, promote it
+    let finalMatchStatus: Record<string, boolean> = {};
+    let consolidationApplied = false;
+    
+    if (identicalMatches.length === 0 && almostSameMatches.length === 1) {
+      console.log(`🔄 CONSOLIDATION: No identical matches but exactly 1 "almost_same" match - promoting to match`);
+      console.log(`   Promoted product: ${almostSameMatches[0].result.product_name}`);
+      finalMatchStatus[almostSameMatches[0].result.id] = true;
+      consolidationApplied = true;
+    } else {
+      // Normal case: only identical matches count as is_match
+      identicalMatches.forEach(m => {
+        finalMatchStatus[m.result.id] = true;
+      });
+    }
+
+    // Update database with match_status for ALL results
     console.log(`💾 Updating ${comparisonResults.length} results in database...`);
-    const updatePromises = comparisonResults.map(async ({ result, isMatch, confidence, visualSimilarity, reason }) => {
+    const updatePromises = comparisonResults.map(async ({ result, matchStatus, confidence, visualSimilarity, reason }) => {
+      const isMatch = finalMatchStatus[result.id] || false;
+      
       const { error: updateError } = await supabase
         .from('branghunt_foodgraph_results')
         .update({ 
           is_match: isMatch,
-          match_confidence: confidence, // AI's confidence in its assessment
-          visual_similarity: visualSimilarity // How similar the images look (0-1)
+          match_status: matchStatus, // Store the three-tier status
+          match_confidence: confidence,
+          visual_similarity: visualSimilarity
         })
         .eq('id', result.id);
       
@@ -108,7 +136,8 @@ export async function POST(request: NextRequest) {
       
       return { 
         ...result, 
-        is_match: isMatch, 
+        is_match: isMatch,
+        match_status: matchStatus,
         match_confidence: confidence,
         visual_similarity: visualSimilarity,
         match_reason: reason 
@@ -117,31 +146,37 @@ export async function POST(request: NextRequest) {
 
     const updatedResults = await Promise.all(updatePromises);
 
-    // Count how many passed the threshold
-    const matchingResults = updatedResults.filter(r => r.is_match);
+    // Count how many are considered matches (after consolidation)
+    const finalMatches = updatedResults.filter(r => r.is_match);
     
     // Sort by visual similarity (highest first) so users see closest matches first
-    // This shows visually similar products even if they're different variants
     const sortedBySimilarity = [...updatedResults].sort((a, b) => {
       const simA = a.visual_similarity ?? 0;
       const simB = b.visual_similarity ?? 0;
-      return simB - simA; // Descending order (highest similarity first)
+      return simB - simA;
     });
     
-    console.log(`✅ Image filtering complete: ${matchingResults.length}/${foodgraphResults.length} products passed 70% threshold`);
+    console.log(`✅ Image filtering complete: ${finalMatches.length} final match(es)`);
+    if (consolidationApplied) {
+      console.log(`   ⭐ Consolidation applied: 1 "almost_same" promoted to match`);
+    }
     console.log(`   Showing all ${sortedBySimilarity.length} results sorted by visual similarity`);
     
     // Log top 3 for debugging
     sortedBySimilarity.slice(0, 3).forEach((r, i) => {
+      const status = r.match_status || 'unknown';
       const visualSim = r.visual_similarity !== undefined ? `, visual: ${Math.round(r.visual_similarity * 100)}%` : '';
-      console.log(`   ${i + 1}. ${r.product_name} - ${r.is_match ? '✓ PASS' : '✗ FAIL'} (confidence: ${Math.round(r.match_confidence * 100)}%${visualSim})`);
+      console.log(`   ${i + 1}. ${r.product_name} - ${status.toUpperCase()} ${r.is_match ? '✓ MATCH' : ''} (confidence: ${Math.round((r.match_confidence || 0) * 100)}%${visualSim})`);
     });
 
     return NextResponse.json({
-      filteredResults: sortedBySimilarity, // Return ALL results sorted by visual similarity
-      totalFiltered: matchingResults.length, // How many passed 70% threshold
+      filteredResults: sortedBySimilarity,
+      totalFiltered: finalMatches.length,
       totalOriginal: foodgraphResults.length,
-      showingAllWithConfidence: true // New flag indicating we're showing all results with scores
+      showingAllWithConfidence: true,
+      consolidationApplied, // Flag indicating if consolidation was used
+      identicalCount: identicalMatches.length,
+      almostSameCount: almostSameMatches.length
     });
 
   } catch (error) {

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { searchProducts, getFrontImageUrl, preFilterFoodGraphResults } from '@/lib/foodgraph';
-import { compareProductImages, cropImageToBoundingBox } from '@/lib/gemini';
+import { compareProductImages, cropImageToBoundingBox, MatchStatus } from '@/lib/gemini';
 
 interface SearchAndSaveResult {
   detectionId: string;
@@ -334,27 +334,46 @@ export async function POST(request: NextRequest) {
                   console.log(`       FoodGraph image URL: ${fgResult.front_image_url}`);
                 }
                 
-                const isMatch = await compareProductImages(
+                const comparisonDetails = await compareProductImages(
                   croppedBase64,  // Use cropped product image, not full shelf!
-                  fgResult.front_image_url as string
+                  fgResult.front_image_url as string,
+                  true // Get detailed results with matchStatus
                 );
                 
-                if (isMatch && index < 3) {
-                  console.log(`    ✨ MATCH found at index ${index}: ${fgResult.product_name}`);
+                if (comparisonDetails.matchStatus !== 'not_match' && index < 3) {
+                  console.log(`    ✨ ${comparisonDetails.matchStatus.toUpperCase()} found at index ${index}: ${fgResult.product_name}`);
                 }
                 
-                return { result: fgResult, isMatch };
+                return { result: fgResult, matchStatus: comparisonDetails.matchStatus, details: comparisonDetails };
               } catch (error) {
                 console.error(`    ⚠️ Comparison error for ${fgResult.product_name}:`, error);
-                return { result: fgResult, isMatch: false };
+                return { result: fgResult, matchStatus: 'not_match' as MatchStatus, details: { matchStatus: 'not_match' as MatchStatus, confidence: 0, visualSimilarity: 0, reason: 'Error' } };
               }
             });
 
             const comparisonResults = await Promise.all(comparisonPromises);
             
-            // Find the first match
-            const matchingResult = comparisonResults.find(r => r.isMatch);
-            const bestMatch = matchingResult ? matchingResult.result : null;
+            // CONSOLIDATION LOGIC: Check for identical and almost_same matches
+            const identicalMatches = comparisonResults.filter(r => r.matchStatus === 'identical');
+            const almostSameMatches = comparisonResults.filter(r => r.matchStatus === 'almost_same');
+            
+            console.log(`    📊 Match status breakdown: Identical=${identicalMatches.length}, Almost Same=${almostSameMatches.length}`);
+            
+            let bestMatch = null;
+            let consolidationApplied = false;
+            
+            if (identicalMatches.length > 0) {
+              // Use first identical match
+              bestMatch = identicalMatches[0].result;
+              console.log(`    ✅ Using IDENTICAL match: ${bestMatch.product_name}`);
+            } else if (almostSameMatches.length === 1) {
+              // Consolidation: Exactly one almost_same match with no identical matches
+              bestMatch = almostSameMatches[0].result;
+              consolidationApplied = true;
+              console.log(`    🔄 CONSOLIDATION: Promoting single "almost_same" match: ${bestMatch.product_name}`);
+            } else if (almostSameMatches.length > 1) {
+              console.log(`    ⚠️ Multiple "almost_same" matches (${almostSameMatches.length}) - no consolidation applied`);
+            }
             
             if (bestMatch) {
               console.log(`    ✅ MATCH FOUND: ${bestMatch.product_name}`);
