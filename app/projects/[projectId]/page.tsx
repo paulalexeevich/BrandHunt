@@ -140,6 +140,18 @@ export default function ProjectViewPage() {
       }
 
       const data = await response.json();
+      
+      // Debug logging for image data
+      if (data.images && data.images.length > 0) {
+        console.log('[Projects] Sample image data:', {
+          id: data.images[0].id,
+          storage_type: data.images[0].storage_type,
+          has_s3_url: !!data.images[0].s3_url,
+          has_file_path: !!data.images[0].file_path,
+          s3_url_preview: data.images[0].s3_url?.substring(0, 60)
+        });
+      }
+      
       setProject(data.project);
       setImages(data.images || []);
       setPagination(data.pagination || null);
