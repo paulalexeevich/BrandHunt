@@ -1567,12 +1567,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 </div>
                 </div>
                 
-                  {/* Extracted Product Information - HIDDEN */}
-                  {false && detection.brand_name ? (
-                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                  {/* Extracted Product Information */}
+                  {detection.brand_name ? (
+                    <div className="bg-white border-2 border-gray-200 rounded-lg p-4 shadow-sm">
                       <div className="flex items-center gap-2 mb-3">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                        <h4 className="font-semibold text-green-900">Extracted Information</h4>
+                        <Package className="w-5 h-5 text-indigo-600" />
+                        <h4 className="font-semibold text-gray-900">Product Information</h4>
                       </div>
                       
                       {/* Classification Badges */}
@@ -1739,9 +1739,18 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       </div>
                 </div>
                   ) : (
-                    <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
-                      <p className="text-sm text-yellow-800">
-                        {detection.label ? `Detected as: ${detection.label}` : 'No information extracted yet'}
+                    <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Package className="w-5 h-5 text-blue-600" />
+                        <h4 className="font-semibold text-blue-900">Detection Info</h4>
+                      </div>
+                      {detection.label && (
+                        <p className="text-sm text-blue-800 mb-2">
+                          <span className="font-semibold">Detected as:</span> {detection.label}
+                        </p>
+                      )}
+                      <p className="text-xs text-blue-700">
+                        Click "Extract Brand & Info" below to analyze this product
                       </p>
                     </div>
                   )}
