@@ -386,15 +386,28 @@ export async function POST(request: NextRequest) {
               .eq('detection_id', detection.id);
 
             // Insert all results
-            const { error: insertError } = await supabase
+            const { error: insertError, data: insertData } = await supabase
               .from('branghunt_foodgraph_results')
-              .insert(foodgraphInserts);
+              .insert(foodgraphInserts)
+              .select();
 
             if (insertError) {
-              console.error(`    ⚠️ Failed to save FoodGraph results:`, insertError);
-              // Don't fail the entire operation, just log the error
+              console.error(`    ❌ FAILED TO SAVE FOODGRAPH RESULTS for detection #${detection.detection_index}:`, {
+                error: insertError,
+                message: insertError.message,
+                details: insertError.details,
+                hint: insertError.hint,
+                code: insertError.code,
+                detection_id: detection.id,
+                image_id: detection.image_id,
+                project_id: image?.project_id,
+                num_results_attempted: foodgraphInserts.length
+              });
+              // Don't fail the entire operation, but make error very visible
+              result.error = `Failed to save ${foodgraphInserts.length} FoodGraph results: ${insertError.message}`;
             } else {
               console.log(`    ✅ Saved ${foodgraphInserts.length} FoodGraph results to database`);
+              console.log(`    📊 Insert confirmation: ${insertData?.length || 0} rows inserted`);
             }
             
             // CONSOLIDATION LOGIC: Check for identical and almost_same matches

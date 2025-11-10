@@ -44,13 +44,22 @@ export async function GET(
           .order('result_rank', { ascending: true });
 
         if (resultsError) {
-          console.error('Failed to fetch FoodGraph results:', resultsError);
+          console.error(`Failed to fetch FoodGraph results for detection #${detection.detection_index}:`, resultsError);
           return { ...detection, foodgraph_results: [] };
+        }
+
+        // Log detections with results for debugging
+        if (foodgraphResults && foodgraphResults.length > 0) {
+          console.log(`📦 Detection #${detection.detection_index}: ${foodgraphResults.length} FoodGraph results, fully_analyzed=${detection.fully_analyzed}`);
         }
 
         return { ...detection, foodgraph_results: foodgraphResults || [] };
       })
     );
+    
+    // Log summary
+    const withResults = detectionsWithResults.filter(d => d.foodgraph_results && d.foodgraph_results.length > 0);
+    console.log(`📊 API Response: ${detectionsWithResults.length} total detections, ${withResults.length} have FoodGraph results`);
 
     return NextResponse.json({ 
       image,
