@@ -97,6 +97,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [showingAllWithConfidence, setShowingAllWithConfidence] = useState(false);
   const [preFiltering, setPreFiltering] = useState(false);
   const [preFilteredCount, setPreFilteredCount] = useState<number | null>(null);
+  const [consolidationApplied, setConsolidationApplied] = useState(false);
+  const [matchStatusCounts, setMatchStatusCounts] = useState<{ identical: number; almostSame: number } | null>(null);
   const [showProductLabels, setShowProductLabels] = useState(true);
   const [extractingPrice, setExtractingPrice] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
@@ -357,6 +359,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     setError(null);
     setPreFilteredCount(null); // Reset pre-filter count on new search
     setFilteredCount(null); // Reset AI filter count on new search
+    setConsolidationApplied(false); // Reset consolidation flag
+    setMatchStatusCounts(null); // Reset match status counts
 
     const requestBody = { 
       detectionId: selectedDetection,
@@ -545,6 +549,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       setFoodgraphResults(data.filteredResults || []);
       setFilteredCount(data.totalFiltered);
       setShowingAllWithConfidence(data.showingAllWithConfidence || false);
+      setConsolidationApplied(data.consolidationApplied || false);
+      setMatchStatusCounts({
+        identical: data.identicalCount || 0,
+        almostSame: data.almostSameCount || 0
+      });
       
     } catch (err) {
       console.error('Filter error:', err);
@@ -1541,6 +1550,45 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               <p className="text-xs text-blue-700 mt-1">
                                 Green ✓ PASS = Visual match (≥70% confidence). Gray ✗ FAIL = No match (different variant/type). 
                                 Check Visual Similarity % to see how close each option is.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Match Status Breakdown */}
+                      {matchStatusCounts && filteredCount !== null && (
+                        <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-400 rounded">
+                          <div className="flex items-start gap-2">
+                            <span className="text-purple-600 text-lg">📊</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-purple-900">AI Match Status Breakdown</p>
+                              <div className="flex flex-wrap gap-3 mt-2 text-xs">
+                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded font-medium">
+                                  ✓ Identical: {matchStatusCounts.identical}
+                                </span>
+                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded font-medium">
+                                  ≈ Almost Same: {matchStatusCounts.almostSame}
+                                </span>
+                                <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded font-medium">
+                                  ✗ Not Match: {foodgraphResults.length - matchStatusCounts.identical - matchStatusCounts.almostSame}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Consolidation Applied Banner */}
+                      {consolidationApplied && (
+                        <div className="mb-3 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-500 rounded">
+                          <div className="flex items-start gap-2">
+                            <span className="text-yellow-600 text-lg">🔄</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-yellow-900">Consolidation Applied</p>
+                              <p className="text-xs text-yellow-800 mt-1">
+                                No identical matches found, but exactly 1 &quot;almost same&quot; match detected. 
+                                This close variant has been promoted to final match (same brand/product, different size or flavor).
                               </p>
                             </div>
                           </div>
