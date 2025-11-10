@@ -1118,6 +1118,101 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           </div>
         )}
 
+        {/* Product Statistics Panel */}
+        {productsDetected && detections.length > 0 && (() => {
+          // Calculate statistics
+          const totalProducts = detections.length;
+          const notProduct = detections.filter(d => d.is_product === false).length;
+          const detailsNotVisible = detections.filter(d => d.is_product === true && d.details_visible === false).length;
+          const validNotProcessed = detections.filter(d => 
+            (d.is_product === true || d.is_product === null) && 
+            (d.details_visible === true || d.details_visible === null) &&
+            !d.brand_name
+          ).length;
+          const validWithMatch = detections.filter(d => d.fully_analyzed === true).length;
+          const validNoMatch = detections.filter(d => 
+            d.brand_name && 
+            !d.fully_analyzed && 
+            d.foodgraph_results && 
+            d.foodgraph_results.length === 0
+          ).length;
+          const validMultipleMatches = detections.filter(d => 
+            d.brand_name && 
+            !d.fully_analyzed && 
+            d.foodgraph_results && 
+            d.foodgraph_results.length > 1
+          ).length;
+
+          return (
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-md p-6 mb-6 border border-indigo-100">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                📊 Product Statistics
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                {/* Total Products */}
+                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                  <div className="text-2xl font-bold text-gray-900">{totalProducts}</div>
+                  <div className="text-xs text-gray-600 mt-1">Total Products</div>
+                </div>
+
+                {/* Not Product */}
+                <div className="bg-red-50 rounded-lg p-4 shadow-sm border border-red-200">
+                  <div className="text-2xl font-bold text-red-700">{notProduct}</div>
+                  <div className="text-xs text-red-600 mt-1">Not Product</div>
+                </div>
+
+                {/* Details Not Visible */}
+                <div className="bg-orange-50 rounded-lg p-4 shadow-sm border border-orange-200">
+                  <div className="text-2xl font-bold text-orange-700">{detailsNotVisible}</div>
+                  <div className="text-xs text-orange-600 mt-1">Details Not Visible</div>
+                </div>
+
+                {/* Valid Not Processed */}
+                <div className="bg-gray-50 rounded-lg p-4 shadow-sm border border-gray-300">
+                  <div className="text-2xl font-bold text-gray-700">{validNotProcessed}</div>
+                  <div className="text-xs text-gray-600 mt-1">Not Identified</div>
+                </div>
+
+                {/* Valid with ONE Match */}
+                <div className="bg-green-50 rounded-lg p-4 shadow-sm border border-green-200">
+                  <div className="text-2xl font-bold text-green-700">{validWithMatch}</div>
+                  <div className="text-xs text-green-600 mt-1">✓ ONE Match</div>
+                </div>
+
+                {/* Valid NO Match */}
+                <div className="bg-yellow-50 rounded-lg p-4 shadow-sm border border-yellow-200">
+                  <div className="text-2xl font-bold text-yellow-700">{validNoMatch}</div>
+                  <div className="text-xs text-yellow-600 mt-1">NO Match</div>
+                </div>
+
+                {/* Valid 2+ Matches */}
+                <div className="bg-purple-50 rounded-lg p-4 shadow-sm border border-purple-200">
+                  <div className="text-2xl font-bold text-purple-700">{validMultipleMatches}</div>
+                  <div className="text-xs text-purple-600 mt-1">2+ Matches</div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="mt-4">
+                <div className="flex justify-between text-xs text-gray-600 mb-1">
+                  <span>Processing Progress</span>
+                  <span>{validWithMatch} / {totalProducts} Completed ({Math.round((validWithMatch / totalProducts) * 100)}%)</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-1"
+                    style={{ width: `${(validWithMatch / totalProducts) * 100}%` }}
+                  >
+                    {validWithMatch > 0 && (
+                      <span className="text-[10px] font-bold text-white">✓</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left: Image with Bounding Boxes */}
           <div className="bg-white rounded-xl shadow-md p-6">
