@@ -19,6 +19,12 @@ import {
   Filter,
   XCircle,
   Package,
+  Users,
+  UserPlus,
+  Trash2,
+  Shield,
+  Eye,
+  Edit,
 } from 'lucide-react';
 import AuthNav from '@/components/AuthNav';
 import { createClient } from '@/lib/supabase-browser';
@@ -55,6 +61,14 @@ interface ImageData {
   detections: Array<{ count: number }>;
 }
 
+interface ProjectMember {
+  id: string;
+  user_id: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  added_at: string;
+  added_by: string;
+}
+
 export default function ProjectViewPage() {
   const params = useParams();
   const router = useRouter();
@@ -72,6 +86,11 @@ export default function ProjectViewPage() {
     totalPages: number;
     hasMore: boolean;
   } | null>(null);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [newMemberUserId, setNewMemberUserId] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState<'admin' | 'member' | 'viewer'>('member');
+  const [memberLoading, setMemberLoading] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -121,11 +140,89 @@ export default function ProjectViewPage() {
       setProject(data.project);
       setImages(data.images || []);
       setPagination(data.pagination || null);
+      
+      // Also fetch members
+      await fetchMembers();
     } catch (err) {
       console.error('Error fetching project data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch project data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMembers = async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/members`, {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setMembers(data.members || []);
+      }
+    } catch (err) {
+      console.error('Error fetching members:', err);
+    }
+  };
+
+  const handleAddMember = async () => {
+    if (!newMemberUserId.trim()) {
+      alert('Please enter a user ID');
+      return;
+    }
+
+    setMemberLoading(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: newMemberUserId, role: newMemberRole }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add member');
+      }
+
+      // Success - refresh members list
+      await fetchMembers();
+      setNewMemberUserId('');
+      setShowAddMember(false);
+      alert('Member added successfully');
+    } catch (err) {
+      console.error('Error adding member:', err);
+      alert(err instanceof Error ? err.message : 'Failed to add member');
+    } finally {
+      setMemberLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm('Are you sure you want to remove this member?')) {
+      return;
+    }
+
+    setMemberLoading(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/members/${memberId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove member');
+      }
+
+      // Success - refresh members list
+      await fetchMembers();
+      alert('Member removed successfully');
+    } catch (err) {
+      console.error('Error removing member:', err);
+      alert(err instanceof Error ? err.message : 'Failed to remove member');
+    } finally {
+      setMemberLoading(false);
     }
   };
 
@@ -321,6 +418,165 @@ export default function ProjectViewPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Project Members */}
+            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Users className="w-6 h-6 text-indigo-600" />
+                  Project Members ({members.length})
+                </h2>
+                <button
+                  onClick={() => setShowAddMember(!showAddMember)}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Add Member
+                </button>
+              </div>
+
+              {/* Add Member Form */}
+              {showAddMember && (
+                <div className="mb-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <h3 className="font-semibold text-gray-900 mb-3">Add New Member</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        User ID
+                      </label>
+                      <input
+                        type="text"
+                        value={newMemberUserId}
+                        onChange={(e) => setNewMemberUserId(e.target.value)}
+                        placeholder="Enter user UUID"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        disabled={memberLoading}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Note: Currently requires the user's UUID. Email lookup coming soon.
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Role
+                      </label>
+                      <select
+                        value={newMemberRole}
+                        onChange={(e) => setNewMemberRole(e.target.value as 'admin' | 'member' | 'viewer')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        disabled={memberLoading}
+                      >
+                        <option value="member">Member (can edit)</option>
+                        <option value="admin">Admin (can manage members)</option>
+                        <option value="viewer">Viewer (read-only)</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleAddMember}
+                        disabled={memberLoading}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 transition-colors"
+                      >
+                        {memberLoading ? 'Adding...' : 'Add Member'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAddMember(false);
+                          setNewMemberUserId('');
+                        }}
+                        disabled={memberLoading}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Members List */}
+              <div className="space-y-2">
+                {members.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Users className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                    <p>No members yet</p>
+                  </div>
+                ) : (
+                  members.map((member) => {
+                    const isOwner = member.role === 'owner';
+                    const isCurrentUser = user && member.user_id === user.id;
+
+                    return (
+                      <div
+                        key={member.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-full ${
+                            isOwner ? 'bg-yellow-100' :
+                            member.role === 'admin' ? 'bg-purple-100' :
+                            member.role === 'member' ? 'bg-blue-100' :
+                            'bg-gray-100'
+                          }`}>
+                            {isOwner ? <Shield className="w-5 h-5 text-yellow-600" /> :
+                             member.role === 'admin' ? <Edit className="w-5 h-5 text-purple-600" /> :
+                             member.role === 'member' ? <Package className="w-5 h-5 text-blue-600" /> :
+                             <Eye className="w-5 h-5 text-gray-600" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900">
+                                {member.user_id.substring(0, 8)}...
+                              </span>
+                              {isCurrentUser && (
+                                <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                                  You
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <span className={`font-semibold ${
+                                isOwner ? 'text-yellow-600' :
+                                member.role === 'admin' ? 'text-purple-600' :
+                                member.role === 'member' ? 'text-blue-600' :
+                                'text-gray-600'
+                              }`}>
+                                {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                              </span>
+                              <span>•</span>
+                              <span>
+                                Added {new Date(member.added_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        {!isOwner && (
+                          <button
+                            onClick={() => handleRemoveMember(member.id)}
+                            disabled={memberLoading}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Remove member"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Info about roles */}
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-900 font-semibold mb-1">About Roles:</p>
+                <ul className="text-xs text-blue-800 space-y-1">
+                  <li><strong>Owner:</strong> Full control, cannot be removed</li>
+                  <li><strong>Admin:</strong> Can manage members and edit content</li>
+                  <li><strong>Member:</strong> Can edit content and add images</li>
+                  <li><strong>Viewer:</strong> Read-only access to project</li>
+                </ul>
               </div>
             </div>
 
