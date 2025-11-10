@@ -120,6 +120,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     displayed: { width: number; height: number };
   } | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'details_not_visible' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches'>('all');
+  const [isFetching, setIsFetching] = useState(false);
 
   useEffect(() => {
     fetchImage();
@@ -212,6 +213,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   }, [selectedDetection, detections]);
 
   const fetchImage = async () => {
+    // Prevent concurrent/rapid fetches
+    if (isFetching) {
+      console.log('⚠️ Fetch already in progress, skipping...');
+      return;
+    }
+
+    setIsFetching(true);
     const fetchStart = Date.now();
     console.log(`🚀 Starting fetch for image ${resolvedParams.imageId}`);
     
@@ -244,6 +252,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       console.error('Failed to fetch image:', error);
       const totalTime = Date.now() - fetchStart;
       console.error(`⏱️ ❌ Failed after ${totalTime}ms`);
+    } finally {
+      setIsFetching(false);
     }
   };
 
