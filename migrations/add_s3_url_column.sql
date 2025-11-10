@@ -18,11 +18,15 @@ CREATE INDEX IF NOT EXISTS idx_images_s3_url ON branghunt_images(s3_url);
 COMMENT ON COLUMN branghunt_images.s3_url IS 'Original S3 URL of the image (alternative to storing base64 in file_path)';
 
 -- =====================================================
--- 2. UPDATE FILE_PATH COLUMN COMMENT
+-- 2. MAKE FILE_PATH NULLABLE
 -- =====================================================
 
+-- Remove NOT NULL constraint from file_path to allow S3 URL storage
+ALTER TABLE branghunt_images
+ALTER COLUMN file_path DROP NOT NULL;
+
 -- Update comment to indicate file_path can store either base64 OR S3 URL
-COMMENT ON COLUMN branghunt_images.file_path IS 'File path or base64-encoded image data (legacy) or S3 URL. Prefer using s3_url column for new images.';
+COMMENT ON COLUMN branghunt_images.file_path IS 'File path or base64-encoded image data (legacy) or S3 URL. Prefer using s3_url column for new images. NULL when using s3_url storage.';
 
 -- =====================================================
 -- 3. ADD STORAGE_TYPE COLUMN
