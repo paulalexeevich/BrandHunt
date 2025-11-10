@@ -173,7 +173,8 @@ export async function POST(request: NextRequest) {
                 brand_name: r.brand_name,
                 category: r.category,
                 front_image_url: r.front_image_url,
-                product_gtin: r.product_gtin
+                product_gtin: r.product_gtin,
+                processing_stage: 'search' // Set processing stage to enable unique constraint
               }));
 
               await supabase

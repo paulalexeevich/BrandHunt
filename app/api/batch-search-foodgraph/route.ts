@@ -111,6 +111,12 @@ export async function POST(request: NextRequest) {
         const foodgraphResults = searchResult.products;
         
         if (foodgraphResults.length > 0) {
+          // Delete any existing results for this detection to avoid duplicates
+          await supabase
+            .from('branghunt_foodgraph_results')
+            .delete()
+            .eq('detection_id', detection.id);
+
           // Save top 50 results to intermediate table (cache for step 4)
           const resultsToSave = foodgraphResults.slice(0, 50).map((r: any, index: number) => ({
             detection_id: detection.id,
@@ -120,7 +126,8 @@ export async function POST(request: NextRequest) {
             category: r.category,
             front_image_url: r.front_image_url,
             product_gtin: r.product_gtin,
-            full_data: r
+            full_data: r,
+            processing_stage: 'search' // Set processing stage to enable unique constraint
           }));
 
           const { error: insertError } = await supabase

@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
               category: product.category || null,
               front_image_url: frontImageUrl,
               full_data: product,
+              processing_stage: 'search', // Set processing stage to enable unique constraint
             });
         }
 

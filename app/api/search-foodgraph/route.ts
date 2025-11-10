@@ -69,6 +69,12 @@ export async function POST(request: NextRequest) {
     const searchTerm = searchResult.searchTerm;
     console.log(`Found ${products.length} products for "${searchTerm}"`);
 
+    // Delete any existing results for this detection to avoid duplicates
+    await supabase
+      .from('branghunt_foodgraph_results')
+      .delete()
+      .eq('detection_id', detectionId);
+
     // Save ALL results to database (typically ~100 results from FoodGraph API)
     // Pre-filtering and AI filtering will narrow these down later
     const foodgraphResults = [];
@@ -89,6 +95,7 @@ export async function POST(request: NextRequest) {
           measures: product.measures || null,
           front_image_url: frontImageUrl,
           full_data: product,
+          processing_stage: 'search', // Set processing stage to enable unique constraint
         })
         .select()
         .single();
