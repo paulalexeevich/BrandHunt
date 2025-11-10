@@ -910,142 +910,188 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   → Product #{detections.findIndex(d => d.id === selectedDetection) + 1} selected
                 </span>
               )}
-              </div>
-            <div className="flex gap-3 items-center">
-              {!productsDetected && (
-                <React.Fragment key="detection-controls">
-                  {/* Detection Method Toggle */}
-                  <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-                    <button
-                      onClick={() => setDetectionMethod('yolo')}
-                      disabled={loading}
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                        detectionMethod === 'yolo'
-                          ? 'bg-white text-indigo-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-800'
-                      }`}
-                    >
-                      ⚡ YOLO
-                    </button>
-                    <button
-                      onClick={() => setDetectionMethod('gemini')}
-                      disabled={loading}
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                        detectionMethod === 'gemini'
-                          ? 'bg-white text-indigo-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-800'
-                      }`}
-                    >
-                      🤖 Gemini
-                    </button>
-                  </div>
-                  <button
-                    onClick={handleDetectProducts}
-                    disabled={loading}
-                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center gap-2"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Detecting...
-                      </>
-                    ) : (
-                      '🎯 Detect Products'
-                    )}
-                  </button>
-                </React.Fragment>
-              )}
-              {productsDetected && detections.some(d => !d.fully_analyzed) && (() => {
-                // Calculate eligible products for each step
-                const needsInfo = detections.filter(d => !d.brand_name).length;
-                const needsPrice = detections.filter(d => d.brand_name && (!d.price || d.price === 'Unknown')).length;
-                const needsSearch = detections.filter(d => d.brand_name && !d.fully_analyzed).length;
-                
-                return (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleExtractInfoAll}
-                      disabled={processingStep1 || needsInfo === 0}
-                      className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
-                      title={needsInfo === 0 ? 'All products have info extracted' : `Extract info for ${needsInfo} products`}
-                    >
-                      {processingStep1 ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Extracting...
-                        </>
-                      ) : (
-                        `📋 Extract Info (${needsInfo})`
-                      )}
-                    </button>
-                    <button
-                      onClick={handleExtractPriceAll}
-                      disabled={processingStep2 || needsPrice === 0}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md text-sm"
-                      title={needsPrice === 0 ? 'All products have prices' : `Extract price for ${needsPrice} products (requires Step 1)`}
-                    >
-                      {processingStep2 ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Extracting...
-                        </>
-                      ) : (
-                        `💰 Extract Price (${needsPrice})`
-                      )}
-                    </button>
-                    
-                    {/* Step 3: Search & Save - Multiple Concurrency Options for Testing */}
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">🔍 Search & Save ({needsSearch})</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => handleSearchAndSaveAll(3)}
-                          disabled={processingStep3 || needsSearch === 0}
-                          className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-medium disabled:opacity-50 text-xs"
-                          title="Process 3 products at a time (safe)"
-                        >
-                          {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡ 3 at once'}
-                        </button>
-                        <button
-                          onClick={() => handleSearchAndSaveAll(10)}
-                          disabled={processingStep3 || needsSearch === 0}
-                          className="px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-all font-medium disabled:opacity-50 text-xs"
-                          title="Process 10 products at a time"
-                        >
-                          {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡ 10 at once'}
-                        </button>
-                        <button
-                          onClick={() => handleSearchAndSaveAll(20)}
-                          disabled={processingStep3 || needsSearch === 0}
-                          className="px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all font-medium disabled:opacity-50 text-xs"
-                          title="Process 20 products at a time"
-                        >
-                          {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡⚡ 20 at once'}
-                        </button>
-                        <button
-                          onClick={() => handleSearchAndSaveAll(50)}
-                          disabled={processingStep3 || needsSearch === 0}
-                          className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-all font-medium disabled:opacity-50 text-xs"
-                          title="Process 50 products at a time"
-                        >
-                          {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🚀 50 at once'}
-                        </button>
-                        <button
-                          onClick={() => handleSearchAndSaveAll(999999)}
-                          disabled={processingStep3 || needsSearch === 0}
-                          className="px-3 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg hover:from-red-600 hover:to-orange-600 transition-all font-bold disabled:opacity-50 text-xs col-span-2"
-                          title="Process ALL products simultaneously (maximum speed, high resource usage)"
-                        >
-                          {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🔥 ALL AT ONCE 🔥'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
           </div>
         </div>
+
+        {/* BLOCK 1: Image Upload & Detection */}
+        {!productsDetected && (
+          <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-xl shadow-lg p-6 mb-6 border-2 border-orange-200">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  📸 Block 1: Image Upload & Detection
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Detect products and extract information from the image
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {/* Detection Method Toggle */}
+              <div className="flex items-center gap-2 bg-white rounded-lg p-1 shadow-sm">
+                <button
+                  onClick={() => setDetectionMethod('yolo')}
+                  disabled={loading}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    detectionMethod === 'yolo'
+                      ? 'bg-orange-500 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  ⚡ YOLO
+                </button>
+                <button
+                  onClick={() => setDetectionMethod('gemini')}
+                  disabled={loading}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    detectionMethod === 'gemini'
+                      ? 'bg-orange-500 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  🤖 Gemini
+                </button>
+              </div>
+              
+              <button
+                onClick={handleDetectProducts}
+                disabled={loading}
+                className="px-8 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-lg hover:from-orange-600 hover:to-yellow-600 transition-all font-bold disabled:bg-gray-400 flex items-center gap-2 shadow-lg"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Detecting...
+                  </>
+                ) : (
+                  '🎯 Detect Products'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* BLOCK 1 (continued): Extract Information - Only show after detection */}
+        {productsDetected && (() => {
+          const needsInfo = detections.filter(d => !d.brand_name).length;
+          const needsPrice = detections.filter(d => d.brand_name && (!d.price || d.price === 'Unknown')).length;
+          const hasExtractionWork = needsInfo > 0 || needsPrice > 0;
+
+          return hasExtractionWork ? (
+            <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-xl shadow-lg p-6 mb-6 border-2 border-orange-200">
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  📋 Block 1: Extract Information
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Extract product details (brand, name, size, price) from detected products
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={handleExtractInfoAll}
+                  disabled={processingStep1 || needsInfo === 0}
+                  className="px-6 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-all font-bold disabled:opacity-50 flex items-center gap-2 shadow-md"
+                  title={needsInfo === 0 ? 'All products have info extracted' : `Extract info for ${needsInfo} products`}
+                >
+                  {processingStep1 ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Extracting...
+                    </>
+                  ) : (
+                    `📋 Extract Info (${needsInfo})`
+                  )}
+                </button>
+                
+                <button
+                  onClick={handleExtractPriceAll}
+                  disabled={processingStep2 || needsPrice === 0}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-bold disabled:opacity-50 flex items-center gap-2 shadow-md"
+                  title={needsPrice === 0 ? 'All products have prices' : `Extract price for ${needsPrice} products`}
+                >
+                  {processingStep2 ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Extracting...
+                    </>
+                  ) : (
+                    `💰 Extract Price (${needsPrice})`
+                  )}
+                </button>
+              </div>
+            </div>
+          ) : null;
+        })()}
+
+        {/* BLOCK 2: Product Matching with FoodGraph */}
+        {productsDetected && (() => {
+          const needsSearch = detections.filter(d => d.brand_name && !d.fully_analyzed).length;
+          
+          return needsSearch > 0 ? (
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl shadow-lg p-6 mb-6 border-2 border-blue-300">
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  🔍 Block 2: Product Matching with FoodGraph
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Search, pre-filter, AI filter, and save product matches from FoodGraph database
+                </p>
+              </div>
+              
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-3">
+                  🔍 Search & Save ({needsSearch} products ready)
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <button
+                    onClick={() => handleSearchAndSaveAll(3)}
+                    disabled={processingStep3 || needsSearch === 0}
+                    className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-bold disabled:opacity-50 text-sm shadow-md"
+                    title="Process 3 products at a time (safe)"
+                  >
+                    {processingStep3 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '⚡ 3 at once'}
+                  </button>
+                  <button
+                    onClick={() => handleSearchAndSaveAll(10)}
+                    disabled={processingStep3 || needsSearch === 0}
+                    className="px-4 py-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-all font-bold disabled:opacity-50 text-sm shadow-md"
+                    title="Process 10 products at a time"
+                  >
+                    {processingStep3 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '⚡⚡ 10 at once'}
+                  </button>
+                  <button
+                    onClick={() => handleSearchAndSaveAll(20)}
+                    disabled={processingStep3 || needsSearch === 0}
+                    className="px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all font-bold disabled:opacity-50 text-sm shadow-md"
+                    title="Process 20 products at a time"
+                  >
+                    {processingStep3 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '⚡⚡⚡ 20 at once'}
+                  </button>
+                  <button
+                    onClick={() => handleSearchAndSaveAll(50)}
+                    disabled={processingStep3 || needsSearch === 0}
+                    className="px-4 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-all font-bold disabled:opacity-50 text-sm shadow-md"
+                    title="Process 50 products at a time"
+                  >
+                    {processingStep3 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '🚀 50 at once'}
+                  </button>
+                  <button
+                    onClick={() => handleSearchAndSaveAll(999999)}
+                    disabled={processingStep3 || needsSearch === 0}
+                    className="px-4 py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg hover:from-red-600 hover:to-orange-600 transition-all font-black disabled:opacity-50 text-sm col-span-2 md:col-span-1 shadow-lg"
+                    title="Process ALL products simultaneously"
+                  >
+                    {processingStep3 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '🔥 ALL 🔥'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null;
+        })()}
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-red-700">
@@ -1053,10 +1099,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           </div>
         )}
 
-        {(processingStep1 || processingStep2 || processingStep3 || step1Progress || step2Progress || step3Progress) && (
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-lg p-4 mb-6">
-            <h3 className="font-bold text-blue-900 mb-3">📊 Batch Processing Progress</h3>
-            <div className="grid grid-cols-3 gap-3 text-sm">
+        {/* Batch Processing Progress - Split by Blocks */}
+        {(processingStep1 || processingStep2 || step1Progress || step2Progress) && (
+          <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-lg p-4 mb-6">
+            <h3 className="font-bold text-orange-900 mb-3">📊 Block 1 Progress: Extraction</h3>
+            <div className="grid grid-cols-2 gap-3 text-sm">
               <div className={`bg-white rounded-lg p-3 border-2 ${step1Progress ? 'border-green-500' : processingStep1 ? 'border-yellow-500' : 'border-gray-300'}`}>
                 <div className="text-xs font-semibold text-gray-600 mb-1">📋 Extract Info</div>
                 <div className={`text-lg font-bold ${step1Progress ? 'text-green-600' : processingStep1 ? 'text-yellow-600' : 'text-gray-400'}`}>
@@ -1075,6 +1122,14 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   {step2Progress ? `✓ Done (${step2Progress.errors} errors)` : processingStep2 ? 'In Progress...' : 'Not Started'}
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {(processingStep3 || step3Progress) && (
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-lg p-4 mb-6">
+            <h3 className="font-bold text-blue-900 mb-3">📊 Block 2 Progress: FoodGraph Matching</h3>
+            <div className="grid grid-cols-1 gap-3 text-sm">
               <div className={`bg-white rounded-lg p-3 border-2 ${step3Progress ? 'border-green-500' : processingStep3 ? 'border-blue-500' : 'border-gray-300'}`}>
                 <div className="text-xs font-semibold text-gray-600 mb-1">🔍 Search & Save</div>
                 <div className={`text-lg font-bold ${step3Progress ? 'text-green-600' : processingStep3 ? 'text-blue-600' : 'text-gray-400'}`}>
