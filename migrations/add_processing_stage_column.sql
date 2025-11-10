@@ -4,7 +4,7 @@
 
 -- Add processing_stage column to track which stage each result came from
 ALTER TABLE branghunt_foodgraph_results 
-ADD COLUMN IF NOT EXISTS processing_stage TEXT DEFAULT 'ai_filtered' 
+ADD COLUMN IF NOT EXISTS processing_stage TEXT DEFAULT 'ai_filter' 
 CHECK (processing_stage IN ('search', 'pre_filter', 'ai_filter'));
 
 -- Add index for efficient filtering by stage
