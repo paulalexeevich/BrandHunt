@@ -41,6 +41,8 @@ export async function GET(
       .select(`
         id,
         file_path,
+        s3_url,
+        storage_type,
         mime_type,
         width,
         height,

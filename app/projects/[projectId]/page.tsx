@@ -633,11 +633,17 @@ export default function ProjectViewPage() {
                       >
                         {/* Image */}
                         <div className="aspect-[3/4] relative bg-gray-200">
-                          <img
-                            src={getImageUrl(image)}
-                            alt="Shelf image"
-                            className="w-full h-full object-cover"
-                          />
+                          {getImageUrl(image) ? (
+                            <img
+                              src={getImageUrl(image)}
+                              alt="Shelf image"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ImageIcon className="w-16 h-16 text-gray-400" />
+                            </div>
+                          )}
                           {/* Status Badge - 4 stages: uploaded, detected, extracted, selected */}
                           {image.status === 'uploaded' && (
                             <div className="absolute top-2 right-2 bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
