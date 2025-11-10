@@ -366,29 +366,28 @@ function extractRetailersFromUrls(urls: string[] | undefined): string[] {
 
 /**
  * Pre-filter FoodGraph results based on text similarity with extracted product info
- * Filters by brand, size, and retailer similarity before AI comparison
+ * Filters by brand and retailer similarity before AI comparison
  * 
- * Scoring weights (when available):
- * - Brand: 35% (most critical for product identity)
- * - Size: 35% (critical for exact product variant match)
+ * Scoring weights:
+ * - Brand: 70% (most critical for product identity)
  * - Retailer: 30% (ensures product is available at the store)
  * 
+ * Note: Size matching is excluded from pre-filtering to avoid false negatives from:
+ * - Size extraction errors or low confidence
+ * - Format differences between extracted size and FoodGraph (oz vs L, etc.)
+ * - Variant differences that AI image comparison can better identify
+ * 
  * Score normalization: Scores are normalized based on which fields are available.
- * If size is "Unknown", scoring uses only brand + retailer (normalized to 100%).
- * Example: Brand 80% + Retailer match = 0.28 + 0.30 = 0.58 raw score
- *          Normalized: 0.58 / 0.65 (max possible) = 89% → passes 85% threshold
+ * Example: Brand 80% match + Retailer match = 0.56 + 0.30 = 0.86 raw score
+ *          Normalized: 0.86 / 1.0 = 86% → passes 85% threshold
  * 
  * Threshold: Only products with ≥85% normalized similarity score are returned
  * This ensures only high-confidence matches proceed to expensive AI image comparison
  * 
- * Fallback logic: If zero results pass the threshold with size matching enabled,
- * automatically retries WITHOUT size matching (brand + retailer only).
- * This helps when size extraction is incorrect or FoodGraph has different size formats.
- * 
  * Note: Flavor is excluded because FoodGraph doesn't provide it as a separate field.
  * 
  * @param products - FoodGraph search results to filter
- * @param extractedInfo - Product information extracted from the shelf image
+ * @param extractedInfo - Product information extracted from the shelf image (size is ignored)
  * @param storeName - Optional store/retailer name from image metadata (e.g., "Target Store #1234")
  * @returns Filtered products with normalized similarity scores ≥85%
  */
@@ -405,43 +404,26 @@ export function preFilterFoodGraphResults(
   // Extract retailer from store name
   const imageRetailer = storeName ? extractRetailerFromStoreName(storeName) : null;
   
-  console.log('🔍 Pre-filtering FoodGraph results:', {
+  console.log('🔍 Pre-filtering FoodGraph results (Brand + Retailer only, size excluded):', {
     totalProducts: products.length,
-    extractedInfo,
+    brand: extractedInfo.brand,
     storeName,
-    imageRetailer
+    imageRetailer,
+    note: 'Size matching excluded from pre-filter'
   });
 
-  // Inner function to perform the actual filtering
-  // The forceExcludeSize parameter allows fallback without size matching
-  const performFiltering = (forceExcludeSize = false): Array<FoodGraphProduct & { similarityScore: number; matchReasons: string[] }> => {
-    const results = products.map((product, index) => {
+  const results = products.map((product, index) => {
     let score = 0;
     let maxPossibleScore = 0; // Track maximum possible score based on available fields
     const reasons: string[] = [];
     
-    // Determine which fields are available for scoring
+    // Determine which fields are available for scoring (size excluded from pre-filter)
     const hasBrand = extractedInfo.brand && extractedInfo.brand !== 'Unknown';
-    // Only use size if confidence >= 80% (0.8) AND not forced to exclude
-    const hasSize = !forceExcludeSize && 
-                    extractedInfo.size && 
-                    extractedInfo.size !== 'Unknown' && 
-                    (!extractedInfo.sizeConfidence || extractedInfo.sizeConfidence >= 0.8);
     const hasRetailer = !!imageRetailer;
     
-    // Log size confidence filtering (only for first product)
-    if (index === 0) {
-      if (forceExcludeSize) {
-        console.log('📏 Size matching DISABLED (fallback mode - zero results with size matching)');
-      } else if (extractedInfo.size && extractedInfo.size !== 'Unknown' && extractedInfo.sizeConfidence) {
-        console.log(`📏 Size confidence check: ${(extractedInfo.sizeConfidence * 100).toFixed(0)}% - ${extractedInfo.sizeConfidence >= 0.8 ? '✅ Using size' : '❌ Ignoring low-confidence size'}`);
-      }
-    }
-    
     // Calculate max possible score based on available fields
-    if (hasBrand) maxPossibleScore += 0.35;
-    if (hasSize) maxPossibleScore += 0.35;
-    if (hasRetailer) maxPossibleScore += 0.30;
+    if (hasBrand) maxPossibleScore += 0.70; // Brand is now 70%
+    if (hasRetailer) maxPossibleScore += 0.30; // Retailer stays 30%
     
     // Debug first product to see actual data structure
     if (index === 0) {
@@ -451,19 +433,17 @@ export function preFilterFoodGraphResults(
         companyManufacturer: product.companyManufacturer,
         measures: product.measures,
         category: product.category,
-        sourcePdpUrls: product.sourcePdpUrls,
-        ingredients: product.ingredients ? 'Present' : 'Missing'
+        sourcePdpUrls: product.sourcePdpUrls
       });
       console.log('🎲 Available fields for scoring:', {
         hasBrand,
-        hasSize: hasSize && !forceExcludeSize,
         hasRetailer,
         maxPossibleScore: maxPossibleScore.toFixed(2),
-        note: forceExcludeSize ? 'SIZE EXCLUDED (fallback mode)' : 'Score will be normalized based on available fields'
+        note: 'Size excluded from pre-filtering (AI image comparison handles variants)'
       });
     }
     
-    // Brand similarity (weight: 35%)
+    // Brand similarity (weight: 70% - increased from 35%)
     // Only apply brand scoring if brand is known (not undefined/null/Unknown)
     if (extractedInfo.brand && extractedInfo.brand !== 'Unknown') {
       const brandSimilarities = [
@@ -485,11 +465,11 @@ export function preFilterFoodGraphResults(
             title: brandSimilarities[2]
           },
           maxSimilarity: brandSimilarity,
-          scoreContribution: (brandSimilarity * 0.35).toFixed(2)
+          scoreContribution: (brandSimilarity * 0.70).toFixed(2)
         });
       }
       
-      score += brandSimilarity * 0.35;
+      score += brandSimilarity * 0.70;
       if (brandSimilarity > 0.5) {
         reasons.push(`Brand match: ${(brandSimilarity * 100).toFixed(0)}%`);
       }
@@ -498,65 +478,7 @@ export function preFilterFoodGraphResults(
       console.log('🏷️  Brand matching skipped:', {
         reason: !extractedInfo.brand ? 'Brand not extracted' : 'Brand is Unknown',
         brandValue: extractedInfo.brand,
-        note: 'Brand weight (35%) not applied to scoring'
-      });
-    }
-    
-    // Size similarity (weight: 35%)
-    // CRITICAL: Only apply size scoring if hasSize is true (confidence >= 80%)
-    if (hasSize) {
-      const extractedSize = extractSizeNumber(extractedInfo.size!);
-      const productSize = extractSizeNumber(product.measures || '');
-      
-      if (index === 0) {
-        console.log('📏 Size matching for first product:', {
-          extractedSize: extractedInfo.size,
-          extractedNumber: extractedSize,
-          productMeasures: product.measures,
-          productNumber: productSize,
-          sizeConfidence: extractedInfo.sizeConfidence ? (extractedInfo.sizeConfidence * 100).toFixed(0) + '%' : 'N/A'
-        });
-      }
-      
-      if (extractedSize !== null && productSize !== null) {
-        // Consider sizes similar if within 20% of each other
-        const sizeDiff = Math.abs(extractedSize - productSize) / Math.max(extractedSize, productSize);
-        const sizeSimilarity = Math.max(0, 1 - sizeDiff * 5); // 0-20% diff maps to 1.0-0.0
-        
-        if (index === 0) {
-          console.log('   Size numeric comparison:', {
-            sizeDiff: sizeDiff.toFixed(2),
-            sizeSimilarity: sizeSimilarity.toFixed(2),
-            scoreContribution: (sizeSimilarity * 0.35).toFixed(2)
-          });
-        }
-        
-        score += sizeSimilarity * 0.35;
-        if (sizeSimilarity > 0.5) {
-          reasons.push(`Size match: ${extractedInfo.size} ≈ ${product.measures}`);
-        }
-      } else if (product.measures && extractedInfo.size &&
-                 (extractedInfo.size.toLowerCase().includes(product.measures.toLowerCase()) ||
-                  product.measures.toLowerCase().includes(extractedInfo.size.toLowerCase()))) {
-        // Text-based size matching as fallback
-        score += 0.23; // 35% * 0.65 (partial credit for text match)
-        reasons.push(`Size text match`);
-        
-        if (index === 0) {
-          console.log('   Size text match: +0.23');
-        }
-      }
-    } else if (index === 0) {
-      // Log when size is skipped (low confidence, missing, or forced exclusion)
-      console.log('📏 Size matching skipped:', {
-        reason: forceExcludeSize ? 'Force excluded (fallback mode)' :
-                !extractedInfo.size ? 'Size not extracted' : 
-                extractedInfo.size === 'Unknown' ? 'Size is Unknown' :
-                extractedInfo.sizeConfidence && extractedInfo.sizeConfidence < 0.8 ? `Low confidence (${(extractedInfo.sizeConfidence * 100).toFixed(0)}%)` : 
-                'Unknown reason',
-        sizeValue: extractedInfo.size,
-        sizeConfidence: extractedInfo.sizeConfidence ? (extractedInfo.sizeConfidence * 100).toFixed(0) + '%' : 'N/A',
-        note: 'Size weight (35%) NOT applied to scoring'
+        note: 'Brand weight (70%) not applied to scoring'
       });
     }
     
@@ -618,57 +540,28 @@ export function preFilterFoodGraphResults(
     };
   });
 
-    // Filter products with similarity score >= 0.85 (85% threshold for AI filtering)
-    // High threshold ensures only strong matches go to expensive AI comparison
-    // Scores are normalized, so 85% threshold applies to available fields only
-    const filtered = results
-      .filter(r => r.similarityScore >= 0.85)
-      .sort((a, b) => b.similarityScore - a.similarityScore);
+  // Filter products with similarity score >= 0.85 (85% threshold for AI filtering)
+  // High threshold ensures only strong matches go to expensive AI comparison
+  // Scores are normalized, so 85% threshold applies to available fields only
+  const filtered = results
+    .filter(r => r.similarityScore >= 0.85)
+    .sort((a, b) => b.similarityScore - a.similarityScore);
 
-    console.log('✅ Pre-filter results:', {
-      originalCount: products.length,
-      filteredCount: filtered.length,
-      threshold: '85% (normalized)',
-      mode: forceExcludeSize ? 'FALLBACK (no size)' : 'NORMAL',
-      fieldsUsed: {
-        brand: extractedInfo.brand && extractedInfo.brand !== 'Unknown',
-        size: !forceExcludeSize && extractedInfo.size && extractedInfo.size !== 'Unknown',
-        retailer: !!imageRetailer
-      },
-      topScores: filtered.slice(0, 5).map(r => ({
-        title: r.title,
-        score: (r.similarityScore * 100).toFixed(0) + '%',
-        reasons: r.matchReasons
-      }))
-    });
+  console.log('✅ Pre-filter results:', {
+    originalCount: products.length,
+    filteredCount: filtered.length,
+    threshold: '85% (normalized)',
+    fieldsUsed: {
+      brand: extractedInfo.brand && extractedInfo.brand !== 'Unknown',
+      size: false, // Size excluded from pre-filtering
+      retailer: !!imageRetailer
+    },
+    topScores: filtered.slice(0, 5).map(r => ({
+      title: r.title,
+      score: (r.similarityScore * 100).toFixed(0) + '%',
+      reasons: r.matchReasons
+    }))
+  });
 
-    return filtered;
-  }; // End of performFiltering inner function
-
-  // First attempt: Try with all available fields (including size if available)
-  const initialResults = performFiltering(false);
-  
-  // Fallback logic: If zero results and size was used, retry without size
-  if (initialResults.length === 0) {
-    // Check if size was actually being used in the initial attempt
-    const sizeWasUsed = extractedInfo.size && 
-                        extractedInfo.size !== 'Unknown' && 
-                        (!extractedInfo.sizeConfidence || extractedInfo.sizeConfidence >= 0.8);
-    
-    if (sizeWasUsed) {
-      console.log('⚠️  FALLBACK TRIGGERED: Zero results with size matching. Retrying WITHOUT size criteria...');
-      const fallbackResults = performFiltering(true);
-      
-      if (fallbackResults.length > 0) {
-        console.log(`✅ Fallback successful: Found ${fallbackResults.length} matches using brand + retailer only`);
-        return fallbackResults;
-      } else {
-        console.log('❌ Fallback also returned zero results');
-      }
-    } else {
-      console.log('ℹ️  Zero results but size was not used in matching (already excluded or unavailable)');
-    }
-  }
-  
-  return initialResults;
+  return filtered;
 }
