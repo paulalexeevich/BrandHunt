@@ -116,6 +116,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     natural: { width: number; height: number };
     displayed: { width: number; height: number };
   } | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'details_not_visible' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches'>('all');
 
   useEffect(() => {
     fetchImage();
@@ -1205,46 +1206,88 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                 {/* Total Products */}
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                <button
+                  onClick={() => setActiveFilter('all')}
+                  className={`bg-white rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                    activeFilter === 'all' ? 'border-gray-900 ring-2 ring-gray-900' : 'border-gray-200'
+                  }`}
+                >
                   <div className="text-2xl font-bold text-gray-900">{totalProducts}</div>
                   <div className="text-xs text-gray-600 mt-1">Total Products</div>
-                </div>
+                  {activeFilter === 'all' && <div className="text-xs text-gray-900 font-semibold mt-1">● Active</div>}
+                </button>
 
                 {/* Not Product */}
-                <div className="bg-red-50 rounded-lg p-4 shadow-sm border border-red-200">
+                <button
+                  onClick={() => setActiveFilter('not_product')}
+                  className={`bg-red-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                    activeFilter === 'not_product' ? 'border-red-900 ring-2 ring-red-900' : 'border-red-200'
+                  }`}
+                >
                   <div className="text-2xl font-bold text-red-700">{notProduct}</div>
                   <div className="text-xs text-red-600 mt-1">Not Product</div>
-                </div>
+                  {activeFilter === 'not_product' && <div className="text-xs text-red-900 font-semibold mt-1">● Active</div>}
+                </button>
 
                 {/* Details Not Visible */}
-                <div className="bg-orange-50 rounded-lg p-4 shadow-sm border border-orange-200">
+                <button
+                  onClick={() => setActiveFilter('details_not_visible')}
+                  className={`bg-orange-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                    activeFilter === 'details_not_visible' ? 'border-orange-900 ring-2 ring-orange-900' : 'border-orange-200'
+                  }`}
+                >
                   <div className="text-2xl font-bold text-orange-700">{detailsNotVisible}</div>
                   <div className="text-xs text-orange-600 mt-1">Details Not Visible</div>
-                </div>
+                  {activeFilter === 'details_not_visible' && <div className="text-xs text-orange-900 font-semibold mt-1">● Active</div>}
+                </button>
 
                 {/* Valid Not Processed */}
-                <div className="bg-gray-50 rounded-lg p-4 shadow-sm border border-gray-300">
+                <button
+                  onClick={() => setActiveFilter('not_identified')}
+                  className={`bg-gray-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                    activeFilter === 'not_identified' ? 'border-gray-900 ring-2 ring-gray-900' : 'border-gray-300'
+                  }`}
+                >
                   <div className="text-2xl font-bold text-gray-700">{validNotProcessed}</div>
                   <div className="text-xs text-gray-600 mt-1">Not Identified</div>
-                </div>
+                  {activeFilter === 'not_identified' && <div className="text-xs text-gray-900 font-semibold mt-1">● Active</div>}
+                </button>
 
                 {/* Valid with ONE Match */}
-                <div className="bg-green-50 rounded-lg p-4 shadow-sm border border-green-200">
+                <button
+                  onClick={() => setActiveFilter('one_match')}
+                  className={`bg-green-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                    activeFilter === 'one_match' ? 'border-green-900 ring-2 ring-green-900' : 'border-green-200'
+                  }`}
+                >
                   <div className="text-2xl font-bold text-green-700">{validWithMatch}</div>
                   <div className="text-xs text-green-600 mt-1">✓ ONE Match</div>
-                </div>
+                  {activeFilter === 'one_match' && <div className="text-xs text-green-900 font-semibold mt-1">● Active</div>}
+                </button>
 
                 {/* Valid NO Match */}
-                <div className="bg-yellow-50 rounded-lg p-4 shadow-sm border border-yellow-200">
+                <button
+                  onClick={() => setActiveFilter('no_match')}
+                  className={`bg-yellow-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                    activeFilter === 'no_match' ? 'border-yellow-900 ring-2 ring-yellow-900' : 'border-yellow-200'
+                  }`}
+                >
                   <div className="text-2xl font-bold text-yellow-700">{validNoMatch}</div>
                   <div className="text-xs text-yellow-600 mt-1">NO Match</div>
-                </div>
+                  {activeFilter === 'no_match' && <div className="text-xs text-yellow-900 font-semibold mt-1">● Active</div>}
+                </button>
 
                 {/* Valid 2+ Matches */}
-                <div className="bg-purple-50 rounded-lg p-4 shadow-sm border border-purple-200">
+                <button
+                  onClick={() => setActiveFilter('multiple_matches')}
+                  className={`bg-purple-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                    activeFilter === 'multiple_matches' ? 'border-purple-900 ring-2 ring-purple-900' : 'border-purple-200'
+                  }`}
+                >
                   <div className="text-2xl font-bold text-purple-700">{validMultipleMatches}</div>
                   <div className="text-xs text-purple-600 mt-1">2+ Matches</div>
-                </div>
+                  {activeFilter === 'multiple_matches' && <div className="text-xs text-purple-900 font-semibold mt-1">● Active</div>}
+                </button>
               </div>
 
               {/* Progress Bar */}
@@ -1280,6 +1323,69 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   {showProductLabels ? '🏷️ Hide' : '🏷️ Show'} Labels
                 </button>
             </div>
+
+            {/* Active Filter Indicator */}
+            {activeFilter !== 'all' && (() => {
+              const filteredDetections = detections.filter((detection) => {
+                if (activeFilter === 'not_product') return detection.is_product === false;
+                if (activeFilter === 'details_not_visible') return detection.is_product === true && detection.details_visible === false;
+                if (activeFilter === 'not_identified') {
+                  return (detection.is_product === true || detection.is_product === null) && 
+                         (detection.details_visible === true || detection.details_visible === null) &&
+                         !detection.brand_name;
+                }
+                if (activeFilter === 'one_match') return detection.fully_analyzed === true;
+                if (activeFilter === 'no_match') {
+                  return detection.brand_name && 
+                         !detection.fully_analyzed && 
+                         detection.foodgraph_results && 
+                         detection.foodgraph_results.length === 0;
+                }
+                if (activeFilter === 'multiple_matches') {
+                  return detection.brand_name && 
+                         !detection.fully_analyzed && 
+                         detection.foodgraph_results && 
+                         detection.foodgraph_results.length > 1;
+                }
+                return false;
+              });
+
+              const filterLabels = {
+                'not_product': 'Not Product',
+                'details_not_visible': 'Details Not Visible',
+                'not_identified': 'Not Identified',
+                'one_match': '✓ ONE Match',
+                'no_match': 'NO Match',
+                'multiple_matches': '2+ Matches'
+              };
+
+              const filterColors = {
+                'not_product': 'bg-red-100 border-red-300 text-red-900',
+                'details_not_visible': 'bg-orange-100 border-orange-300 text-orange-900',
+                'not_identified': 'bg-gray-100 border-gray-300 text-gray-900',
+                'one_match': 'bg-green-100 border-green-300 text-green-900',
+                'no_match': 'bg-yellow-100 border-yellow-300 text-yellow-900',
+                'multiple_matches': 'bg-purple-100 border-purple-300 text-purple-900'
+              };
+
+              return (
+                <div className={`mb-4 p-3 rounded-lg border-2 ${filterColors[activeFilter]}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">🔍 Filter Active:</span>
+                      <span className="font-bold">{filterLabels[activeFilter]}</span>
+                      <span className="text-sm">({filteredDetections.length} of {detections.length} products shown)</span>
+                    </div>
+                    <button
+                      onClick={() => setActiveFilter('all')}
+                      className="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 font-medium"
+                    >
+                      Clear Filter
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
             
             <div className="relative inline-block max-w-full">
               <img
@@ -1289,7 +1395,31 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 className="max-w-full h-auto rounded-lg"
                 style={{ display: 'block' }}
               />
-              {imageDimensions ? detections.map((detection, index) => {
+              {imageDimensions ? detections.filter((detection) => {
+                // Filter based on active filter
+                if (activeFilter === 'all') return true;
+                if (activeFilter === 'not_product') return detection.is_product === false;
+                if (activeFilter === 'details_not_visible') return detection.is_product === true && detection.details_visible === false;
+                if (activeFilter === 'not_identified') {
+                  return (detection.is_product === true || detection.is_product === null) && 
+                         (detection.details_visible === true || detection.details_visible === null) &&
+                         !detection.brand_name;
+                }
+                if (activeFilter === 'one_match') return detection.fully_analyzed === true;
+                if (activeFilter === 'no_match') {
+                  return detection.brand_name && 
+                         !detection.fully_analyzed && 
+                         detection.foodgraph_results && 
+                         detection.foodgraph_results.length === 0;
+                }
+                if (activeFilter === 'multiple_matches') {
+                  return detection.brand_name && 
+                         !detection.fully_analyzed && 
+                         detection.foodgraph_results && 
+                         detection.foodgraph_results.length > 1;
+                }
+                return true;
+              }).map((detection, index) => {
                 const box = detection.bounding_box;
                 const isSelected = detection.id === selectedDetection;
                 
