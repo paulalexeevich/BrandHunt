@@ -210,6 +210,41 @@ export async function POST(request: NextRequest) {
               total: detections.length
             });
 
+            // SAVE STAGE 1: Raw search results
+            console.log(`  [#${detection.detection_index}] 💾 Saving ${foodgraphResults.length} raw search results...`);
+            const searchInserts = foodgraphResults.map((fgResult, index) => ({
+              detection_id: detection.id,
+              search_term: searchTerm || `${detection.brand_name} ${detection.product_name || ''}`.trim(),
+              result_rank: index + 1,
+              product_gtin: fgResult.product_gtin || fgResult.key || null,
+              product_name: fgResult.product_name || fgResult.title || null,
+              brand_name: fgResult.brand_name || fgResult.companyBrand || null,
+              category: fgResult.category || null,
+              measures: fgResult.measures || null,
+              front_image_url: fgResult.front_image_url || null,
+              full_data: fgResult,
+              processing_stage: 'search',
+              match_status: null,
+              match_confidence: null,
+              visual_similarity: null,
+            }));
+
+            // Delete existing results for this detection before inserting new ones
+            await supabase
+              .from('branghunt_foodgraph_results')
+              .delete()
+              .eq('detection_id', detection.id);
+
+            const { error: searchInsertError } = await supabase
+              .from('branghunt_foodgraph_results')
+              .insert(searchInserts);
+
+            if (searchInsertError) {
+              console.error(`    ⚠️ Failed to save raw search results:`, searchInsertError.message);
+            } else {
+              console.log(`    ✅ Saved ${searchInserts.length} raw search results`);
+            }
+
             console.log(`  [#${detection.detection_index}] Pre-filtering ${foodgraphResults.length} results by brand/size/retailer...`);
 
             // Apply text-based pre-filtering with retailer matching
@@ -225,6 +260,35 @@ export async function POST(request: NextRequest) {
             );
 
             console.log(`  ✅ Pre-filtered to ${preFilteredResults.length} results (from ${foodgraphResults.length})`);
+
+            // SAVE STAGE 2: Pre-filtered results
+            console.log(`  [#${detection.detection_index}] 💾 Saving ${preFilteredResults.length} pre-filtered results...`);
+            const preFilterInserts = preFilteredResults.map((fgResult, index) => ({
+              detection_id: detection.id,
+              search_term: searchTerm || `${detection.brand_name} ${detection.product_name || ''}`.trim(),
+              result_rank: index + 1,
+              product_gtin: fgResult.product_gtin || fgResult.key || null,
+              product_name: fgResult.product_name || fgResult.title || null,
+              brand_name: fgResult.brand_name || fgResult.companyBrand || null,
+              category: fgResult.category || null,
+              measures: fgResult.measures || null,
+              front_image_url: fgResult.front_image_url || null,
+              full_data: fgResult,
+              processing_stage: 'pre_filter',
+              match_status: null,
+              match_confidence: null,
+              visual_similarity: null,
+            }));
+
+            const { error: preFilterInsertError } = await supabase
+              .from('branghunt_foodgraph_results')
+              .insert(preFilterInserts);
+
+            if (preFilterInsertError) {
+              console.error(`    ⚠️ Failed to save pre-filtered results:`, preFilterInsertError.message);
+            } else {
+              console.log(`    ✅ Saved ${preFilterInserts.length} pre-filtered results`);
+            }
 
             sendProgress({
               type: 'progress',
@@ -356,11 +420,10 @@ export async function POST(request: NextRequest) {
 
             const comparisonResults = await Promise.all(comparisonPromises);
             
-            // SAVE INTERMEDIATE RESULTS TO DATABASE
-            // This allows users to review complex cases with multiple matches
-            console.log(`  [#${detection.detection_index}] Saving ${comparisonResults.length} FoodGraph results to database...`);
+            // SAVE STAGE 3: AI-filtered results with match scores
+            console.log(`  [#${detection.detection_index}] 💾 Saving ${comparisonResults.length} AI-filtered results to database...`);
             
-            const foodgraphInserts = comparisonResults.map((comparison, index) => {
+            const aiFilterInserts = comparisonResults.map((comparison, index) => {
               const fgResult = comparison.result;
               return {
                 detection_id: detection.id,
@@ -373,41 +436,37 @@ export async function POST(request: NextRequest) {
                 measures: fgResult.measures || null,
                 front_image_url: fgResult.front_image_url || null,
                 full_data: fgResult,
+                processing_stage: 'ai_filter',
                 match_status: comparison.matchStatus || 'not_match',
                 match_confidence: comparison.details?.confidence || 0,
                 visual_similarity: comparison.details?.visualSimilarity || 0,
               };
             });
 
-            // Delete existing results for this detection (in case of re-processing)
-            await supabase
+            // Insert AI-filtered results (we already have search and pre_filter results in DB)
+            const { error: aiFilterInsertError, data: aiFilterInsertData } = await supabase
               .from('branghunt_foodgraph_results')
-              .delete()
-              .eq('detection_id', detection.id);
-
-            // Insert all results
-            const { error: insertError, data: insertData } = await supabase
-              .from('branghunt_foodgraph_results')
-              .insert(foodgraphInserts)
+              .insert(aiFilterInserts)
               .select();
 
-            if (insertError) {
-              console.error(`    ❌ FAILED TO SAVE FOODGRAPH RESULTS for detection #${detection.detection_index}:`, {
-                error: insertError,
-                message: insertError.message,
-                details: insertError.details,
-                hint: insertError.hint,
-                code: insertError.code,
+            if (aiFilterInsertError) {
+              console.error(`    ❌ FAILED TO SAVE AI-FILTERED RESULTS for detection #${detection.detection_index}:`, {
+                error: aiFilterInsertError,
+                message: aiFilterInsertError.message,
+                details: aiFilterInsertError.details,
+                hint: aiFilterInsertError.hint,
+                code: aiFilterInsertError.code,
                 detection_id: detection.id,
                 image_id: detection.image_id,
                 project_id: image?.project_id,
-                num_results_attempted: foodgraphInserts.length
+                num_results_attempted: aiFilterInserts.length
               });
               // Don't fail the entire operation, but make error very visible
-              result.error = `Failed to save ${foodgraphInserts.length} FoodGraph results: ${insertError.message}`;
+              result.error = `Failed to save ${aiFilterInserts.length} AI-filtered results: ${aiFilterInsertError.message}`;
             } else {
-              console.log(`    ✅ Saved ${foodgraphInserts.length} FoodGraph results to database`);
-              console.log(`    📊 Insert confirmation: ${insertData?.length || 0} rows inserted`);
+              console.log(`    ✅ Saved ${aiFilterInserts.length} AI-filtered results to database`);
+              console.log(`    📊 Insert confirmation: ${aiFilterInsertData?.length || 0} rows inserted`);
+              console.log(`    📊 Total results in DB for this detection: ${searchInserts.length} search + ${preFilterInserts.length} pre-filter + ${aiFilterInserts.length} AI-filter`);
             }
             
             // CONSOLIDATION LOGIC: Check for identical and almost_same matches

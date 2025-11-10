@@ -63,6 +63,7 @@ interface FoodGraphResult {
   result_rank: number;
   is_match?: boolean | null;
   match_confidence?: number | null;
+  processing_stage?: 'search' | 'pre_filter' | 'ai_filter' | null;
   companyBrand?: string | null;
   companyManufacturer?: string | null;
   measures?: string | null;
@@ -98,6 +99,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [preFiltering, setPreFiltering] = useState(false);
   const [preFilteredCount, setPreFilteredCount] = useState<number | null>(null);
   const [consolidationApplied, setConsolidationApplied] = useState(false);
+  const [stageFilter, setStageFilter] = useState<'all' | 'search' | 'pre_filter' | 'ai_filter'>('all');
   const [matchStatusCounts, setMatchStatusCounts] = useState<{ identical: number; almostSame: number } | null>(null);
   const [showProductLabels, setShowProductLabels] = useState(true);
   const [extractingPrice, setExtractingPrice] = useState(false);
@@ -1957,12 +1959,86 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         </div>
                       )}
                       
+                      {/* Stage Filter Buttons */}
+                      {(() => {
+                        const stageStats = {
+                          all: foodgraphResults.length,
+                          search: foodgraphResults.filter(r => r.processing_stage === 'search').length,
+                          pre_filter: foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length,
+                          ai_filter: foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length
+                        };
+                        
+                        // Only show stage filter if we have results from multiple stages
+                        const hasMultipleStages = (stageStats.search > 0 ? 1 : 0) + (stageStats.pre_filter > 0 ? 1 : 0) + (stageStats.ai_filter > 0 ? 1 : 0) > 1;
+                        
+                        if (!hasMultipleStages) return null;
+                        
+                        return (
+                          <div className="mb-4">
+                            <p className="text-sm font-semibold text-gray-700 mb-2">Filter by Processing Stage:</p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => setStageFilter('all')}
+                                className={`px-3 py-1 text-sm rounded-lg transition-all ${
+                                  stageFilter === 'all'
+                                    ? 'bg-indigo-600 text-white ring-2 ring-indigo-300'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                              >
+                                All ({stageStats.all})
+                              </button>
+                              {stageStats.search > 0 && (
+                                <button
+                                  onClick={() => setStageFilter('search')}
+                                  className={`px-3 py-1 text-sm rounded-lg transition-all ${
+                                    stageFilter === 'search'
+                                      ? 'bg-blue-600 text-white ring-2 ring-blue-300'
+                                      : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                  }`}
+                                >
+                                  🔍 Search ({stageStats.search})
+                                </button>
+                              )}
+                              {stageStats.pre_filter > 0 && (
+                                <button
+                                  onClick={() => setStageFilter('pre_filter')}
+                                  className={`px-3 py-1 text-sm rounded-lg transition-all ${
+                                    stageFilter === 'pre_filter'
+                                      ? 'bg-orange-600 text-white ring-2 ring-orange-300'
+                                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                                  }`}
+                                >
+                                  ⚡ Pre-filter ({stageStats.pre_filter})
+                                </button>
+                              )}
+                              {stageStats.ai_filter > 0 && (
+                                <button
+                                  onClick={() => setStageFilter('ai_filter')}
+                                  className={`px-3 py-1 text-sm rounded-lg transition-all ${
+                                    stageFilter === 'ai_filter'
+                                      ? 'bg-purple-600 text-white ring-2 ring-purple-300'
+                                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                  }`}
+                                >
+                                  🤖 AI Filter ({stageStats.ai_filter})
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      
                       <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
                         {(() => {
+                          // Apply stage filter first
+                          let filteredResults = stageFilter === 'all' 
+                            ? foodgraphResults 
+                            : foodgraphResults.filter(r => r.processing_stage === stageFilter);
+                          
                           // If AI filtered, show all results (with confidence scores). Otherwise show first 50
                           const resultsToShow = filteredCount !== null
-                            ? foodgraphResults // Show all (already sorted by confidence from backend)
-                            : foodgraphResults.slice(0, 50);
+                            ? filteredResults // Show all (already sorted by confidence from backend)
+                            : filteredResults.slice(0, 50);
                           
                           return resultsToShow.map((result, index) => {
                             const isSaved = detection.selected_foodgraph_result_id === result.id;
@@ -2212,6 +2288,28 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     )}
                   </div>
                 )}
+                                
+                                {/* Stage Badge */}
+                                {result.processing_stage && (
+                                  <div className="mt-2 mb-1 flex items-center justify-center">
+                                    {result.processing_stage === 'search' && (
+                                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-semibold rounded-full">
+                                        🔍 Search Stage
+                                      </span>
+                                    )}
+                                    {result.processing_stage === 'pre_filter' && (
+                                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded-full">
+                                        ⚡ Pre-filtered (≥85%)
+                                      </span>
+                                    )}
+                                    {result.processing_stage === 'ai_filter' && (
+                                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-semibold rounded-full">
+                                        🤖 AI Analyzed
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                
                                 {isSaved ? (
                                   <div className="mt-2 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded text-center flex items-center justify-center gap-1">
                                     <CheckCircle className="w-3 h-3" />
