@@ -92,10 +92,10 @@ export async function GET(
       });
     }
 
-    // Format images with proper data URIs and detection counts
+    // Format images with detection counts (keep original fields for S3 URL support)
     const formattedImages = (images || []).map(img => ({
       ...img,
-      image_data: `data:${img.mime_type};base64,${img.file_path}`,
+      // Keep all fields for frontend to determine image source (s3_url or file_path)
       detections: [{ count: detectionCounts[img.id] || 0 }]
     }));
 

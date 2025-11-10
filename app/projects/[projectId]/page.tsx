@@ -29,6 +29,7 @@ import {
 import AuthNav from '@/components/AuthNav';
 import { createClient } from '@/lib/supabase-browser';
 import { User } from '@supabase/supabase-js';
+import { getImageUrl } from '@/lib/image-utils';
 
 interface ProjectStats {
   project_id: string;
@@ -49,7 +50,9 @@ interface ProjectStats {
 
 interface ImageData {
   id: string;
-  image_data: string;
+  file_path: string | null;
+  s3_url: string | null;
+  storage_type?: 's3_url' | 'base64';
   mime_type: string;
   width: number;
   height: number;
@@ -631,7 +634,7 @@ export default function ProjectViewPage() {
                         {/* Image */}
                         <div className="aspect-[3/4] relative bg-gray-200">
                           <img
-                            src={image.image_data}
+                            src={getImageUrl(image)}
                             alt="Shelf image"
                             className="w-full h-full object-cover"
                           />
