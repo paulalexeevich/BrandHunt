@@ -1031,48 +1031,50 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           const hasExtractionWork = needsInfo > 0 || needsPrice > 0;
 
           return hasExtractionWork ? (
-            <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-xl shadow-lg p-6 mb-6 border-2 border-orange-200">
-              <div className="mb-4">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  📋 Block 1: Extract Information
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Extract product details (brand, name, size, price) from detected products
-                </p>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={handleExtractInfoAll}
-                  disabled={processingStep1 || needsInfo === 0}
-                  className="px-6 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-all font-bold disabled:opacity-50 flex items-center gap-2 shadow-md"
-                  title={needsInfo === 0 ? 'All products have info extracted' : `Extract info for ${needsInfo} products`}
-                >
-                  {processingStep1 ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Extracting...
-                    </>
-                  ) : (
-                    `📋 Extract Info (${needsInfo})`
-                  )}
-                </button>
+            <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-lg shadow p-4 mb-4 border-2 border-orange-200">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base font-bold text-gray-900">
+                    📋 Block 1: Extract Information
+                  </h2>
+                  <p className="text-xs text-gray-600">
+                    Extract product details (brand, name, size, price) from detected products
+                  </p>
+                </div>
                 
-                <button
-                  onClick={handleExtractPriceAll}
-                  disabled={processingStep2 || needsPrice === 0}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-bold disabled:opacity-50 flex items-center gap-2 shadow-md"
-                  title={needsPrice === 0 ? 'All products have prices' : `Extract price for ${needsPrice} products`}
-                >
-                  {processingStep2 ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Extracting...
-                    </>
-                  ) : (
-                    `💰 Extract Price (${needsPrice})`
-                  )}
-                </button>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={handleExtractInfoAll}
+                    disabled={processingStep1 || needsInfo === 0}
+                    className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 text-sm"
+                    title={needsInfo === 0 ? 'All products have info extracted' : `Extract info for ${needsInfo} products`}
+                  >
+                    {processingStep1 ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Extracting...
+                      </>
+                    ) : (
+                      `📋 Extract Info (${needsInfo})`
+                    )}
+                  </button>
+                  
+                  <button
+                    onClick={handleExtractPriceAll}
+                    disabled={processingStep2 || needsPrice === 0}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 text-sm"
+                    title={needsPrice === 0 ? 'All products have prices' : `Extract price for ${needsPrice} products`}
+                  >
+                    {processingStep2 ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Extracting...
+                      </>
+                    ) : (
+                      `💰 Extract Price (${needsPrice})`
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           ) : null;
@@ -1083,60 +1085,60 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           const needsSearch = detections.filter(d => d.brand_name && !d.fully_analyzed).length;
           
           return needsSearch > 0 ? (
-            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl shadow-lg p-6 mb-6 border-2 border-blue-300">
-              <div className="mb-4">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg shadow p-4 mb-4 border-2 border-blue-300">
+              <div className="mb-3">
+                <h2 className="text-base font-bold text-gray-900">
                   🔍 Block 2: Product Matching with FoodGraph
                 </h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-xs text-gray-600">
                   Search, pre-filter, AI filter, and save product matches from FoodGraph database
                 </p>
               </div>
               
               <div>
-                <p className="text-sm font-semibold text-gray-700 mb-3">
+                <p className="text-xs font-semibold text-gray-700 mb-2">
                   🔍 Search & Save ({needsSearch} products ready)
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-5 gap-2">
                   <button
                     onClick={() => handleSearchAndSaveAll(3)}
                     disabled={processingStep3 || needsSearch === 0}
-                    className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-bold disabled:opacity-50 text-sm shadow-md"
+                    className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-semibold disabled:opacity-50 text-xs"
                     title="Process 3 products at a time (safe)"
                   >
-                    {processingStep3 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '⚡ 3 at once'}
+                    {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡ 3 at once'}
                   </button>
                   <button
                     onClick={() => handleSearchAndSaveAll(10)}
                     disabled={processingStep3 || needsSearch === 0}
-                    className="px-4 py-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-all font-bold disabled:opacity-50 text-sm shadow-md"
+                    className="px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-all font-semibold disabled:opacity-50 text-xs"
                     title="Process 10 products at a time"
                   >
-                    {processingStep3 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '⚡⚡ 10 at once'}
+                    {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡ 10 at once'}
                   </button>
                   <button
                     onClick={() => handleSearchAndSaveAll(20)}
                     disabled={processingStep3 || needsSearch === 0}
-                    className="px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all font-bold disabled:opacity-50 text-sm shadow-md"
+                    className="px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all font-semibold disabled:opacity-50 text-xs"
                     title="Process 20 products at a time"
                   >
-                    {processingStep3 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '⚡⚡⚡ 20 at once'}
+                    {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡⚡ 20 at once'}
                   </button>
                   <button
                     onClick={() => handleSearchAndSaveAll(50)}
                     disabled={processingStep3 || needsSearch === 0}
-                    className="px-4 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-all font-bold disabled:opacity-50 text-sm shadow-md"
+                    className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-all font-semibold disabled:opacity-50 text-xs"
                     title="Process 50 products at a time"
                   >
-                    {processingStep3 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '🚀 50 at once'}
+                    {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🚀 50 at once'}
                   </button>
                   <button
                     onClick={() => handleSearchAndSaveAll(999999)}
                     disabled={processingStep3 || needsSearch === 0}
-                    className="px-4 py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg hover:from-red-600 hover:to-orange-600 transition-all font-black disabled:opacity-50 text-sm col-span-2 md:col-span-1 shadow-lg"
+                    className="px-3 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg hover:from-red-600 hover:to-orange-600 transition-all font-bold disabled:opacity-50 text-xs"
                     title="Process ALL products simultaneously"
                   >
-                    {processingStep3 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '🔥 ALL 🔥'}
+                    {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🔥 ALL 🔥'}
                   </button>
                 </div>
               </div>
