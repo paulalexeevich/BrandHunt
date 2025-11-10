@@ -243,6 +243,16 @@ export async function POST(request: NextRequest) {
               console.error(`    ⚠️ Failed to save raw search results:`, searchInsertError.message);
             } else {
               console.log(`    ✅ Saved ${searchInserts.length} raw search results`);
+              
+              // Send progress update with save count
+              sendProgress({
+                type: 'progress',
+                detectionIndex: detection.detection_index,
+                stage: 'saving',
+                message: `💾 Search: ${searchInserts.length} results saved`,
+                processed: globalIndex + 1,
+                total: detections.length
+              });
             }
 
             console.log(`  [#${detection.detection_index}] Pre-filtering ${foodgraphResults.length} results by brand/size/retailer...`);
@@ -288,6 +298,16 @@ export async function POST(request: NextRequest) {
               console.error(`    ⚠️ Failed to save pre-filtered results:`, preFilterInsertError.message);
             } else {
               console.log(`    ✅ Saved ${preFilterInserts.length} pre-filtered results`);
+              
+              // Send progress update with save count
+              sendProgress({
+                type: 'progress',
+                detectionIndex: detection.detection_index,
+                stage: 'saving',
+                message: `💾 Pre-filter: ${preFilterInserts.length} results saved`,
+                processed: globalIndex + 1,
+                total: detections.length
+              });
             }
 
             sendProgress({
@@ -467,6 +487,16 @@ export async function POST(request: NextRequest) {
               console.log(`    ✅ Saved ${aiFilterInserts.length} AI-filtered results to database`);
               console.log(`    📊 Insert confirmation: ${aiFilterInsertData?.length || 0} rows inserted`);
               console.log(`    📊 Total results in DB for this detection: ${searchInserts.length} search + ${preFilterInserts.length} pre-filter + ${aiFilterInserts.length} AI-filter`);
+              
+              // Send progress update with all save counts
+              sendProgress({
+                type: 'progress',
+                detectionIndex: detection.detection_index,
+                stage: 'saving',
+                message: `💾 AI-filter: ${aiFilterInserts.length} results saved (Total: ${searchInserts.length + preFilterInserts.length + aiFilterInserts.length})`,
+                processed: globalIndex + 1,
+                total: detections.length
+              });
             }
             
             // CONSOLIDATION LOGIC: Check for identical and almost_same matches
