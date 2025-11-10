@@ -2028,7 +2028,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         );
                       })()}
                       
-                      <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
                         {(() => {
                           // Apply stage filter first
                           let filteredResults = stageFilter === 'all' 
@@ -2093,50 +2093,57 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 'border-gray-200'
                               } overflow-hidden hover:border-indigo-400 transition-colors relative`}
                             >
-                          {/* SELECTED badge (for batch-processed saved products) */}
-                          {detection.fully_analyzed && result.id === detection.selected_foodgraph_result_id && (
-                            <div className="absolute top-2 left-2 z-10">
-                              <span className="px-2 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold rounded-full flex items-center gap-1 shadow-lg">
-                                🎯 SELECTED
-                              </span>
-                            </div>
-                          )}
+                              {/* Horizontal layout: image on left, content on right */}
+                              <div className="flex gap-3 p-3">
+                                {/* Left: Product Image */}
+                                <div className="flex-shrink-0 relative">
+                                  {/* SELECTED badge (for batch-processed saved products) */}
+                                  {detection.fully_analyzed && result.id === detection.selected_foodgraph_result_id && (
+                                    <div className="absolute -top-1 -left-1 z-10">
+                                      <span className="px-2 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold rounded-full flex items-center gap-1 shadow-lg">
+                                        🎯 SELECTED
+                                      </span>
+                                    </div>
+                                  )}
 
-                          {/* Match Status badge (only show after AI filtering) */}
-                          {filteredCount !== null && (
-                            <div className="absolute top-2 right-2 z-10">
-                              {matchStatus === 'identical' ? (
-                                <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
-                                  ✓ IDENTICAL
-                                </span>
-                              ) : matchStatus === 'almost_same' ? (
-                                <span className="px-2 py-1 bg-yellow-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
-                                  ≈ ALMOST SAME
-                                </span>
-                              ) : passedThreshold ? (
-                                <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
-                                  ✓ PASS
-                                </span>
-                              ) : (
-                                <span className="px-2 py-1 bg-gray-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
-                                  ✗ FAIL
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          
-                          {result.front_image_url ? (
-                            <img
-                              src={result.front_image_url}
-                              alt={result.product_name || 'Product'}
-                                  className="w-full h-24 object-contain bg-gray-50"
-                            />
-                          ) : (
-                                <div className="w-full h-24 bg-gray-100 flex items-center justify-center">
-                              <Package className="w-8 h-8 text-gray-400" />
-                            </div>
-                          )}
-                              <div className="p-2">
+                                  {/* Match Status badge (only show after AI filtering) */}
+                                  {filteredCount !== null && (
+                                    <div className="absolute -top-1 -right-1 z-10">
+                                      {matchStatus === 'identical' ? (
+                                        <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                          ✓ IDENTICAL
+                                        </span>
+                                      ) : matchStatus === 'almost_same' ? (
+                                        <span className="px-2 py-1 bg-yellow-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                          ≈ ALMOST SAME
+                                        </span>
+                                      ) : passedThreshold ? (
+                                        <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                          ✓ PASS
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-1 bg-gray-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                          ✗ FAIL
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  
+                                  {result.front_image_url ? (
+                                    <img
+                                      src={result.front_image_url}
+                                      alt={result.product_name || 'Product'}
+                                      className="w-32 h-32 object-contain bg-gray-50 rounded"
+                                    />
+                                  ) : (
+                                    <div className="w-32 h-32 bg-gray-100 flex items-center justify-center rounded">
+                                      <Package className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* Right: Product Details */}
+                              <div className="flex-1 min-w-0">
                                 {/* Visual Match Status - Prominent Display */}
                                 {filteredCount !== null && result.match_confidence !== undefined && (
                                   <div className="mb-2 flex items-center justify-between">
@@ -2180,17 +2187,18 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                   </div>
                                 )}
                                 
-                                <p className="text-xs font-semibold text-gray-900 truncate" title={result.product_name || 'Unnamed'}>
+                                <p className="text-sm font-semibold text-gray-900 line-clamp-2" title={result.product_name || 'Unnamed'}>
                               {result.product_name || 'Unnamed Product'}
                             </p>
-                            <p className="text-xs text-gray-600 truncate">
+                            <p className="text-sm text-gray-600 truncate">
                               {result.brand_name || 'Unknown Brand'}
                             </p>
                             <p className="text-xs text-indigo-600 font-semibold mt-1">
                               #{index + 1}
                             </p>
                             
-                            {/* Comparison: Extracted vs FoodGraph */}
+                            {/* Comparison: Extracted vs FoodGraph - HIDDEN for horizontal layout */}
+                            {/* 
                             <div className="mt-2 space-y-1 text-[10px] bg-blue-50 border border-blue-200 p-1.5 rounded">
                               <div className="font-semibold text-blue-900 mb-1">Extracted → FoodGraph</div>
                               <div className="space-y-0.5">
@@ -2226,6 +2234,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 )}
                               </div>
                             </div>
+                            */}
                             
                             {(result as any).similarityScore !== undefined && (
                               <div className="mt-2">
@@ -2311,21 +2320,22 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 )}
                                 
                                 {isSaved ? (
-                                  <div className="mt-2 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded text-center flex items-center justify-center gap-1">
-                                    <CheckCircle className="w-3 h-3" />
+                                  <div className="mt-2 px-3 py-1.5 bg-green-500 text-white text-sm font-semibold rounded text-center flex items-center justify-center gap-1">
+                                    <CheckCircle className="w-4 h-4" />
                                     Saved
-                          </div>
+                                  </div>
                                 ) : (
                                   <button
                                     onClick={() => handleSaveResult(result.id)}
                                     disabled={savingResult}
-                                    className="mt-2 w-full px-2 py-1 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                                    className="mt-2 w-full px-3 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
                                   >
                                     {savingResult && savedResultId === result.id ? 'Saving...' : '💾 Save'}
                                   </button>
                                 )}
-                        </div>
-                    </div>
+                              </div>
+                              </div>
+                            </div>
                             );
                           });
                         })()}
