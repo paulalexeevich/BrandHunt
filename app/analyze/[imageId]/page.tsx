@@ -4,6 +4,7 @@ import React, { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, CheckCircle, Package, Trash2 } from 'lucide-react';
+import { getImageUrl } from '@/lib/image-utils';
 
 interface BoundingBox {
   y0: number;
@@ -74,7 +75,10 @@ interface FoodGraphResult {
 interface ImageData {
   id: string;
   original_filename: string;
-  file_path: string;
+  file_path: string | null;
+  s3_url?: string | null;
+  storage_type?: 's3_url' | 'base64';
+  mime_type?: string | null;
   processing_status: string;
   store_name?: string | null;
   project_id?: string | null;
@@ -1485,7 +1489,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             <div className="relative inline-block max-w-full">
               <img
                 ref={imageRef}
-                src={`data:image/jpeg;base64,${image.file_path}`}
+                src={getImageUrl(image)}
                 alt={image.original_filename}
                 className="max-w-full h-auto rounded-lg"
                 style={{ display: 'block' }}

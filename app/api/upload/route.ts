@@ -22,36 +22,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file or URL provided' }, { status: 400 });
     }
 
-    let base64: string;
+    let base64: string | null = null;
     let filename: string;
     let fileSize: number;
     let mimeType: string;
+    let storageType: 's3_url' | 'base64' = 'base64';
+    let s3Url: string | null = null;
 
     if (imageUrl) {
-      // Fetch image from S3 URL
+      // Store S3 URL directly without fetching/converting to base64
+      console.log('[Upload] Storing S3 URL directly:', imageUrl);
+      
+      // Extract filename from URL
+      const urlParts = imageUrl.split('/');
+      filename = urlParts[urlParts.length - 1] || 'image-from-url.jpg';
+      
+      // Store the S3 URL
+      s3Url = imageUrl;
+      storageType = 's3_url';
+      
+      // Try to fetch just the headers to get file size and mime type (HEAD request is faster)
       try {
-        const response = await fetch(imageUrl);
+        const response = await fetch(imageUrl, { method: 'HEAD' });
         if (!response.ok) {
-          return NextResponse.json({ error: 'Failed to fetch image from URL' }, { status: 400 });
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        base64 = buffer.toString('base64');
-        
-        // Extract filename from URL
-        const urlParts = imageUrl.split('/');
-        filename = urlParts[urlParts.length - 1] || 'image-from-url.jpg';
-        fileSize = buffer.length;
-        mimeType = response.headers.get('content-type') || 'image/jpeg';
-
-        // Validate it's an image
-        if (!mimeType.startsWith('image/')) {
-          return NextResponse.json({ error: 'URL does not point to an image' }, { status: 400 });
+          console.warn('[Upload] Failed to fetch image metadata, using defaults');
+          fileSize = 0;
+          mimeType = 'image/jpeg';
+        } else {
+          const contentLength = response.headers.get('content-length');
+          fileSize = contentLength ? parseInt(contentLength) : 0;
+          mimeType = response.headers.get('content-type') || 'image/jpeg';
+          
+          // Validate it's an image
+          if (!mimeType.startsWith('image/')) {
+            return NextResponse.json({ error: 'URL does not point to an image' }, { status: 400 });
+          }
         }
       } catch (error) {
-        console.error('Error fetching image from URL:', error);
-        return NextResponse.json({ error: 'Failed to fetch image from URL' }, { status: 400 });
+        console.warn('[Upload] Failed to fetch image metadata:', error);
+        // Continue with defaults
+        fileSize = 0;
+        mimeType = 'image/jpeg';
       }
     } else if (file) {
       // Validate file type
@@ -59,19 +70,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'File must be an image' }, { status: 400 });
       }
 
-      // Read file as base64
+      // Read file as base64 (legacy mode for local file uploads)
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       base64 = buffer.toString('base64');
       filename = file.name;
       fileSize = file.size;
       mimeType = file.type;
+      storageType = 'base64';
     } else {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
     // Store image metadata in Supabase
     console.log('[Upload] Saving to database...');
+    console.log('[Upload] Storage type:', storageType);
     console.log('[Upload] Image size:', fileSize, 'bytes, MIME:', mimeType);
     if (storeName) {
       console.log('[Upload] Store name:', storeName);
@@ -79,12 +92,18 @@ export async function POST(request: NextRequest) {
     if (projectId) {
       console.log('[Upload] Project ID:', projectId);
     }
+    if (s3Url) {
+      console.log('[Upload] S3 URL:', s3Url);
+    }
+    
     const { data, error } = await supabase
       .from('branghunt_images')
       .insert({
         user_id: user.id,
         original_filename: filename,
         file_path: base64,
+        s3_url: s3Url,
+        storage_type: storageType,
         file_size: fileSize,
         mime_type: mimeType,
         store_name: storeName || null,

@@ -132,51 +132,31 @@ export async function POST(request: NextRequest) {
 
             console.log(`[Upload Excel] Processing row ${rowNumber}: ${storeName}`);
 
-            // Fetch image from URL
-            let base64: string;
-            let fileSize: number;
-            let mimeType: string;
+            // Store S3 URL directly without fetching
+            let fileSize: number = 0;
+            let mimeType: string = 'image/jpeg';
             let filename: string;
 
+            // Extract filename from URL
+            const urlParts = imageUrl.split('/');
+            filename = urlParts[urlParts.length - 1] || `image-${rowNumber}.jpg`;
+
+            // Try to fetch just headers (HEAD request) to get file size and mime type
             try {
-              const response = await fetch(imageUrl);
-              if (!response.ok) {
-                throw new Error(`Failed to fetch image: ${response.statusText}`);
-              }
+              const response = await fetch(imageUrl, { method: 'HEAD' });
+              if (response.ok) {
+                const contentLength = response.headers.get('content-length');
+                fileSize = contentLength ? parseInt(contentLength) : 0;
+                mimeType = response.headers.get('content-type') || 'image/jpeg';
 
-              const arrayBuffer = await response.arrayBuffer();
-              const buffer = Buffer.from(arrayBuffer);
-              base64 = buffer.toString('base64');
-              fileSize = buffer.length;
-              mimeType = response.headers.get('content-type') || 'image/jpeg';
-
-              // Extract filename from URL
-              const urlParts = imageUrl.split('/');
-              filename = urlParts[urlParts.length - 1] || `image-${rowNumber}.jpg`;
-
-              // Validate it's an image
-              if (!mimeType.startsWith('image/')) {
-                throw new Error('URL does not point to an image');
+                // Validate it's an image
+                if (!mimeType.startsWith('image/')) {
+                  throw new Error('URL does not point to an image');
+                }
               }
             } catch (fetchError) {
-              results.failed++;
-              results.errors.push({ 
-                row: rowNumber, 
-                error: `Failed to fetch image: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`,
-                storeName 
-              });
-              
-              // Send progress update
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
-                type: 'progress', 
-                current: i + 1, 
-                total: jsonData.length,
-                successful: results.successful,
-                failed: results.failed,
-                currentRow: rowNumber,
-                currentStore: storeName
-              })}\n\n`));
-              continue;
+              console.warn(`[Upload Excel] Failed to fetch metadata for row ${rowNumber}, using defaults:`, fetchError);
+              // Continue with defaults - don't fail the upload
             }
 
             // Store image metadata in Supabase with store_name
@@ -185,7 +165,9 @@ export async function POST(request: NextRequest) {
               .insert({
                 user_id: user.id,
                 original_filename: filename,
-                file_path: base64,
+                file_path: null,
+                s3_url: imageUrl,
+                storage_type: 's3_url',
                 file_size: fileSize,
                 mime_type: mimeType,
                 store_name: storeName,
