@@ -99,7 +99,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [preFiltering, setPreFiltering] = useState(false);
   const [preFilteredCount, setPreFilteredCount] = useState<number | null>(null);
   const [consolidationApplied, setConsolidationApplied] = useState(false);
-  const [stageFilter, setStageFilter] = useState<'all' | 'search' | 'pre_filter' | 'ai_filter'>('all');
+  const [stageFilter, setStageFilter] = useState<'all' | 'search' | 'pre_filter' | 'ai_filter'>('ai_filter');
   const [matchStatusCounts, setMatchStatusCounts] = useState<{ identical: number; almostSame: number } | null>(null);
   const [showProductLabels, setShowProductLabels] = useState(true);
   const [extractingPrice, setExtractingPrice] = useState(false);
@@ -1242,8 +1242,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               <div className="mt-4 bg-white rounded-lg p-4 border border-blue-200">
                 <h4 className="font-semibold text-sm text-gray-700 mb-2">📦 Product Progress (3 at a time)</h4>
                 <div className="space-y-1 max-h-48 overflow-y-auto">
-                  {step3Details.map((detail) => (
-                    <div key={detail.detectionIndex} className="flex items-center gap-2 text-xs py-1 px-2 bg-gray-50 rounded">
+                  {step3Details.map((detail, idx) => (
+                    <div key={`step3-${detail.detectionIndex}-${idx}`} className="flex items-center gap-2 text-xs py-1 px-2 bg-gray-50 rounded">
                       <span className="font-mono text-gray-500">#{detail.detectionIndex}</span>
                       <span className="flex-1 truncate text-gray-700">{detail.product}</span>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -1531,7 +1531,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 
                 return (
                   <div
-                    key={detection.id}
+                    key={`detection-${detection.id}-${index}`}
                     onClick={() => handleBoundingBoxClick(detection.id)}
                     className="absolute cursor-pointer hover:opacity-80 transition-opacity"
                     style={{
@@ -2215,8 +2215,27 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                     </div>
                                   )}
 
+                                  {/* Processing Stage badge (only show when viewing All stages) */}
+                                  {stageFilter === 'all' && (
+                                    <div className="absolute -top-1 -right-1 z-10">
+                                      {result.processing_stage === 'search' ? (
+                                        <span className="px-1.5 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded">
+                                          🔍
+                                        </span>
+                                      ) : result.processing_stage === 'pre_filter' ? (
+                                        <span className="px-1.5 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded">
+                                          ⚡
+                                        </span>
+                                      ) : result.processing_stage === 'ai_filter' ? (
+                                        <span className="px-1.5 py-0.5 bg-purple-500 text-white text-[10px] font-bold rounded">
+                                          🤖
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  )}
+
                                   {/* Match Status badge (only show after AI filtering) - smaller */}
-                                  {filteredCount !== null && (
+                                  {filteredCount !== null && stageFilter !== 'all' && (
                                     <div className="absolute -top-1 -right-1 z-10">
                                       {matchStatus === 'identical' ? (
                                         <span className="px-1.5 py-0.5 bg-green-600 text-white text-[10px] font-bold rounded flex items-center gap-1">
