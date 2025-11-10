@@ -1877,19 +1877,43 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-gray-900">
-                          FoodGraph Matches ({foodgraphResults.length})
-                          {preFilteredCount !== null && filteredCount === null && (
-                            <span className="ml-2 text-sm text-orange-600">→ Pre-filtered to {preFilteredCount} (≥85% match)</span>
-                          )}
-                          {filteredCount !== null && (
-                            <span className="ml-2 text-sm text-green-600">
-                              → {filteredCount} passed 70% AI threshold {filteredCount === 0 && '(showing all with scores)'}
-                            </span>
-                          )}
-                        </h4>
-                      </div>
+                      {/* Show current stage info */}
+                      {(() => {
+                        // Calculate counts for each stage
+                        const stageStats = {
+                          all: foodgraphResults.length,
+                          search: foodgraphResults.filter(r => r.processing_stage === 'search').length,
+                          pre_filter: foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length,
+                          ai_filter: foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length
+                        };
+                        
+                        // Get current filtered count
+                        let currentCount = stageFilter === 'all' ? stageStats.all :
+                                         stageFilter === 'search' ? stageStats.search :
+                                         stageFilter === 'pre_filter' ? stageStats.pre_filter :
+                                         stageStats.ai_filter;
+                        
+                        // Further filter for NO MATCH if hidden
+                        if (stageFilter === 'ai_filter' && !showNoMatch && matchStatusCounts) {
+                          currentCount = matchStatusCounts.identical + matchStatusCounts.almostSame;
+                        }
+                        
+                        return (
+                          <div className="mb-3">
+                            <h4 className="font-semibold text-gray-900 mb-2">
+                              Viewing: {
+                                stageFilter === 'all' ? `All Results (${currentCount})` :
+                                stageFilter === 'search' ? `🔍 Search Results (${currentCount})` :
+                                stageFilter === 'pre_filter' ? `⚡ Pre-filtered Results (${currentCount})` :
+                                `🤖 AI Filtered Results (${currentCount}${!showNoMatch && matchStatusCounts ? ' - NO MATCH hidden' : ''})`
+                              }
+                            </h4>
+                            <p className="text-xs text-gray-600">
+                              Pipeline: FoodGraph returned {stageStats.search} → Pre-filter selected {stageStats.pre_filter} (≥85%) → AI analyzed {stageStats.ai_filter}
+                            </p>
+                          </div>
+                        );
+                      })()}
                       
                       {/* Info banner when showing all with confidence */}
                       {showingAllWithConfidence && (
@@ -1909,8 +1933,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         </div>
                       )}
                       
-                      {/* Match Status Breakdown with Toggle */}
-                      {matchStatusCounts && filteredCount !== null && (
+                      {/* Match Status Breakdown with Toggle - Only show when viewing AI Filter */}
+                      {matchStatusCounts && filteredCount !== null && stageFilter === 'ai_filter' && (
                         <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-400 rounded">
                           <div className="flex items-start gap-2">
                             <span className="text-purple-600 text-lg">📊</span>
@@ -1970,7 +1994,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         </div>
                       )}
                       
-                      {/* Stage Filter Buttons */}
+                      {/* Stage Filter Buttons - Always visible */}
                       {(() => {
                         const stageStats = {
                           all: foodgraphResults.length,
@@ -1979,61 +2003,59 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           ai_filter: foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length
                         };
                         
-                        // Only show stage filter if we have results from multiple stages
-                        const hasMultipleStages = (stageStats.search > 0 ? 1 : 0) + (stageStats.pre_filter > 0 ? 1 : 0) + (stageStats.ai_filter > 0 ? 1 : 0) > 1;
-                        
-                        if (!hasMultipleStages) return null;
-                        
                         return (
-                          <div className="mb-4">
+                          <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                             <p className="text-sm font-semibold text-gray-700 mb-2">Filter by Processing Stage:</p>
                             <div className="flex flex-wrap gap-2">
                               <button
                                 onClick={() => setStageFilter('all')}
-                                className={`px-3 py-1 text-sm rounded-lg transition-all ${
+                                className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
                                   stageFilter === 'all'
-                                    ? 'bg-indigo-600 text-white ring-2 ring-indigo-300'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-indigo-600 text-white ring-2 ring-indigo-300 shadow-sm'
+                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                                 }`}
                               >
                                 All ({stageStats.all})
                               </button>
-                              {stageStats.search > 0 && (
-                                <button
-                                  onClick={() => setStageFilter('search')}
-                                  className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                                    stageFilter === 'search'
-                                      ? 'bg-blue-600 text-white ring-2 ring-blue-300'
-                                      : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                  }`}
-                                >
-                                  🔍 Search ({stageStats.search})
-                                </button>
-                              )}
-                              {stageStats.pre_filter > 0 && (
-                                <button
-                                  onClick={() => setStageFilter('pre_filter')}
-                                  className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                                    stageFilter === 'pre_filter'
-                                      ? 'bg-orange-600 text-white ring-2 ring-orange-300'
-                                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                                  }`}
-                                >
-                                  ⚡ Pre-filter ({stageStats.pre_filter})
-                                </button>
-                              )}
-                              {stageStats.ai_filter > 0 && (
-                                <button
-                                  onClick={() => setStageFilter('ai_filter')}
-                                  className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                                    stageFilter === 'ai_filter'
-                                      ? 'bg-purple-600 text-white ring-2 ring-purple-300'
-                                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                                  }`}
-                                >
-                                  🤖 AI Filter ({stageStats.ai_filter})
-                                </button>
-                              )}
+                              <button
+                                onClick={() => setStageFilter('search')}
+                                disabled={stageStats.search === 0}
+                                className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
+                                  stageFilter === 'search'
+                                    ? 'bg-blue-600 text-white ring-2 ring-blue-300 shadow-sm'
+                                    : stageStats.search > 0
+                                      ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                                      : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                                }`}
+                              >
+                                🔍 Search ({stageStats.search})
+                              </button>
+                              <button
+                                onClick={() => setStageFilter('pre_filter')}
+                                disabled={stageStats.pre_filter === 0}
+                                className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
+                                  stageFilter === 'pre_filter'
+                                    ? 'bg-orange-600 text-white ring-2 ring-orange-300 shadow-sm'
+                                    : stageStats.pre_filter > 0
+                                      ? 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
+                                      : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                                }`}
+                              >
+                                ⚡ Pre-filter ({stageStats.pre_filter})
+                              </button>
+                              <button
+                                onClick={() => setStageFilter('ai_filter')}
+                                disabled={stageStats.ai_filter === 0}
+                                className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
+                                  stageFilter === 'ai_filter'
+                                    ? 'bg-purple-600 text-white ring-2 ring-purple-300 shadow-sm'
+                                    : stageStats.ai_filter > 0
+                                      ? 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
+                                      : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                                }`}
+                              >
+                                🤖 AI Filter ({stageStats.ai_filter})
+                              </button>
                             </div>
                           </div>
                         );
@@ -2063,8 +2085,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             return (statusOrder[aStatus] || 4) - (statusOrder[bStatus] || 4);
                           });
                           
-                          // Filter out NO MATCH results unless showNoMatch is true
-                          if (!showNoMatch && filteredCount !== null) {
+                          // Filter out NO MATCH results unless showNoMatch is true (only for AI Filter stage)
+                          if (!showNoMatch && filteredCount !== null && stageFilter === 'ai_filter') {
                             filteredResults = filteredResults.filter(r => {
                               const matchStatus = (r as any).match_status;
                               return matchStatus === 'identical' || matchStatus === 'almost_same' || r.is_match === true;
