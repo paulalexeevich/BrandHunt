@@ -94,6 +94,12 @@ export default function ProjectViewPage() {
   const [newMemberUserId, setNewMemberUserId] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<'admin' | 'member' | 'viewer'>('member');
   const [memberLoading, setMemberLoading] = useState(false);
+  
+  // Batch processing state
+  const [batchDetecting, setBatchDetecting] = useState(false);
+  const [batchExtracting, setBatchExtracting] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<string>('');
+  
   const supabase = createClient();
 
   useEffect(() => {
@@ -243,6 +249,86 @@ export default function ProjectViewPage() {
 
   const getDetectionCount = (image: ImageData): number => {
     return image.detections && image.detections.length > 0 ? image.detections[0].count : 0;
+  };
+
+  const handleBatchDetect = async () => {
+    if (!confirm('Run product detection on all unprocessed images in this project?')) {
+      return;
+    }
+
+    setBatchDetecting(true);
+    setBatchProgress('Starting batch detection...');
+
+    try {
+      const response = await fetch('/api/batch-detect-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          projectId,
+          concurrency: 3 // Process 3 images at a time
+        }),
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Batch detection failed');
+      }
+
+      setBatchProgress(`✅ Completed: ${result.summary.successful} successful, ${result.summary.totalDetections} products detected`);
+      
+      // Refresh project data
+      await fetchProjectData();
+      
+      setTimeout(() => setBatchProgress(''), 5000);
+    } catch (error) {
+      console.error('Batch detection error:', error);
+      setBatchProgress(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setBatchProgress(''), 5000);
+    } finally {
+      setBatchDetecting(false);
+    }
+  };
+
+  const handleBatchExtract = async () => {
+    if (!confirm('Extract product information (brand, name, description) from all detected products?')) {
+      return;
+    }
+
+    setBatchExtracting(true);
+    setBatchProgress('Starting batch extraction...');
+
+    try {
+      const response = await fetch('/api/batch-extract-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          projectId,
+          concurrency: 2 // Process 2 images at a time
+        }),
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Batch extraction failed');
+      }
+
+      setBatchProgress(`✅ Completed: ${result.summary.successful} images, ${result.summary.totalDetections} products processed`);
+      
+      // Refresh project data
+      await fetchProjectData();
+      
+      setTimeout(() => setBatchProgress(''), 5000);
+    } catch (error) {
+      console.error('Batch extraction error:', error);
+      setBatchProgress(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setBatchProgress(''), 5000);
+    } finally {
+      setBatchExtracting(false);
+    }
   };
 
   if (authLoading) {
@@ -616,6 +702,74 @@ export default function ProjectViewPage() {
                   <LinkIcon className="w-5 h-5" />
                   <span className="font-semibold">S3 URL Upload</span>
                 </Link>
+              </div>
+            </div>
+
+            {/* Batch Processing Controls */}
+            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Batch Processing</h2>
+              <p className="text-gray-600 mb-4">
+                Process multiple images in parallel for faster analysis
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <button
+                  onClick={handleBatchDetect}
+                  disabled={batchDetecting || batchExtracting}
+                  className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {batchDetecting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span className="font-semibold">Detecting Products...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Target className="w-5 h-5" />
+                      <span className="font-semibold">Batch Detect Products</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleBatchExtract}
+                  disabled={batchDetecting || batchExtracting}
+                  className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {batchExtracting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span className="font-semibold">Extracting Info...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Package className="w-5 h-5" />
+                      <span className="font-semibold">Batch Extract Info</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              {/* Progress Message */}
+              {batchProgress && (
+                <div className={`p-4 rounded-lg ${
+                  batchProgress.includes('✅') ? 'bg-green-50 border border-green-200' :
+                  batchProgress.includes('❌') ? 'bg-red-50 border border-red-200' :
+                  'bg-blue-50 border border-blue-200'
+                }`}>
+                  <p className={`text-sm font-medium ${
+                    batchProgress.includes('✅') ? 'text-green-900' :
+                    batchProgress.includes('❌') ? 'text-red-900' :
+                    'text-blue-900'
+                  }`}>
+                    {batchProgress}
+                  </p>
+                </div>
+              )}
+              <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-sm text-gray-900 font-semibold mb-1">About Batch Processing:</p>
+                <ul className="text-xs text-gray-700 space-y-1">
+                  <li><strong>Batch Detect:</strong> Runs product detection on all unprocessed images (3 at a time)</li>
+                  <li><strong>Batch Extract:</strong> Extracts brand, name, and description from detected products (2 images at a time)</li>
+                  <li><strong>Parallel Processing:</strong> Multiple images are processed simultaneously for faster results</li>
+                </ul>
               </div>
             </div>
 
