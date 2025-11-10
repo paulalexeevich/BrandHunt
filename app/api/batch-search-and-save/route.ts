@@ -165,6 +165,9 @@ export async function POST(request: NextRequest) {
                 })
               : await searchProducts(detection.brand_name);
             
+            // Capture search term for database storage
+            const searchTerm = searchResult.searchTerm;
+            
             // Transform products to add front_image_url property
             const foodgraphResults = searchResult.products.map(product => ({
               ...product,
