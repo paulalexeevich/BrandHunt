@@ -2093,37 +2093,37 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 'border-gray-200'
                               } overflow-hidden hover:border-indigo-400 transition-colors relative`}
                             >
-                              {/* Horizontal layout: image on left, content on right */}
-                              <div className="flex gap-3 p-3">
+                              {/* Horizontal layout: image on left, content in middle, save button on right */}
+                              <div className="flex gap-2 p-2">
                                 {/* Left: Product Image */}
                                 <div className="flex-shrink-0 relative">
                                   {/* SELECTED badge (for batch-processed saved products) */}
                                   {detection.fully_analyzed && result.id === detection.selected_foodgraph_result_id && (
                                     <div className="absolute -top-1 -left-1 z-10">
-                                      <span className="px-2 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold rounded-full flex items-center gap-1 shadow-lg">
+                                      <span className="px-2 py-0.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-[10px] font-bold rounded-full flex items-center gap-1 shadow-lg">
                                         🎯 SELECTED
                                       </span>
                                     </div>
                                   )}
 
-                                  {/* Match Status badge (only show after AI filtering) */}
+                                  {/* Match Status badge (only show after AI filtering) - smaller */}
                                   {filteredCount !== null && (
                                     <div className="absolute -top-1 -right-1 z-10">
                                       {matchStatus === 'identical' ? (
-                                        <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                        <span className="px-1.5 py-0.5 bg-green-600 text-white text-[10px] font-bold rounded flex items-center gap-1">
                                           ✓ IDENTICAL
                                         </span>
                                       ) : matchStatus === 'almost_same' ? (
-                                        <span className="px-2 py-1 bg-yellow-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                        <span className="px-1.5 py-0.5 bg-yellow-500 text-white text-[10px] font-bold rounded flex items-center gap-1">
                                           ≈ ALMOST SAME
                                         </span>
                                       ) : passedThreshold ? (
-                                        <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                        <span className="px-1.5 py-0.5 bg-green-600 text-white text-[10px] font-bold rounded flex items-center gap-1">
                                           ✓ PASS
                                         </span>
                                       ) : (
-                                        <span className="px-2 py-1 bg-gray-600 text-white text-xs font-bold rounded-full flex items-center gap-1">
-                                          ✗ FAIL
+                                        <span className="px-1.5 py-0.5 bg-gray-400 text-white text-[10px] font-medium rounded">
+                                          NO MATCH
                                         </span>
                                       )}
                                     </div>
@@ -2133,69 +2133,55 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                     <img
                                       src={result.front_image_url}
                                       alt={result.product_name || 'Product'}
-                                      className="w-32 h-32 object-contain bg-gray-50 rounded"
+                                      className="w-24 h-24 object-contain bg-gray-50 rounded"
                                     />
                                   ) : (
-                                    <div className="w-32 h-32 bg-gray-100 flex items-center justify-center rounded">
-                                      <Package className="w-8 h-8 text-gray-400" />
+                                    <div className="w-24 h-24 bg-gray-100 flex items-center justify-center rounded">
+                                      <Package className="w-6 h-6 text-gray-400" />
                                     </div>
                                   )}
                                 </div>
                                 
-                                {/* Right: Product Details */}
-                              <div className="flex-1 min-w-0">
-                                {/* Visual Match Status - Prominent Display */}
-                                {filteredCount !== null && result.match_confidence !== undefined && (
-                                  <div className="mb-2 flex items-center justify-between">
-                                    {matchStatus === 'identical' ? (
-                                      <>
-                                        <span className="text-lg font-bold text-green-600">
-                                          {Math.round(result.match_confidence * 100)}%
-                                        </span>
+                                {/* Middle: Product Details */}
+                              <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                {/* Product name and brand - compact */}
+                                <div className="space-y-0.5">
+                                  <p className="text-sm font-semibold text-gray-900 line-clamp-1" title={result.product_name || 'Unnamed'}>
+                                    {result.product_name || 'Unnamed Product'}
+                                  </p>
+                                  <p className="text-xs text-gray-600 truncate">
+                                    {result.brand_name || 'Unknown Brand'}
+                                  </p>
+                                  {/* Match status inline - only after AI filtering */}
+                                  {filteredCount !== null && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] text-indigo-600 font-semibold">
+                                        #{index + 1}
+                                      </span>
+                                      {matchStatus === 'identical' && (
                                         <span className="text-[10px] font-semibold text-green-600">
-                                          IDENTICAL
+                                          ✓ IDENTICAL
                                         </span>
-                                      </>
-                                    ) : matchStatus === 'almost_same' ? (
-                                      <>
-                                        <span className="text-lg font-bold text-yellow-600">
-                                          {Math.round(result.match_confidence * 100)}%
-                                        </span>
+                                      )}
+                                      {matchStatus === 'almost_same' && (
                                         <span className="text-[10px] font-semibold text-yellow-600">
-                                          ALMOST SAME
+                                          ≈ ALMOST SAME
                                         </span>
-                                      </>
-                                    ) : passedThreshold ? (
-                                      <>
-                                        <span className="text-lg font-bold text-green-600">
-                                          {Math.round(result.match_confidence * 100)}%
-                                        </span>
-                                        <span className="text-[10px] font-semibold text-green-600">
-                                          MATCH
-                                        </span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <span className="text-lg font-bold text-red-600">
+                                      )}
+                                      {!passedThreshold && matchStatus !== 'identical' && matchStatus !== 'almost_same' && (
+                                        <span className="text-[10px] font-semibold text-gray-500">
                                           NO MATCH
                                         </span>
-                                        <span className="text-[10px] font-semibold text-gray-500">
-                                          {Math.round(result.match_confidence * 100)}% confident
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-                                )}
-                                
-                                <p className="text-sm font-semibold text-gray-900 line-clamp-2" title={result.product_name || 'Unnamed'}>
-                              {result.product_name || 'Unnamed Product'}
-                            </p>
-                            <p className="text-sm text-gray-600 truncate">
-                              {result.brand_name || 'Unknown Brand'}
-                            </p>
-                            <p className="text-xs text-indigo-600 font-semibold mt-1">
-                              #{index + 1}
-                            </p>
+                                      )}
+                                    </div>
+                                  )}
+                                  {/* Show index when not AI filtered */}
+                                  {filteredCount === null && (
+                                    <p className="text-[10px] text-indigo-600 font-semibold">
+                                      #{index + 1}
+                                    </p>
+                                  )}
+                                </div>
                             
                             {/* Comparison: Extracted vs FoodGraph - HIDDEN for horizontal layout */}
                             {/* 
@@ -2236,99 +2222,28 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             </div>
                             */}
                             
-                            {(result as any).similarityScore !== undefined && (
-                              <div className="mt-2">
-                                <p className="text-xs text-orange-600 font-semibold mb-1">
-                                  Total Match: {Math.round((result as any).similarityScore * 100)}%
-                                </p>
-                                {(result as any).matchReasons && (result as any).matchReasons.length > 0 && (
-                                  <div className="space-y-0.5">
-                                    {(result as any).matchReasons.map((reason: string, idx: number) => (
-                                      <p key={idx} className="text-[10px] text-green-600 flex items-center gap-1">
-                                        <span>✓</span>
-                                        <span>{reason}</span>
-                                      </p>
-                                    ))}
-                                  </div>
+                                {/* Optional: Show visual similarity if available - hidden for compactness */}
+                                {/* 
+                                {(result as any).visual_similarity !== undefined && (result as any).visual_similarity !== null && (
+                                  <p className="text-[10px] text-purple-600 mt-0.5">
+                                    Visual: {Math.round((result as any).visual_similarity * 100)}%
+                                  </p>
                                 )}
+                                */}
                               </div>
-                            )}
-                            
-                {/* AI Assessment Details */}
-                {result.match_confidence !== undefined && result.match_confidence !== null && filteredCount !== null && (
-                  <div className={`mt-2 p-2 rounded border ${
-                    matchStatus === 'identical' ? 'bg-green-50 border-green-300' :
-                    matchStatus === 'almost_same' ? 'bg-yellow-50 border-yellow-300' :
-                    passedThreshold ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
-                  }`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className={`text-xs font-semibold ${
-                        matchStatus === 'identical' ? 'text-green-900' :
-                        matchStatus === 'almost_same' ? 'text-yellow-900' :
-                        passedThreshold ? 'text-green-900' : 'text-red-900'
-                      }`}>
-                        🤖 AI Assessment
-                      </p>
-                      <p className={`text-[10px] font-semibold ${
-                        matchStatus === 'identical' ? 'text-green-700' :
-                        matchStatus === 'almost_same' ? 'text-yellow-700' :
-                        passedThreshold ? 'text-green-700' : 'text-red-700'
-                      }`}>
-                        {matchStatus === 'identical' ? 'Identical' :
-                         matchStatus === 'almost_same' ? 'Almost Same' :
-                         passedThreshold ? `${Math.round(result.match_confidence * 100)}% Match` : 'No Match'}
-                      </p>
-                    </div>
-                    {/* Visual Similarity Score */}
-                    {(result as any).visual_similarity !== undefined && (result as any).visual_similarity !== null && (
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-[10px] text-gray-600">
-                          Visual Similarity:
-                        </p>
-                        <p className="text-[10px] font-semibold text-purple-600">
-                          {Math.round((result as any).visual_similarity * 100)}%
-                        </p>
-                      </div>
-                    )}
-                    {(result as any).match_reason && (
-                      <p className="text-[10px] text-gray-600 italic leading-tight">
-                        {(result as any).match_reason}
-                      </p>
-                    )}
-                  </div>
-                )}
-                                
-                                {/* Stage Badge */}
-                                {result.processing_stage && (
-                                  <div className="mt-2 mb-1 flex items-center justify-center">
-                                    {result.processing_stage === 'search' && (
-                                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-semibold rounded-full">
-                                        🔍 Search Stage
-                                      </span>
-                                    )}
-                                    {result.processing_stage === 'pre_filter' && (
-                                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded-full">
-                                        ⚡ Pre-filtered (≥85%)
-                                      </span>
-                                    )}
-                                    {result.processing_stage === 'ai_filter' && (
-                                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-semibold rounded-full">
-                                        🤖 AI Analyzed
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                
+                              
+                              {/* Right: Save Button */}
+                              <div className="flex-shrink-0 flex items-center">
                                 {isSaved ? (
-                                  <div className="mt-2 px-3 py-1.5 bg-green-500 text-white text-sm font-semibold rounded text-center flex items-center justify-center gap-1">
-                                    <CheckCircle className="w-4 h-4" />
+                                  <div className="px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" />
                                     Saved
                                   </div>
                                 ) : (
                                   <button
                                     onClick={() => handleSaveResult(result.id)}
                                     disabled={savingResult}
-                                    className="mt-2 w-full px-3 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                                    className="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
                                   >
                                     {savingResult && savedResultId === result.id ? 'Saving...' : '💾 Save'}
                                   </button>
