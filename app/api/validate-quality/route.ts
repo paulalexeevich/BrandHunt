@@ -32,9 +32,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get base64 and mime type
-    const imageBase64 = image.file_path;
-    const mimeType = image.mime_type || 'image/jpeg';
+    // Get image data (handles both S3 URLs and base64 storage)
+    const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
+    const imageBase64 = await getImageBase64ForProcessing(image);
+    const mimeType = getImageMimeType(image);
 
     // Validate image quality using Gemini
     const validation = await validateImageQuality(imageBase64, mimeType);

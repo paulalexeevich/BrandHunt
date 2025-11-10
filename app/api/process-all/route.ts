@@ -90,13 +90,18 @@ export async function POST(request: NextRequest) {
         };
 
         try {
+          // Get image data (handles both S3 URLs and base64 storage) - only fetch once per detection
+          const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
+          const imageBase64 = await getImageBase64ForProcessing(image);
+          const mimeType = getImageMimeType(image);
+          
           // Step 1: Extract brand info if not already done
           if (!detection.brand_name) {
             console.log(`  [${detection.detection_index}] Extracting brand info...`);
             
             const brandData = await extractProductInfo(
-              image.file_path,
-              image.mime_type || 'image/jpeg',
+              imageBase64,
+              mimeType,
               detection.bounding_box
             );
 
@@ -127,8 +132,8 @@ export async function POST(request: NextRequest) {
             
             try {
               const priceData = await extractPrice(
-                image.file_path,
-                image.mime_type || 'image/jpeg',
+                imageBase64,
+                mimeType,
                 detection.bounding_box,
                 {
                   brand: detection.brand_name,

@@ -81,9 +81,14 @@ export async function POST(request: NextRequest) {
         try {
           console.log(`  [${detection.detection_index}] Extracting price...`);
           
+          // Get image data (handles both S3 URLs and base64 storage)
+          const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
+          const imageBase64 = await getImageBase64ForProcessing(image);
+          const mimeType = getImageMimeType(image);
+          
           const priceData = await extractPrice(
-            image.file_path,
-            image.mime_type || 'image/jpeg',
+            imageBase64,
+            mimeType,
             detection.bounding_box,
             {
               brand: detection.brand_name,

@@ -42,9 +42,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const image = detection.branghunt_images as { file_path: string; mime_type: string };
+    const image = detection.branghunt_images as { file_path: string | null; s3_url: string | null; storage_type?: 's3_url' | 'base64'; mime_type: string };
     
-    if (!image || !image.file_path) {
+    if (!image) {
       return NextResponse.json(
         { error: 'Image data not found for this detection' },
         { status: 404 }
@@ -53,10 +53,15 @@ export async function POST(request: NextRequest) {
 
     console.log('📸 Found detection with bounding box:', detection.bounding_box);
 
+    // Get image data (handles both S3 URLs and base64 storage)
+    const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
+    const imageBase64 = await getImageBase64ForProcessing(image);
+    const mimeType = getImageMimeType(image);
+
     // 2. Extract price using Gemini API
     const priceInfo = await extractPrice(
-      image.file_path,
-      image.mime_type || 'image/jpeg',
+      imageBase64,
+      mimeType,
       detection.bounding_box,
       {
         brand: detection.brand_name,

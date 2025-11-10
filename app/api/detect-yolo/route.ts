@@ -68,9 +68,12 @@ export async function POST(request: NextRequest) {
 
     console.log(`[YOLO Detection] Image size: ${image.width}x${image.height}`);
 
+    // Get image data (handles both S3 URLs and base64 storage)
+    const { getImageBase64ForProcessing } = await import('@/lib/image-processor');
+    const imageBase64 = await getImageBase64ForProcessing(image);
+    
     // Convert base64 to buffer for YOLO API
-    const base64Data = image.file_path.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
+    const buffer = Buffer.from(imageBase64, 'base64');
     
     console.log('[YOLO Detection] Calling YOLO API...');
     console.log(`[YOLO Detection] Buffer size: ${buffer.length} bytes`);

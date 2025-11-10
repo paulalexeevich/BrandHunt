@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { detectProducts } from '@/lib/gemini';
+import { getImageBase64ForProcessing, getImageMimeType } from '@/lib/image-processor';
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -38,8 +39,9 @@ export async function POST(request: NextRequest) {
       .update({ processing_status: 'detecting' })
       .eq('id', imageId);
 
-    const imageBase64 = image.file_path;
-    const mimeType = image.mime_type || 'image/jpeg';
+    // Get image data (handles both S3 URLs and base64 storage)
+    const imageBase64 = await getImageBase64ForProcessing(image);
+    const mimeType = getImageMimeType(image);
     
     // Check image size (base64 string length)
     const imageSizeKB = (imageBase64.length * 3 / 4 / 1024).toFixed(2);

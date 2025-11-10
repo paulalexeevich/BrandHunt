@@ -41,9 +41,13 @@ export async function POST(request: NextRequest) {
     console.log('Testing crop with bounding box:', boundingBox);
     console.log('Image dimensions from DB:', image.width, 'x', image.height);
 
+    // Get image data (handles both S3 URLs and base64 storage)
+    const { getImageBase64ForProcessing } = await import('@/lib/image-processor');
+    const imageBase64 = await getImageBase64ForProcessing(image);
+    
     // Crop the image
     const { croppedBase64, width, height } = await cropImageToBoundingBox(
-      image.file_path,
+      imageBase64,
       boundingBox
     );
 

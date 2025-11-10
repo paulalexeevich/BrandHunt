@@ -28,8 +28,10 @@ export async function POST(request: NextRequest) {
       .update({ processing_status: 'processing' })
       .eq('id', imageId);
 
-    const imageBase64 = image.file_path;
-    const mimeType = image.mime_type || 'image/jpeg';
+    // Get image data (handles both S3 URLs and base64 storage)
+    const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
+    const imageBase64 = await getImageBase64ForProcessing(image);
+    const mimeType = getImageMimeType(image);
 
     // Step 1: Detect products using Gemini
     let detections;

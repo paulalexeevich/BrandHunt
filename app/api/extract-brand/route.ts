@@ -25,8 +25,11 @@ export async function POST(request: NextRequest) {
     }
 
     const image = detection.image;
-    const imageBase64 = image.file_path;
-    const mimeType = image.mime_type || 'image/jpeg';
+    
+    // Get image data (handles both S3 URLs and base64 storage)
+    const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
+    const imageBase64 = await getImageBase64ForProcessing(image);
+    const mimeType = getImageMimeType(image);
     const boundingBox = detection.bounding_box;
 
     // Extract brand name and category using Gemini

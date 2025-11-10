@@ -108,7 +108,10 @@ export async function POST(request: NextRequest) {
     // Configurable concurrency: 3 (default), 10, 20, 50, or 999999 (all at once)
     const CONCURRENCY_LIMIT = concurrency || 3;
     const DELAY_BETWEEN_BATCHES = 5000; // 5 second delay between batches (for FoodGraph API rate limiting)
-    const imageBase64 = image.file_path;
+    
+    // Get image data (handles both S3 URLs and base64 storage)
+    const { getImageBase64ForProcessing } = await import('@/lib/image-processor');
+    const imageBase64 = await getImageBase64ForProcessing(image);
     
     console.log(`📊 Processing with concurrency limit: ${CONCURRENCY_LIMIT === 999999 ? `ALL ${detections.length}` : CONCURRENCY_LIMIT}`);
 
