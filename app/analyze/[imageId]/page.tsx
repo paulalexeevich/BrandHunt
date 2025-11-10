@@ -105,6 +105,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [extractingPrice, setExtractingPrice] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
   const [savedResultId, setSavedResultId] = useState<string | null>(null);
+  const [showNoMatch, setShowNoMatch] = useState(false);
   const [processingStep1, setProcessingStep1] = useState(false);
   const [processingStep2, setProcessingStep2] = useState(false);
   const [processingStep3, setProcessingStep3] = useState(false);
@@ -1585,8 +1586,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 </div>
                 </div>
                 
-                  {/* Extracted Product Information */}
-                  {detection.brand_name ? (
+                  {/* Extracted Product Information - HIDDEN */}
+                  {false && detection.brand_name ? (
                     <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <CheckCircle className="w-5 h-5 text-green-600" />
@@ -1908,22 +1909,32 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         </div>
                       )}
                       
-                      {/* Match Status Breakdown */}
+                      {/* Match Status Breakdown with Toggle */}
                       {matchStatusCounts && filteredCount !== null && (
                         <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-400 rounded">
                           <div className="flex items-start gap-2">
                             <span className="text-purple-600 text-lg">📊</span>
                             <div className="flex-1">
-                              <p className="text-sm font-semibold text-purple-900">AI Match Status Breakdown</p>
-                              <div className="flex flex-wrap gap-3 mt-2 text-xs">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-sm font-semibold text-purple-900">AI Match Status Breakdown</p>
+                                {foodgraphResults.length - matchStatusCounts.identical - matchStatusCounts.almostSame > 0 && (
+                                  <button
+                                    onClick={() => setShowNoMatch(!showNoMatch)}
+                                    className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs font-medium transition-colors"
+                                  >
+                                    {showNoMatch ? '👁️ Hide' : '👁️ Show'} No Match ({foodgraphResults.length - matchStatusCounts.identical - matchStatusCounts.almostSame})
+                                  </button>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-3 text-xs">
                                 <span className="px-2 py-1 bg-green-100 text-green-800 rounded font-medium">
                                   ✓ Identical: {matchStatusCounts.identical}
                                 </span>
                                 <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded font-medium">
                                   ≈ Almost Same: {matchStatusCounts.almostSame}
                                 </span>
-                                <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded font-medium">
-                                  ✗ Not Match: {foodgraphResults.length - matchStatusCounts.identical - matchStatusCounts.almostSame}
+                                <span className={`px-2 py-1 rounded font-medium ${showNoMatch ? 'bg-gray-200 text-gray-800' : 'bg-gray-100 text-gray-500'}`}>
+                                  {showNoMatch ? '👁️' : ''} No Match: {foodgraphResults.length - matchStatusCounts.identical - matchStatusCounts.almostSame} {!showNoMatch && '(hidden)'}
                                 </span>
                               </div>
                             </div>
@@ -2034,6 +2045,31 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           let filteredResults = stageFilter === 'all' 
                             ? foodgraphResults 
                             : foodgraphResults.filter(r => r.processing_stage === stageFilter);
+                          
+                          // Sort by match status: identical first, then almost same, then no match
+                          filteredResults = [...filteredResults].sort((a, b) => {
+                            const aStatus = (a as any).match_status || 'not_match';
+                            const bStatus = (b as any).match_status || 'not_match';
+                            const aMatch = a.is_match === true;
+                            const bMatch = b.is_match === true;
+                            
+                            // Priority: identical > almost_same > match > no_match
+                            const statusOrder: Record<string, number> = {
+                              'identical': 1,
+                              'almost_same': 2,
+                              'not_match': aMatch ? 3 : 4
+                            };
+                            
+                            return (statusOrder[aStatus] || 4) - (statusOrder[bStatus] || 4);
+                          });
+                          
+                          // Filter out NO MATCH results unless showNoMatch is true
+                          if (!showNoMatch && filteredCount !== null) {
+                            filteredResults = filteredResults.filter(r => {
+                              const matchStatus = (r as any).match_status;
+                              return matchStatus === 'identical' || matchStatus === 'almost_same' || r.is_match === true;
+                            });
+                          }
                           
                           // If AI filtered, show all results (with confidence scores). Otherwise show first 50
                           const resultsToShow = filteredCount !== null
