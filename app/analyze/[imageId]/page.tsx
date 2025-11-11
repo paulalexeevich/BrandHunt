@@ -578,6 +578,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       setContextualAnalysis(data);
       setShowContextAnalysis(true);
       
+      // If results were saved, refresh the detection data to show updated brand/size
+      if (contextSaveResults && data.saved) {
+        console.log('✅ Refreshing detection data after contextual correction...');
+        await fetchImage();
+      }
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Contextual analysis failed');
     } finally {

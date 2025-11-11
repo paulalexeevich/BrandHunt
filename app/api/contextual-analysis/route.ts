@@ -338,17 +338,47 @@ export async function POST(request: NextRequest) {
         contextual_right_neighbor_count: right.length,
       };
       
+      const correctionNotes: string[] = [];
+      
       // Handle different prompt response formats
       if (analysis.inferred_brand || analysis.brand) {
-        updateData.contextual_brand = analysis.inferred_brand || analysis.brand;
-        updateData.contextual_brand_confidence = analysis.brand_confidence;
+        const contextualBrand = analysis.inferred_brand || analysis.brand;
+        const contextualBrandConf = analysis.brand_confidence || 0;
+        
+        updateData.contextual_brand = contextualBrand;
+        updateData.contextual_brand_confidence = contextualBrandConf;
         updateData.contextual_brand_reasoning = analysis.brand_reasoning || analysis.brand_method || analysis.reasoning;
+        
+        // OVERWRITE brand_name if contextual analysis has higher confidence
+        const currentBrandConf = detection.brand_confidence || 0;
+        const currentBrand = detection.brand_name;
+        
+        if (contextualBrandConf > currentBrandConf) {
+          console.log(`[Contextual] Brand confidence improved: ${currentBrandConf} → ${contextualBrandConf}`);
+          updateData.brand_name = contextualBrand;
+          updateData.brand_confidence = contextualBrandConf;
+          correctionNotes.push(`Brand updated from "${currentBrand}" (${Math.round(currentBrandConf * 100)}%) to "${contextualBrand}" (${Math.round(contextualBrandConf * 100)}%)`);
+        }
       }
       
       if (analysis.inferred_size || analysis.size) {
-        updateData.contextual_size = analysis.inferred_size || analysis.size;
-        updateData.contextual_size_confidence = analysis.size_confidence;
+        const contextualSize = analysis.inferred_size || analysis.size;
+        const contextualSizeConf = analysis.size_confidence || 0;
+        
+        updateData.contextual_size = contextualSize;
+        updateData.contextual_size_confidence = contextualSizeConf;
         updateData.contextual_size_reasoning = analysis.size_reasoning || analysis.size_method;
+        
+        // OVERWRITE size if contextual analysis has higher confidence
+        const currentSizeConf = detection.size_confidence || 0;
+        const currentSize = detection.size;
+        
+        if (contextualSizeConf > currentSizeConf) {
+          console.log(`[Contextual] Size confidence improved: ${currentSizeConf} → ${contextualSizeConf}`);
+          updateData.size = contextualSize;
+          updateData.size_confidence = contextualSizeConf;
+          correctionNotes.push(`Size updated from "${currentSize}" (${Math.round(currentSizeConf * 100)}%) to "${contextualSize}" (${Math.round(contextualSizeConf * 100)}%)`);
+        }
       }
       
       if (analysis.visual_similarity) {
@@ -372,6 +402,13 @@ export async function POST(request: NextRequest) {
         updateData.contextual_notes = analysis.notes || analysis.explanation;
       }
       
+      // Set correction marker if any fields were overwritten
+      if (correctionNotes.length > 0) {
+        updateData.corrected_by_contextual = true;
+        updateData.contextual_correction_notes = correctionNotes.join('; ');
+        console.log('[Contextual] Corrections applied:', correctionNotes);
+      }
+      
       const { error: updateError } = await supabase
         .from('branghunt_detections')
         .update(updateData)
@@ -381,6 +418,9 @@ export async function POST(request: NextRequest) {
         console.error('[Contextual Analysis] Failed to save results:', updateError);
       } else {
         console.log('[Contextual Analysis] Results saved successfully');
+        if (correctionNotes.length > 0) {
+          console.log('✅ Brand/size corrected by contextual analysis!');
+        }
       }
     }
     
