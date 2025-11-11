@@ -464,11 +464,97 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     setContextualAnalysis(null);
 
     try {
+      const detection = detections.find(d => d.id === detectionId);
+      if (!detection) {
+        throw new Error('Detection not found');
+      }
+
+      // First, fetch all detections to calculate expanded bounding box
+      const allDetections = detections;
+      
+      // Find neighbors (same logic as API)
+      const targetBox = detection.bounding_box;
+      const targetCenterY = (targetBox.y0 + targetBox.y1) / 2;
+      const targetHeight = targetBox.y1 - targetBox.y0;
+      const yTolerance = targetHeight * 0.3;
+      const maxHorizontalDistance = 500;
+      
+      const neighbors = allDetections
+        .filter(det => det.id !== detection.id)
+        .filter(det => {
+          const centerY = (det.bounding_box.y0 + det.bounding_box.y1) / 2;
+          return Math.abs(centerY - targetCenterY) <= yTolerance;
+        });
+      
+      const left = neighbors
+        .filter(det => det.bounding_box.x1 <= targetBox.x0)
+        .filter(det => targetBox.x0 - det.bounding_box.x1 <= maxHorizontalDistance)
+        .sort((a, b) => b.bounding_box.x1 - a.bounding_box.x1)
+        .slice(0, 3);
+      
+      const right = neighbors
+        .filter(det => det.bounding_box.x0 >= targetBox.x1)
+        .filter(det => det.bounding_box.x0 - targetBox.x1 <= maxHorizontalDistance)
+        .sort((a, b) => a.bounding_box.x0 - b.bounding_box.x0)
+        .slice(0, 3);
+      
+      console.log(`Found ${left.length} left neighbors, ${right.length} right neighbors`);
+      
+      // Calculate expanded bounding box
+      const boxes = [
+        targetBox,
+        ...left.map(d => d.bounding_box),
+        ...right.map(d => d.bounding_box),
+      ];
+      
+      const expandedBox = {
+        y0: Math.min(...boxes.map(b => b.y0)),
+        x0: Math.min(...boxes.map(b => b.x0)),
+        y1: Math.max(...boxes.map(b => b.y1)),
+        x1: Math.max(...boxes.map(b => b.x1)),
+      };
+      
+      console.log('Expanded box:', expandedBox);
+      
+      // Generate expanded crop using canvas (same as AI filter)
+      if (!image) {
+        throw new Error('Image not loaded');
+      }
+      
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = getImageUrl(image);
+      
+      await new Promise((resolve, reject) => {
+        img.onerror = reject;
+        img.onload = resolve;
+      });
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      
+      const imageWidth = img.width;
+      const imageHeight = img.height;
+      
+      const cropLeft = Math.round((expandedBox.x0 / 1000) * imageWidth);
+      const cropTop = Math.round((expandedBox.y0 / 1000) * imageHeight);
+      const cropWidth = Math.round(((expandedBox.x1 - expandedBox.x0) / 1000) * imageWidth);
+      const cropHeight = Math.round(((expandedBox.y1 - expandedBox.y0) / 1000) * imageHeight);
+      
+      canvas.width = cropWidth;
+      canvas.height = cropHeight;
+      ctx.drawImage(img, cropLeft, cropTop, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+      
+      const expandedCropBase64 = canvas.toDataURL('image/jpeg').split(',')[1];
+      
+      console.log('Generated expanded crop');
+
       const response = await fetch('/api/contextual-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           detectionId,
+          expandedCropBase64,
           promptVersion: contextPromptVersion,
           minNeighbors: 3
         }),

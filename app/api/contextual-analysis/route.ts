@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
-import { getImageBase64ForProcessing } from '@/lib/image-processor';
-import Jimp from 'jimp';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize Gemini AI
@@ -85,44 +83,7 @@ function calculateExpandedBox(
   };
 }
 
-/**
- * Extract a crop from the image using Jimp
- */
-async function extractCrop(
-  imageBase64: string,
-  mimeType: string,
-  boundingBox: BoundingBox
-): Promise<string> {
-  // Convert base64 to buffer
-  const imageBuffer = Buffer.from(
-    imageBase64.replace(/^data:image\/\w+;base64,/, ''),
-    'base64'
-  );
-  
-  const image = await Jimp.read(imageBuffer);
-  const width = image.getWidth();
-  const height = image.getHeight();
-  
-  // Convert normalized coordinates (0-1000) to actual pixels
-  const x = Math.floor((boundingBox.x0 / 1000) * width);
-  const y = Math.floor((boundingBox.y0 / 1000) * height);
-  const cropWidth = Math.floor(((boundingBox.x1 - boundingBox.x0) / 1000) * width);
-  const cropHeight = Math.floor(((boundingBox.y1 - boundingBox.y0) / 1000) * height);
-  
-  // Ensure coordinates are within bounds
-  const safeX = Math.max(0, Math.min(x, width - 1));
-  const safeY = Math.max(0, Math.min(y, height - 1));
-  const safeWidth = Math.min(cropWidth, width - safeX);
-  const safeHeight = Math.min(cropHeight, height - safeY);
-  
-  // Crop the image
-  const cropped = image.crop(safeX, safeY, safeWidth, safeHeight);
-  
-  // Convert to base64
-  const croppedBase64 = await cropped.getBase64Async(mimeType || Jimp.MIME_JPEG);
-  
-  return croppedBase64;
-}
+// Removed extractCrop function - cropping now happens on the frontend using canvas
 
 /**
  * Call Gemini API to analyze product with context
@@ -277,10 +238,12 @@ Return JSON only:
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { detectionId, promptVersion = 'v1', minNeighbors = 3 } = body;
+    const { detectionId, expandedCropBase64, promptVersion = 'v1', minNeighbors = 3 } = body;
     
-    if (!detectionId) {
-      return NextResponse.json({ error: 'Detection ID is required' }, { status: 400 });
+    if (!detectionId || !expandedCropBase64) {
+      return NextResponse.json({ 
+        error: 'Detection ID and expanded crop image are required' 
+      }, { status: 400 });
     }
     
     const supabase = await createAuthenticatedSupabaseClient();
@@ -312,7 +275,7 @@ export async function POST(request: NextRequest) {
     
     console.log(`[Contextual Analysis] Found ${left.length} left neighbors, ${right.length} right neighbors`);
     
-    // Calculate expanded bounding box
+    // Calculate expanded bounding box (for reference/display)
     const expandedBox = calculateExpandedBox(
       detection.bounding_box,
       left,
@@ -321,29 +284,11 @@ export async function POST(request: NextRequest) {
     );
     
     console.log('[Contextual Analysis] Expanded box:', expandedBox);
+    console.log('[Contextual Analysis] Using frontend-generated crop');
     
-    // Get the image
-    const { data: image, error: imageError } = await supabase
-      .from('branghunt_images')
-      .select('*')
-      .eq('id', detection.image_id)
-      .single();
-    
-    if (imageError || !image) {
-      return NextResponse.json({ error: 'Image not found' }, { status: 404 });
-    }
-    
-    // Get image data
-    const { base64Data, mimeType } = await getImageBase64ForProcessing(image);
-    
-    // Extract expanded crop
-    const expandedCrop = await extractCrop(base64Data, mimeType, expandedBox);
-    
-    console.log('[Contextual Analysis] Extracted expanded crop');
-    
-    // Analyze with Gemini
+    // Analyze with Gemini using the crop provided by frontend
     const analysis = await analyzeWithContext(
-      expandedCrop,
+      expandedCropBase64,
       detection,
       left,
       right,
@@ -375,7 +320,7 @@ export async function POST(request: NextRequest) {
         })),
       },
       expanded_box: expandedBox,
-      expanded_crop_preview: expandedCrop,
+      expanded_crop_preview: `data:image/jpeg;base64,${expandedCropBase64}`,
       analysis,
       prompt_version: promptVersion,
     });
