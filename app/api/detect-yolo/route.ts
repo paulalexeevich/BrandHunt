@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
           image_id: imageId,
           detection_index: det.detection_index,
           bounding_box: det.bounding_box,
-          confidence_score: det.confidence,
+          confidence: det.confidence, // Use 'confidence' column (same as batch detection)
           label: det.label,
         }))
       );
