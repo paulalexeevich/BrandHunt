@@ -266,7 +266,11 @@ export async function POST(request: NextRequest) {
     // Filter detections that need contextual analysis:
     // - brand_name is 'Unknown' OR
     // - brand_confidence <= 90%
+    // SKIP products marked as is_product = false (not actual products)
     const detectionsToProcess = allDetections.filter(det => {
+      // Skip non-products
+      if (det.is_product === false) return false;
+      
       const brandUnknown = !det.brand_name || det.brand_name.toLowerCase() === 'unknown';
       const lowConfidence = det.brand_confidence !== null && det.brand_confidence <= 0.90;
       return brandUnknown || lowConfidence;

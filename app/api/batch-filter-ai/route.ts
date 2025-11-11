@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
 
 
     // Fetch all detections that have cached FoodGraph results but no filtering done yet
+    // SKIP products marked as is_product = false (not actual products)
     const { data: detections, error: detectionsError } = await supabase
       .from('branghunt_detections')
       .select(`
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
       `)
       .eq('image_id', imageId)
       .not('brand_name', 'is', null)
+      .not('is_product', 'eq', false)  // Skip non-products
       .is('fully_analyzed', null)
       .order('detection_index');
 
