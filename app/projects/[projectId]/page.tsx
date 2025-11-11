@@ -155,7 +155,6 @@ export default function ProjectViewPage() {
           branghunt_detections (
             id,
             is_product,
-            details_visible,
             brand_name,
             fully_analyzed
           )
@@ -171,10 +170,9 @@ export default function ProjectViewPage() {
       const stats: ProductStatistics = {
         totalProducts: allDetections.length,
         notProduct: allDetections.filter((d: any) => d.is_product === false).length,
-        detailsNotVisible: allDetections.filter((d: any) => d.is_product === true && d.details_visible === 'none').length,
+        detailsNotVisible: 0, // No longer tracking visibility level
         notIdentified: allDetections.filter((d: any) => 
           (d.is_product === true || d.is_product === null) && 
-          (d.details_visible === 'clear' || d.details_visible === null) &&
           !d.brand_name
         ).length,
         oneMatch: allDetections.filter((d: any) => d.fully_analyzed === true).length,

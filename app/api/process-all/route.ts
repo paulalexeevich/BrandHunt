@@ -113,9 +113,7 @@ export async function POST(request: NextRequest) {
                   product_name: brandData.productName,
                   category: brandData.category,
                   flavor: brandData.flavor,
-                  size: brandData.size,
-                  sku: brandData.sku,
-                  description: brandData.description
+                  size: brandData.size
                 })
                 .eq('id', detection.id);
 

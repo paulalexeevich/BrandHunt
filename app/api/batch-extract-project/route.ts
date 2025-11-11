@@ -136,7 +136,6 @@ export async function POST(request: NextRequest) {
                     .update({
                       // Classification fields
                       is_product: productInfo.isProduct,
-                      details_visible: productInfo.detailsVisible,
                       extraction_notes: productInfo.extractionNotes || null,
                       // Product fields
                       brand_name: productInfo.brand,
@@ -144,16 +143,12 @@ export async function POST(request: NextRequest) {
                       category: productInfo.category,
                       flavor: productInfo.flavor,
                       size: productInfo.size,
-                      sku: productInfo.sku,
-                      description: productInfo.description,
                       // Confidence scores
                       brand_confidence: productInfo.brandConfidence,
                       product_name_confidence: productInfo.productNameConfidence,
                       category_confidence: productInfo.categoryConfidence,
                       flavor_confidence: productInfo.flavorConfidence,
                       size_confidence: productInfo.sizeConfidence,
-                      sku_confidence: productInfo.skuConfidence,
-                      description_confidence: productInfo.descriptionConfidence,
                       // Metadata
                       brand_extraction_response: JSON.stringify(productInfo),
                       updated_at: new Date().toISOString()

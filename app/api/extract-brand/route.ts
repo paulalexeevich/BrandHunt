@@ -48,24 +48,19 @@ export async function POST(request: NextRequest) {
       .update({
         // Classification fields
         is_product: productInfo.isProduct,
-        details_visible: productInfo.detailsVisible,
         extraction_notes: productInfo.extractionNotes || null,
         // Product fields
         brand_name: productInfo.brand,
         category: productInfo.category,
-        sku: productInfo.sku,
         product_name: productInfo.productName,
         flavor: productInfo.flavor,
         size: productInfo.size,
-        description: productInfo.description,
         // Confidence scores
         brand_confidence: productInfo.brandConfidence,
         product_name_confidence: productInfo.productNameConfidence,
         category_confidence: productInfo.categoryConfidence,
         flavor_confidence: productInfo.flavorConfidence,
         size_confidence: productInfo.sizeConfidence,
-        sku_confidence: productInfo.skuConfidence,
-        description_confidence: productInfo.descriptionConfidence,
         // Metadata
         brand_extraction_prompt: `Product info extraction for detection ${detectionId}`,
         brand_extraction_response: JSON.stringify(productInfo),
@@ -83,24 +78,19 @@ export async function POST(request: NextRequest) {
       success: true,
       // Classification
       isProduct: productInfo.isProduct,
-      detailsVisible: productInfo.detailsVisible,
       extractionNotes: productInfo.extractionNotes,
       // Product data
       brandName: productInfo.brand,
       category: productInfo.category,
-      sku: productInfo.sku,
       productName: productInfo.productName,
       flavor: productInfo.flavor,
       size: productInfo.size,
-      description: productInfo.description,
       // Confidence scores
       brandConfidence: productInfo.brandConfidence,
       productNameConfidence: productInfo.productNameConfidence,
       categoryConfidence: productInfo.categoryConfidence,
       flavorConfidence: productInfo.flavorConfidence,
       sizeConfidence: productInfo.sizeConfidence,
-      skuConfidence: productInfo.skuConfidence,
-      descriptionConfidence: productInfo.descriptionConfidence,
       // Full detection record
       detection: updatedDetection,
       message: 'Product info extracted successfully' 

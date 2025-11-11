@@ -8,22 +8,17 @@ interface ExtractionResult {
   status: 'success' | 'error';
   productInfo?: {
     isProduct: boolean;
-    detailsVisible: 'clear' | 'partial' | 'none';
     extractionNotes?: string;
     brand: string;
     productName: string;
     category: string;
     flavor: string;
     size: string;
-    sku: string;
-    description: string;
     brandConfidence: number;
     productNameConfidence: number;
     categoryConfidence: number;
     flavorConfidence: number;
     sizeConfidence: number;
-    skuConfidence: number;
-    descriptionConfidence: number;
   };
   error?: string;
 }
@@ -114,7 +109,6 @@ export async function POST(request: NextRequest) {
             .update({
               // Classification fields
               is_product: productInfo.isProduct,
-              details_visible: productInfo.detailsVisible,
               extraction_notes: productInfo.extractionNotes || null,
               // Product fields
               brand_name: productInfo.brand,
@@ -122,16 +116,12 @@ export async function POST(request: NextRequest) {
               category: productInfo.category,
               flavor: productInfo.flavor,
               size: productInfo.size,
-              sku: productInfo.sku,
-              description: productInfo.description,
               // Confidence scores
               brand_confidence: productInfo.brandConfidence,
               product_name_confidence: productInfo.productNameConfidence,
               category_confidence: productInfo.categoryConfidence,
               flavor_confidence: productInfo.flavorConfidence,
               size_confidence: productInfo.sizeConfidence,
-              sku_confidence: productInfo.skuConfidence,
-              description_confidence: productInfo.descriptionConfidence,
               // Metadata
               brand_extraction_response: JSON.stringify(productInfo),
               updated_at: new Date().toISOString()
@@ -145,25 +135,20 @@ export async function POST(request: NextRequest) {
           result.status = 'success';
           result.productInfo = {
             isProduct: productInfo.isProduct,
-            detailsVisible: productInfo.detailsVisible,
             extractionNotes: productInfo.extractionNotes,
             brand: productInfo.brand,
             productName: productInfo.productName,
             category: productInfo.category,
             flavor: productInfo.flavor,
             size: productInfo.size,
-            sku: productInfo.sku,
-            description: productInfo.description,
             brandConfidence: productInfo.brandConfidence,
             productNameConfidence: productInfo.productNameConfidence,
             categoryConfidence: productInfo.categoryConfidence,
             flavorConfidence: productInfo.flavorConfidence,
-            sizeConfidence: productInfo.sizeConfidence,
-            skuConfidence: productInfo.skuConfidence,
-            descriptionConfidence: productInfo.descriptionConfidence
+            sizeConfidence: productInfo.sizeConfidence
           };
 
-          console.log(`  ✅ [${detection.detection_index}] Info extracted and saved (isProduct: ${productInfo.isProduct}, detailsVisible: ${productInfo.detailsVisible})`);
+          console.log(`  ✅ [${detection.detection_index}] Info extracted and saved (isProduct: ${productInfo.isProduct})`);
 
 
         } catch (error) {

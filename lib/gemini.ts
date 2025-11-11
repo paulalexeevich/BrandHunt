@@ -48,7 +48,6 @@ export interface DetectedProduct {
 export interface ProductInfo {
   // Classification fields
   isProduct: boolean;
-  detailsVisible: 'clear' | 'partial' | 'none';  // Three-level visibility status
   extractionNotes?: string;
   
   // Product fields
@@ -57,8 +56,6 @@ export interface ProductInfo {
   category: string;
   flavor: string;
   size: string;
-  description: string;
-  sku: string;
   
   // Confidence scores (0.0 to 1.0)
   brandConfidence: number;
@@ -66,8 +63,6 @@ export interface ProductInfo {
   categoryConfidence: number;
   flavorConfidence: number;
   sizeConfidence: number;
-  descriptionConfidence: number;
-  skuConfidence: number;
 }
 
 /**
@@ -267,7 +262,6 @@ export async function extractProductInfo(
     // Fallback when parsing fails
     return {
       isProduct: false,
-      detailsVisible: 'none',
       extractionNotes: 'Failed to parse AI response',
       brand: 'Unknown',
       brandConfidence: 0,
@@ -278,11 +272,7 @@ export async function extractProductInfo(
       flavor: 'Unknown',
       flavorConfidence: 0,
       size: 'Unknown',
-      sizeConfidence: 0,
-      description: 'Unknown',
-      descriptionConfidence: 0,
-      sku: 'Unknown',
-      skuConfidence: 0
+      sizeConfidence: 0
     };
   }
 }

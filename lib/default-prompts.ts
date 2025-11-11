@@ -2,23 +2,16 @@
 // Separated into its own file to allow safe imports from client components
 
 export const DEFAULT_EXTRACT_INFO_PROMPT = `
-Analyze this image and extract product information.
+Analyze this product image and extract information with confidence scores.
 
-FIRST, determine classification:
-1. Is this actually a product? (vs shelf fixture, price tag, empty space, or non-product item)
-2. What is the visibility level of product details?
-   - "clear": All CRITICAL details are clearly visible and readable (brand, product name, flavor)
-   - "partial": Some details visible but not all critical information can be extracted
-   - "none": No product details are visible (too far, blurry, obstructed, or angle prevents reading)
+FIRST, determine: Is this actually a product? (vs shelf fixture, price tag, empty space, or non-product item)
 
-THEN, extract the following information:
+If it IS a product, extract the following information:
 1. Brand name (manufacturer/brand, e.g., "Tru Fru", "Reese's", "bettergoods")
 2. Product name (full product name as written on package, e.g., "Frozen Fruit Strawberries", "Peanut Butter Cups")
-3. Category (e.g., "Frozen Food", "Dairy", "Snacks", "Candy")
+3. Category (e.g., "Frozen Food", "Dairy", "Snacks", "Candy", "Beverage")
 4. Flavor/Variant (e.g., "Strawberry", "Raspberry", "Chocolate", "Original")
 5. Size/Weight (e.g., "8 oz", "16 oz", "2 lbs", "500g")
-6. Description (brief product description from package, e.g., "Dark Chocolate Covered Strawberries")
-7. SKU/Barcode (any product code, UPC, or barcode visible)
 
 For EACH extracted field, provide a confidence score from 0.0 to 1.0:
 - 1.0 = Completely certain, text is clearly visible and readable
@@ -31,8 +24,7 @@ For EACH extracted field, provide a confidence score from 0.0 to 1.0:
 Return a JSON object with this EXACT structure:
 {
   "isProduct": true or false,
-  "detailsVisible": "clear" or "partial" or "none",
-  "extractionNotes": "Brief note explaining classification or extraction issues (e.g., 'Not a product - price tag only', 'Product too far/blurry', 'All critical details clearly visible')",
+  "extractionNotes": "Brief note explaining classification or any issues (e.g., 'Not a product - price tag only', 'Product partially visible', 'All details clearly readable')",
   "brand": "brand name or Unknown",
   "brandConfidence": 0.0 to 1.0,
   "productName": "full product name or Unknown",
@@ -42,20 +34,14 @@ Return a JSON object with this EXACT structure:
   "flavor": "flavor or variant or Unknown",
   "flavorConfidence": 0.0 to 1.0,
   "size": "size or weight or Unknown",
-  "sizeConfidence": 0.0 to 1.0,
-  "description": "product description or Unknown",
-  "descriptionConfidence": 0.0 to 1.0,
-  "sku": "product code/barcode or Unknown",
-  "skuConfidence": 0.0 to 1.0
+  "sizeConfidence": 0.0 to 1.0
 }
 
 Important Guidelines:
-- If isProduct = false, set detailsVisible = "none", all confidence scores to 0.0, and all fields to "Unknown"
-- If detailsVisible = "clear", confidence scores for critical fields (brand, productName, flavor) should be high (0.7-1.0)
-- If detailsVisible = "partial", some confidence scores may be moderate (0.4-0.7) but not all critical fields are complete
-- If detailsVisible = "none", all confidence scores should be very low (0.0-0.3)
-- Use Unknown for any field you cannot determine
+- If isProduct = false, set all confidence scores to 0.0 and all fields to "Unknown"
 - Be honest about confidence - lower scores for partially visible or unclear text
+- Focus on what you CAN see clearly rather than guessing
+- Use Unknown for any field you cannot determine with reasonable confidence
 
 Only return the JSON object, nothing else.
 `;
