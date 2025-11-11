@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-server';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { getImageBase64ForProcessing } from '@/lib/image-processor';
 import Jimp from 'jimp';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Detection ID is required' }, { status: 400 });
     }
     
-    const supabase = await createClient();
+    const supabase = await createAuthenticatedSupabaseClient();
     
     // Get the detection
     const { data: detection, error: detectionError } = await supabase
