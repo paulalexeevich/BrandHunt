@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
             message: `Starting extraction for ${totalDetectionsToExtract} detections across ${images.length} images...`
           });
 
-          // Process images with controlled concurrency
+          // Process images with controlled concurrency and send progress as each completes
           const results: ExtractionResult[] = [];
           let processedDetectionsCount = 0;
           
@@ -102,8 +102,8 @@ export async function POST(request: NextRequest) {
             const batch = images.slice(i, i + concurrency);
             console.log(`\n📦 Processing batch ${Math.floor(i/concurrency) + 1}/${Math.ceil(images.length/concurrency)} (${batch.length} images)...`);
             
-            const batchResults = await Promise.all(
-              batch.map(async (image) => {
+            // Process batch with progress updates as each image completes
+            const batchPromises = batch.map(async (image) => {
                 const result: ExtractionResult = {
                   imageId: image.id,
                   originalFilename: image.original_filename,
@@ -213,26 +213,30 @@ export async function POST(request: NextRequest) {
                   return result;
                 }
               })
-            );
-
-            results.push(...batchResults);
-            
-            // Update processed count
-            const batchDetections = batchResults.reduce((sum, r) => sum + (r.processedDetections || 0), 0);
-            processedDetectionsCount += batchDetections;
-
-            // Send progress update after each batch
-            const successful = results.filter(r => r.status === 'success').length;
-            const failed = results.filter(r => r.status === 'error').length;
-
-            sendProgress({
-              type: 'progress',
-              totalDetections: totalDetectionsToExtract,
-              processedDetections: processedDetectionsCount,
-              successful,
-              failed,
-              message: `Processed ${processedDetectionsCount}/${totalDetectionsToExtract} detections (${successful} images successful, ${failed} failed)`
             });
+
+            // Wait for each promise to complete and send progress update
+            for (const promise of batchPromises) {
+              const result = await promise;
+              results.push(result);
+              
+              // Update processed count
+              processedDetectionsCount += result.processedDetections || 0;
+
+              // Send progress update after EACH image completes
+              const successful = results.filter(r => r.status === 'success').length;
+              const failed = results.filter(r => r.status === 'error').length;
+
+              sendProgress({
+                type: 'progress',
+                totalDetections: totalDetectionsToExtract,
+                processedDetections: processedDetectionsCount,
+                successful,
+                failed,
+                currentImage: result.originalFilename,
+                message: `Processing: ${result.originalFilename} (${processedDetectionsCount}/${totalDetectionsToExtract} detections)`
+              });
+            }
           }
 
           // Calculate final summary
