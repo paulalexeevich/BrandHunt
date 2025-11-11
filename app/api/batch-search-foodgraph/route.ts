@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAuthenticatedSupabaseClient, createServiceRoleClient } from '@/lib/auth';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { searchProducts } from '@/lib/foodgraph';
 
 interface SearchResult {
@@ -22,11 +22,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔍 Starting batch FoodGraph search for image ${imageId}...`);
 
-    // Create authenticated Supabase client for reading data (respects RLS)
+    // Create authenticated Supabase client (same as used for detection updates)
     const supabase = await createAuthenticatedSupabaseClient();
-    
-    // Create service role client for writing FoodGraph results (bypasses RLS)
-    const supabaseAdmin = createServiceRoleClient();
 
     // Fetch all detections that have brand info but no FoodGraph results yet
     const { data: detections, error: detectionsError } = await supabase
@@ -128,7 +125,7 @@ export async function POST(request: NextRequest) {
             processing_stage: 'search' // Set processing stage to enable unique constraint
           }));
 
-          const { error: insertError } = await supabaseAdmin
+          const { error: insertError } = await supabase
             .from('branghunt_foodgraph_results')
             .upsert(resultsToSave, {
               onConflict: 'detection_id,product_gtin',
@@ -136,6 +133,15 @@ export async function POST(request: NextRequest) {
             });
 
           if (insertError) {
+            console.error(`  ❌ FAILED TO SAVE SEARCH RESULTS for detection #${detection.detection_index}:`, {
+              error: insertError,
+              message: insertError.message,
+              details: insertError.details,
+              hint: insertError.hint,
+              code: insertError.code,
+              detection_id: detection.id,
+              num_results: resultsToSave.length
+            });
             throw new Error(`Database insert failed: ${insertError.message}`);
           }
 

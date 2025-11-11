@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createAuthenticatedSupabaseClient, createServiceRoleClient } from '@/lib/auth';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { searchProducts, getFrontImageUrl, preFilterFoodGraphResults } from '@/lib/foodgraph';
 import { compareProductImages, cropImageToBoundingBox, MatchStatus } from '@/lib/gemini';
 
@@ -53,11 +53,8 @@ export async function POST(request: NextRequest) {
       console.log(`⚡ Concurrency level: ${concurrency === 999999 ? 'ALL (unlimited)' : concurrency} products at a time`);
     }
 
-    // Create authenticated Supabase client for reading data (respects RLS)
+    // Create authenticated Supabase client (same as used for detection updates)
     const supabase = await createAuthenticatedSupabaseClient();
-    
-    // Create service role client for writing FoodGraph results (bypasses RLS)
-    const supabaseAdmin = createServiceRoleClient();
 
     // Fetch the image data
     const { data: image, error: imageError } = await supabase
@@ -235,9 +232,9 @@ export async function POST(request: NextRequest) {
               visual_similarity: null,
             }));
 
-            // Use UPSERT with service role client (bypasses RLS) to insert or update existing results
+            // Use UPSERT to insert or update existing results
             // This prevents duplicates and updates rows as they progress through stages
-            const { error: searchInsertError } = await supabaseAdmin
+            const { error: searchInsertError } = await supabase
               .from('branghunt_foodgraph_results')
               .upsert(searchInserts, {
                 onConflict: 'detection_id,product_gtin',
@@ -245,7 +242,19 @@ export async function POST(request: NextRequest) {
               });
 
             if (searchInsertError) {
-              console.error(`    ⚠️ Failed to save raw search results:`, searchInsertError.message);
+              console.error(`    ❌ FAILED TO SAVE SEARCH RESULTS for detection #${detection.detection_index}:`, {
+                error: searchInsertError,
+                message: searchInsertError.message,
+                details: searchInsertError.details,
+                hint: searchInsertError.hint,
+                code: searchInsertError.code,
+                detection_id: detection.id,
+                image_id: detection.image_id,
+                project_id: image?.project_id,
+                num_results: searchInserts.length,
+                first_gtin: searchInserts[0]?.product_gtin
+              });
+              throw new Error(`Failed to save search results: ${searchInsertError.message}`);
             } else {
               console.log(`    ✅ Saved ${searchInserts.length} raw search results`);
               
@@ -295,7 +304,7 @@ export async function POST(request: NextRequest) {
               visual_similarity: null,
             }));
 
-            const { error: preFilterInsertError } = await supabaseAdmin
+            const { error: preFilterInsertError } = await supabase
               .from('branghunt_foodgraph_results')
               .upsert(preFilterInserts, {
                 onConflict: 'detection_id,product_gtin',
@@ -303,7 +312,19 @@ export async function POST(request: NextRequest) {
               });
 
             if (preFilterInsertError) {
-              console.error(`    ⚠️ Failed to save pre-filtered results:`, preFilterInsertError.message);
+              console.error(`    ❌ FAILED TO SAVE PRE-FILTER RESULTS for detection #${detection.detection_index}:`, {
+                error: preFilterInsertError,
+                message: preFilterInsertError.message,
+                details: preFilterInsertError.details,
+                hint: preFilterInsertError.hint,
+                code: preFilterInsertError.code,
+                detection_id: detection.id,
+                image_id: detection.image_id,
+                project_id: image?.project_id,
+                num_results: preFilterInserts.length,
+                first_gtin: preFilterInserts[0]?.product_gtin
+              });
+              throw new Error(`Failed to save pre-filter results: ${preFilterInsertError.message}`);
             } else {
               console.log(`    ✅ Saved ${preFilterInserts.length} pre-filtered results`);
               
@@ -473,11 +494,10 @@ export async function POST(request: NextRequest) {
             });
 
             // UPSERT AI-filtered results (updates existing rows from pre-filter stage)
-            // Use service role client to bypass RLS (fixes issue where results weren't being saved)
-            console.log(`    🔍 DEBUG: About to UPSERT ${aiFilterInserts.length} AI-filtered results for detection ${detection.id}`);
-            console.log(`    🔍 DEBUG: First result GTIN: ${aiFilterInserts[0]?.product_gtin}, processing_stage: ${aiFilterInserts[0]?.processing_stage}`);
+            console.log(`    💾 Saving ${aiFilterInserts.length} AI-filtered results for detection ${detection.id}`);
+            console.log(`    📋 First result: GTIN=${aiFilterInserts[0]?.product_gtin}, stage=${aiFilterInserts[0]?.processing_stage}, match_status=${aiFilterInserts[0]?.match_status}`);
             
-            const { error: aiFilterInsertError, data: aiFilterInsertData } = await supabaseAdmin
+            const { error: aiFilterInsertError, data: aiFilterInsertData } = await supabase
               .from('branghunt_foodgraph_results')
               .upsert(aiFilterInserts, {
                 onConflict: 'detection_id,product_gtin',
@@ -495,28 +515,32 @@ export async function POST(request: NextRequest) {
                 detection_id: detection.id,
                 image_id: detection.image_id,
                 project_id: image?.project_id,
-                num_results_attempted: aiFilterInserts.length
+                num_results: aiFilterInserts.length,
+                first_gtin: aiFilterInserts[0]?.product_gtin
               });
-              // Don't fail the entire operation, but make error very visible
-              result.error = `Failed to save ${aiFilterInserts.length} AI-filtered results: ${aiFilterInsertError.message}`;
+              throw new Error(`Failed to save AI-filtered results: ${aiFilterInsertError.message}`);
             } else {
               console.log(`    ✅ Saved ${aiFilterInserts.length} AI-filtered results to database`);
-              console.log(`    📊 Insert confirmation: ${aiFilterInsertData?.length || 0} rows inserted`);
-              console.log(`    🔍 DEBUG: Inserted rows GTINs: ${aiFilterInsertData?.map((r: any) => r.product_gtin).join(', ')}`);
+              console.log(`    📊 Upsert confirmed: ${aiFilterInsertData?.length || 0} rows affected`);
               
               // VERIFY: Query back the results immediately to confirm they're in DB
-              const { data: verifyData, error: verifyError } = await supabaseAdmin
+              const { data: verifyData, error: verifyError } = await supabase
                 .from('branghunt_foodgraph_results')
-                .select('product_gtin, processing_stage')
+                .select('product_gtin, processing_stage, match_status')
                 .eq('detection_id', detection.id);
               
-              console.log(`    🔍 DEBUG: VERIFICATION QUERY for detection ${detection.id}:`);
-              console.log(`    🔍 DEBUG: Found ${verifyData?.length || 0} rows in database`);
+              console.log(`    ✅ VERIFICATION: Found ${verifyData?.length || 0} total rows in database for this detection`);
               if (verifyError) {
-                console.error(`    🔍 DEBUG: Verification query error:`, verifyError);
+                console.error(`    ❌ Verification query error:`, verifyError);
+              } else if (verifyData) {
+                const stageBreakdown = verifyData.reduce((acc: any, r: any) => {
+                  acc[r.processing_stage] = (acc[r.processing_stage] || 0) + 1;
+                  return acc;
+                }, {});
+                console.log(`    📊 Stage breakdown:`, stageBreakdown);
               }
               
-              console.log(`    📊 Total results in DB for this detection: ${searchInserts.length} search + ${preFilterInserts.length} pre-filter + ${aiFilterInserts.length} AI-filter`);
+              console.log(`    📊 Total saved: search=${searchInserts.length}, pre-filter=${preFilterInserts.length}, AI-filter=${aiFilterInserts.length}`);
               
               // Send progress update with all save counts
               sendProgress({
