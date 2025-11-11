@@ -1482,19 +1482,39 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           ).length;
           
           // Match Status (only for processed products)
-          // Matched = Actually saved/confirmed matches
-          const matched = detections.filter(d => 
-            d.brand_name &&
-            (d.fully_analyzed === true || (d.selected_foodgraph_gtin && d.selected_foodgraph_gtin.trim() !== ''))
-          ).length;
+          // Matched = ONLY products with selected_foodgraph_gtin (actually saved)
+          const matchedDetections = detections.filter(d => 
+            d.selected_foodgraph_gtin && d.selected_foodgraph_gtin.trim() !== ''
+          );
+          const matched = matchedDetections.length;
           
-          // Not Matched = Products with 0 results OR 1 result pending (not saved yet)
-          const notMatched = detections.filter(d => 
+          // Not Matched = Products that are processed but NOT saved (no selected_foodgraph_gtin)
+          const notMatchedDetections = detections.filter(d => 
             d.brand_name && 
-            !d.fully_analyzed && 
-            !d.selected_foodgraph_gtin &&
-            (!d.foodgraph_results || d.foodgraph_results.length <= 1)
-          ).length;
+            (!d.selected_foodgraph_gtin || d.selected_foodgraph_gtin.trim() === '')
+          );
+          const notMatched = notMatchedDetections.length;
+          
+          // Debug logging
+          console.log('📊 STATISTICS DEBUG:');
+          console.log(`   Total detections: ${detections.length}`);
+          console.log(`   Processed (has brand): ${processed}`);
+          console.log(`   Matched: ${matched}`);
+          console.log(`   Not Matched: ${notMatched}`);
+          console.log('   Matched products:', matchedDetections.map(d => ({
+            idx: d.detection_index,
+            brand: d.brand_name,
+            fully_analyzed: d.fully_analyzed,
+            has_gtin: !!d.selected_foodgraph_gtin,
+            results_count: d.foodgraph_results?.length || 0
+          })));
+          console.log('   Not Matched products:', notMatchedDetections.map(d => ({
+            idx: d.detection_index,
+            brand: d.brand_name,
+            fully_analyzed: d.fully_analyzed,
+            has_gtin: !!d.selected_foodgraph_gtin,
+            results_count: d.foodgraph_results?.length || 0
+          })));
           
           // 2+ Matches = Products with multiple results needing manual review
           const multipleMatches = detections.filter(d => 
@@ -1506,102 +1526,102 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           ).length;
 
           return (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-md p-6 mb-6 border border-indigo-100">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow p-3 mb-4 border border-indigo-100">
+              <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
                 📊 Product Statistics
               </h3>
               
               {/* Row 1: Processing Status */}
-              <div className="mb-4">
-                <h4 className="text-xs font-semibold text-gray-600 mb-2 uppercase">Processing Status</h4>
-                <div className="grid grid-cols-3 gap-3">
+              <div className="mb-2">
+                <h4 className="text-[10px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Processing Status</h4>
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => setActiveFilter('processed')}
-                    className={`bg-blue-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
-                      activeFilter === 'processed' ? 'border-blue-900 ring-2 ring-blue-900' : 'border-blue-200'
+                    className={`bg-blue-50 rounded p-2 border transition-all hover:scale-105 ${
+                      activeFilter === 'processed' ? 'border-blue-900 ring-1 ring-blue-900' : 'border-blue-200'
                     }`}
                   >
-                    <div className="text-3xl font-bold text-blue-700">{processed}</div>
-                    <div className="text-xs text-blue-600 mt-1">Processed</div>
-                    {activeFilter === 'processed' && <div className="text-xs text-blue-900 font-semibold mt-1">● Active</div>}
+                    <div className="text-xl font-bold text-blue-700">{processed}</div>
+                    <div className="text-[10px] text-blue-600 mt-0.5">Processed</div>
+                    {activeFilter === 'processed' && <div className="text-[9px] text-blue-900 font-semibold mt-0.5">● Active</div>}
                   </button>
 
                   <button
                     onClick={() => setActiveFilter('not_identified')}
-                    className={`bg-gray-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
-                      activeFilter === 'not_identified' ? 'border-gray-900 ring-2 ring-gray-900' : 'border-gray-300'
+                    className={`bg-gray-50 rounded p-2 border transition-all hover:scale-105 ${
+                      activeFilter === 'not_identified' ? 'border-gray-900 ring-1 ring-gray-900' : 'border-gray-300'
                     }`}
                   >
-                    <div className="text-3xl font-bold text-gray-700">{notProcessed}</div>
-                    <div className="text-xs text-gray-600 mt-1">Not Processed</div>
-                    {activeFilter === 'not_identified' && <div className="text-xs text-gray-900 font-semibold mt-1">● Active</div>}
+                    <div className="text-xl font-bold text-gray-700">{notProcessed}</div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">Not Processed</div>
+                    {activeFilter === 'not_identified' && <div className="text-[9px] text-gray-900 font-semibold mt-0.5">● Active</div>}
                   </button>
 
                   <button
                     onClick={() => setActiveFilter('not_product')}
-                    className={`bg-red-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
-                      activeFilter === 'not_product' ? 'border-red-900 ring-2 ring-red-900' : 'border-red-200'
+                    className={`bg-red-50 rounded p-2 border transition-all hover:scale-105 ${
+                      activeFilter === 'not_product' ? 'border-red-900 ring-1 ring-red-900' : 'border-red-200'
                     }`}
                   >
-                    <div className="text-3xl font-bold text-red-700">{notProduct}</div>
-                    <div className="text-xs text-red-600 mt-1">Not Product</div>
-                    {activeFilter === 'not_product' && <div className="text-xs text-red-900 font-semibold mt-1">● Active</div>}
+                    <div className="text-xl font-bold text-red-700">{notProduct}</div>
+                    <div className="text-[10px] text-red-600 mt-0.5">Not Product</div>
+                    {activeFilter === 'not_product' && <div className="text-[9px] text-red-900 font-semibold mt-0.5">● Active</div>}
                   </button>
                 </div>
               </div>
 
               {/* Row 2: Match Status */}
               <div>
-                <h4 className="text-xs font-semibold text-gray-600 mb-2 uppercase">Match Status</h4>
-                <div className="grid grid-cols-3 gap-3">
+                <h4 className="text-[10px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Match Status</h4>
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => setActiveFilter('one_match')}
-                    className={`bg-green-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
-                      activeFilter === 'one_match' ? 'border-green-900 ring-2 ring-green-900' : 'border-green-200'
+                    className={`bg-green-50 rounded p-2 border transition-all hover:scale-105 ${
+                      activeFilter === 'one_match' ? 'border-green-900 ring-1 ring-green-900' : 'border-green-200'
                     }`}
                   >
-                    <div className="text-3xl font-bold text-green-700">{matched}</div>
-                    <div className="text-xs text-green-600 mt-1">✓ Matched</div>
-                    {activeFilter === 'one_match' && <div className="text-xs text-green-900 font-semibold mt-1">● Active</div>}
+                    <div className="text-xl font-bold text-green-700">{matched}</div>
+                    <div className="text-[10px] text-green-600 mt-0.5">✓ Matched</div>
+                    {activeFilter === 'one_match' && <div className="text-[9px] text-green-900 font-semibold mt-0.5">● Active</div>}
                   </button>
 
                   <button
                     onClick={() => setActiveFilter('no_match')}
-                    className={`bg-yellow-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
-                      activeFilter === 'no_match' ? 'border-yellow-900 ring-2 ring-yellow-900' : 'border-yellow-200'
+                    className={`bg-yellow-50 rounded p-2 border transition-all hover:scale-105 ${
+                      activeFilter === 'no_match' ? 'border-yellow-900 ring-1 ring-yellow-900' : 'border-yellow-200'
                     }`}
                   >
-                    <div className="text-3xl font-bold text-yellow-700">{notMatched}</div>
-                    <div className="text-xs text-yellow-600 mt-1">Not Matched</div>
-                    {activeFilter === 'no_match' && <div className="text-xs text-yellow-900 font-semibold mt-1">● Active</div>}
+                    <div className="text-xl font-bold text-yellow-700">{notMatched}</div>
+                    <div className="text-[10px] text-yellow-600 mt-0.5">Not Matched</div>
+                    {activeFilter === 'no_match' && <div className="text-[9px] text-yellow-900 font-semibold mt-0.5">● Active</div>}
                   </button>
 
                   <button
                     onClick={() => setActiveFilter('multiple_matches')}
-                    className={`bg-purple-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
-                      activeFilter === 'multiple_matches' ? 'border-purple-900 ring-2 ring-purple-900' : 'border-purple-200'
+                    className={`bg-purple-50 rounded p-2 border transition-all hover:scale-105 ${
+                      activeFilter === 'multiple_matches' ? 'border-purple-900 ring-1 ring-purple-900' : 'border-purple-200'
                     }`}
                   >
-                    <div className="text-3xl font-bold text-purple-700">{multipleMatches}</div>
-                    <div className="text-xs text-purple-600 mt-1">2+ Matches</div>
-                    {activeFilter === 'multiple_matches' && <div className="text-xs text-purple-900 font-semibold mt-1">● Active</div>}
+                    <div className="text-xl font-bold text-purple-700">{multipleMatches}</div>
+                    <div className="text-[10px] text-purple-600 mt-0.5">2+ Matches</div>
+                    {activeFilter === 'multiple_matches' && <div className="text-[9px] text-purple-900 font-semibold mt-0.5">● Active</div>}
                   </button>
                 </div>
               </div>
 
               {/* Progress Bar */}
-              <div className="mt-4">
-                <div className="flex justify-between text-xs text-gray-600 mb-1">
+              <div className="mt-2.5">
+                <div className="flex justify-between text-[10px] text-gray-600 mb-1">
                   <span>Processing Progress</span>
                   <span>{matched} / {totalProducts} Saved ({Math.round((matched / totalProducts) * 100)}%)</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                   <div 
-                    className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-1"
+                    className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-0.5"
                     style={{ width: `${(matched / totalProducts) * 100}%` }}
                   >
                     {matched > 0 && (
-                      <span className="text-[10px] font-bold text-white">✓</span>
+                      <span className="text-[9px] font-bold text-white">✓</span>
                     )}
                   </div>
                 </div>
@@ -1629,15 +1649,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                          !detection.brand_name;
                 }
                 if (activeFilter === 'one_match') {
-                  // SAVED products only
-                  return detection.fully_analyzed === true || (detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '');
+                  // MATCHED = has selected_foodgraph_gtin (actually saved)
+                  return detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '';
                 }
                 if (activeFilter === 'no_match') {
-                  // Not Matched includes both 0 results AND 1 result pending (not saved)
+                  // NOT MATCHED = has brand but NO selected_foodgraph_gtin (not saved)
                   return detection.brand_name && 
-                         !detection.fully_analyzed && 
-                         !detection.selected_foodgraph_gtin &&
-                         (!detection.foodgraph_results || detection.foodgraph_results.length <= 1);
+                         (!detection.selected_foodgraph_gtin || detection.selected_foodgraph_gtin.trim() === '');
                 }
                 if (activeFilter === 'multiple_matches') {
                   return detection.brand_name && 
@@ -1706,15 +1724,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                          !detection.brand_name;
                 }
                 if (activeFilter === 'one_match') {
-                  // SAVED products only
-                  return detection.fully_analyzed === true || (detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '');
+                  // MATCHED = has selected_foodgraph_gtin (actually saved)
+                  return detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '';
                 }
                 if (activeFilter === 'no_match') {
-                  // Not Matched includes both 0 results AND 1 result pending (not saved)
+                  // NOT MATCHED = has brand but NO selected_foodgraph_gtin (not saved)
                   return detection.brand_name && 
-                         !detection.fully_analyzed && 
-                         !detection.selected_foodgraph_gtin &&
-                         (!detection.foodgraph_results || detection.foodgraph_results.length <= 1);
+                         (!detection.selected_foodgraph_gtin || detection.selected_foodgraph_gtin.trim() === '');
                 }
                 if (activeFilter === 'multiple_matches') {
                   return detection.brand_name && 
