@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { getImageBase64ForProcessing, getImageMimeType } from '@/lib/image-processor';
 
+// Enable Node.js runtime for streaming support
+export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for batch processing
 
 // YOLO API configuration
