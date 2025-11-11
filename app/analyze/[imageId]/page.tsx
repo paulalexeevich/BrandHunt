@@ -104,6 +104,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [consolidationApplied, setConsolidationApplied] = useState(false);
   const [stageFilter, setStageFilter] = useState<'search' | 'pre_filter' | 'ai_filter'>('search');
   const [matchStatusCounts, setMatchStatusCounts] = useState<{ identical: number; almostSame: number } | null>(null);
+  const [loadedDetectionIds, setLoadedDetectionIds] = useState<Set<string>>(new Set());
   const [extractingPrice, setExtractingPrice] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
   const [savedResultId, setSavedResultId] = useState<string | null>(null);
@@ -205,19 +206,18 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             setFilteredCount(detection.foodgraph_results.length);
           }
           setPreFilteredCount(detection.foodgraph_results.length);
-        } else if (detection && detection.fully_analyzed) {
-          // Detection is fully analyzed but results weren't loaded - fetch them on demand
+        } else if (detection && detection.fully_analyzed && !loadedDetectionIds.has(detection.id)) {
+          // Detection is fully analyzed but results weren't loaded - fetch them on demand (ONCE)
           console.log(`📥 Fetching FoodGraph results on-demand for detection ${detection.id}`);
+          
+          // Mark as loaded immediately to prevent re-fetching
+          setLoadedDetectionIds(prev => new Set([...prev, detection.id]));
+          
           try {
             const response = await fetch(`/api/foodgraph-results/${detection.id}`);
             if (response.ok) {
               const data = await response.json();
               console.log(`📦 Loaded ${data.results?.length || 0} FoodGraph results on-demand`);
-              
-              // Update the detection in state with the loaded results
-              setDetections(prev => prev.map(d => 
-                d.id === detection.id ? { ...d, foodgraph_results: data.results } : d
-              ));
               
               // ALWAYS set state, even for 0 results (NO MATCH case)
               if (data.results) {
@@ -899,6 +899,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     if (refreshedData.detections) {
                       // Update all detections with fresh data from DB
                       setDetections(refreshedData.detections);
+                      // Clear the loaded cache so updated detections can load their results
+                      setLoadedDetectionIds(new Set());
                       // This will automatically update the statistics panel
                     }
                   })
