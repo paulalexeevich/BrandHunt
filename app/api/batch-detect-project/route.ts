@@ -1,9 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
-import { detectProducts } from '@/lib/gemini';
 import { getImageBase64ForProcessing, getImageMimeType } from '@/lib/image-processor';
 
 export const maxDuration = 300; // 5 minutes for batch processing
+
+// YOLO API configuration
+const YOLO_API_URL = 'http://157.180.25.214/api/detect';
+const CONFIDENCE_THRESHOLD = 0.5; // Minimum 50% confidence
+
+interface YOLODetection {
+  bbox: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  };
+  confidence: number;
+  class_id: number;
+  class_name: string;
+}
+
+interface YOLOResponse {
+  success: boolean;
+  image_dimensions: {
+    width: number;
+    height: number;
+  };
+  detections: YOLODetection[];
+  total_detections: number;
+}
 
 interface DetectionResult {
   imageId: string;
@@ -28,7 +53,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`🚀 Starting batch detection for project ${projectId} with concurrency ${concurrency}...`);
+    console.log(`🚀 Starting YOLO batch detection for project ${projectId} with concurrency ${concurrency}...`);
 
     // Create authenticated Supabase client
     const supabase = await createAuthenticatedSupabaseClient();
@@ -87,11 +112,38 @@ export async function POST(request: NextRequest) {
             const imageBase64 = await getImageBase64ForProcessing(image);
             const mimeType = getImageMimeType(image);
 
-            // Run detection
-            const detections = await detectProducts(imageBase64, mimeType);
+            // Convert base64 to buffer for YOLO API
+            const buffer = Buffer.from(imageBase64, 'base64');
+            
+            // Call YOLO API with multipart/form-data
+            const formData = new FormData();
+            const blob = new Blob([buffer], { type: mimeType || 'image/jpeg' });
+            formData.append('file', blob, 'image.jpg');
 
-            if (!detections || detections.length === 0) {
-              console.log(`  ℹ️  No products detected in ${image.original_filename}`);
+            const yoloResponse = await fetch(YOLO_API_URL, {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!yoloResponse.ok) {
+              throw new Error(`YOLO API error: ${yoloResponse.status}`);
+            }
+
+            const yoloData: YOLOResponse = await yoloResponse.json();
+
+            if (!yoloData.success || !yoloData.detections) {
+              throw new Error('YOLO API returned invalid response');
+            }
+
+            // Filter low-confidence detections
+            const filteredDetections = yoloData.detections.filter(
+              det => det.confidence >= CONFIDENCE_THRESHOLD
+            );
+
+            console.log(`  ✅ Detected ${filteredDetections.length}/${yoloData.total_detections} products (confidence >= ${CONFIDENCE_THRESHOLD * 100}%)`);
+
+            if (filteredDetections.length === 0) {
+              console.log(`  ℹ️  No high-confidence products in ${image.original_filename}`);
               
               // Mark as completed even with no detections
               await supabase
@@ -109,14 +161,26 @@ export async function POST(request: NextRequest) {
               return result;
             }
 
-            // Save detections to database
-            const detectionsToInsert = detections.map((detection, index) => ({
-              image_id: image.id,
-              detection_index: index,
-              label: detection.label,
-              bounding_box: detection.bounding_box,
-              confidence: detection.confidence,
-            }));
+            // Convert YOLO format to BrangHunt format
+            // YOLO returns pixel coordinates, convert to normalized (0-1000)
+            const yoloWidth = yoloData.image_dimensions.width;
+            const yoloHeight = yoloData.image_dimensions.height;
+
+            const detectionsToInsert = filteredDetections.map((detection, index) => {
+              // Convert YOLO bbox (x1, y1, x2, y2) to normalized coordinates
+              const y0 = Math.round((detection.bbox.y1 / yoloHeight) * 1000);
+              const x0 = Math.round((detection.bbox.x1 / yoloWidth) * 1000);
+              const y1 = Math.round((detection.bbox.y2 / yoloHeight) * 1000);
+              const x1 = Math.round((detection.bbox.x2 / yoloWidth) * 1000);
+
+              return {
+                image_id: image.id,
+                detection_index: index,
+                label: detection.class_name,
+                bounding_box: { y0, x0, y1, x1 },
+                confidence: detection.confidence,
+              };
+            });
 
             const { error: insertError } = await supabase
               .from('branghunt_detections')
@@ -138,10 +202,10 @@ export async function POST(request: NextRequest) {
               })
               .eq('id', image.id);
 
-            console.log(`  ✅ Detected ${detections.length} products in ${image.original_filename}`);
+            console.log(`  ✅ Saved ${filteredDetections.length} products for ${image.original_filename}`);
             
             result.status = 'success';
-            result.detectionsCount = detections.length;
+            result.detectionsCount = filteredDetections.length;
             return result;
 
           } catch (error) {
@@ -167,7 +231,7 @@ export async function POST(request: NextRequest) {
     const failed = results.filter(r => r.status === 'error').length;
     const totalDetections = results.reduce((sum, r) => sum + (r.detectionsCount || 0), 0);
 
-    console.log(`\n✅ Batch detection complete: ${successful} successful, ${failed} failed, ${totalDetections} total detections`);
+    console.log(`\n✅ YOLO batch detection complete: ${successful} successful, ${failed} failed, ${totalDetections} total detections`);
 
     return NextResponse.json({
       message: `Processed ${results.length} images`,
