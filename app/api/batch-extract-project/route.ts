@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       .order('created_at');
 
     if (imagesError) {
-      console.error('Error fetching images:', imagesError);
+      console.error('❌ Error fetching images:', imagesError);
       return NextResponse.json({ 
         error: 'Failed to fetch images',
         details: imagesError.message 
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!images || images.length === 0) {
+      console.log(`⚠️  No images found for project ${projectId} with detection_completed=true`);
       return NextResponse.json({
         message: 'No images with detections found',
         processed: 0,
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`📸 Found ${images.length} images with detections`);
+    console.log(`📸 Found ${images.length} images with detections for project ${projectId}`);
 
     // Process images with controlled concurrency
     const results: ExtractionResult[] = [];
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
           };
 
           try {
-            console.log(`  📋 Extracting info from ${image.original_filename}...`);
+            console.log(`  📋 Extracting info from ${image.original_filename} (image_id: ${image.id})...`);
 
             // Fetch detections that don't have brand info yet
             const { data: detections, error: detectionsError } = await supabase
@@ -93,17 +94,20 @@ export async function POST(request: NextRequest) {
               .order('detection_index');
 
             if (detectionsError) {
+              console.error(`  ❌ Error fetching detections:`, detectionsError);
               throw new Error(`Failed to fetch detections: ${detectionsError.message}`);
             }
 
+            console.log(`  🔍 Found ${detections?.length || 0} detections needing extraction for ${image.original_filename}`);
+
             if (!detections || detections.length === 0) {
-              console.log(`  ℹ️  No unprocessed detections in ${image.original_filename}`);
+              console.log(`  ℹ️  No unprocessed detections in ${image.original_filename} (all already have brand_name)`);
               result.status = 'success';
               result.processedDetections = 0;
               return result;
             }
 
-            console.log(`  📦 Extracting info for ${detections.length} detections...`);
+            console.log(`  📦 Extracting info for ${detections.length} detections in parallel...`);
 
             // Get image data once (handles both S3 URLs and base64 storage)
             const imageBase64 = await getImageBase64ForProcessing(image);
@@ -168,7 +172,8 @@ export async function POST(request: NextRequest) {
     const failed = results.filter(r => r.status === 'error').length;
     const totalDetections = results.reduce((sum, r) => sum + (r.processedDetections || 0), 0);
 
-    console.log(`\n✅ Batch extraction complete: ${successful} successful, ${failed} failed, ${totalDetections} total detections processed`);
+    console.log(`\n✅ Batch extraction complete: ${successful}/${results.length} images successful, ${failed} failed, ${totalDetections} total detections processed`);
+    console.log(`   Project: ${projectId}, Concurrency: ${concurrency}`);
 
     return NextResponse.json({
       message: `Processed ${results.length} images`,
