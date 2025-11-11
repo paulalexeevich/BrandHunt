@@ -115,9 +115,13 @@ export async function POST(request: NextRequest) {
 
             // Process all detections in parallel for this image
             let successCount = 0;
+            let extractionErrors = 0;
+            let dbUpdateErrors = 0;
+            
             await Promise.all(
-              detections.map(async (detection) => {
+              detections.map(async (detection, idx) => {
                 try {
+                  // Call Gemini API to extract product info
                   const productInfo = await extractProductInfo(
                     imageBase64,
                     mimeType,
@@ -140,17 +144,19 @@ export async function POST(request: NextRequest) {
                     .eq('id', detection.id);
 
                   if (updateError) {
-                    console.error(`    ❌ Failed to update detection ${detection.detection_index}:`, updateError);
+                    console.error(`    ❌ DB update failed for detection ${detection.detection_index}:`, updateError.message);
+                    dbUpdateErrors++;
                   } else {
                     successCount++;
                   }
                 } catch (error) {
-                  console.error(`    ❌ Failed to extract info for detection ${detection.detection_index}:`, error);
+                  console.error(`    ❌ Extraction failed for detection ${detection.detection_index}:`, error instanceof Error ? error.message : 'Unknown error');
+                  extractionErrors++;
                 }
               })
             );
 
-            console.log(`  ✅ Extracted info for ${successCount}/${detections.length} detections in ${image.original_filename}`);
+            console.log(`  ✅ Extracted info for ${successCount}/${detections.length} detections in ${image.original_filename} (${extractionErrors} Gemini errors, ${dbUpdateErrors} DB errors)`);
             
             result.status = 'success';
             result.processedDetections = successCount;
