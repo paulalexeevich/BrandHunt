@@ -108,12 +108,18 @@ export async function POST(request: NextRequest) {
             }
 
             console.log(`  📦 Extracting info for ${detections.length} detections in parallel...`);
+            console.log(`  🔵 Image storage: type=${image.storage_type}, has_s3_url=${!!image.s3_url}, has_file_path=${!!image.file_path}`);
 
             // Get image data once (handles both S3 URLs and base64 storage)
+            console.log(`  🔵 Calling getImageBase64ForProcessing...`);
             const imageBase64 = await getImageBase64ForProcessing(image);
+            console.log(`  ✅ Got image base64: ${imageBase64.length} characters`);
+            
             const mimeType = getImageMimeType(image);
-
+            console.log(`  ✅ MIME type: ${mimeType}`);
+            
             // Process all detections in parallel for this image
+            console.log(`  🔵 Starting ${detections.length} parallel extractions...`);
             let successCount = 0;
             let extractionErrors = 0;
             let dbUpdateErrors = 0;
