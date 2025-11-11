@@ -31,10 +31,10 @@ export async function POST(request: NextRequest) {
     // Create authenticated Supabase client
     const supabase = await createAuthenticatedSupabaseClient();
 
-    // Fetch the image data
+    // Fetch the image data with project info
     const { data: image, error: imageError } = await supabase
       .from('branghunt_images')
-      .select('*')
+      .select('*, project_id')
       .eq('id', imageId)
       .single();
 
@@ -44,6 +44,10 @@ export async function POST(request: NextRequest) {
         details: imageError?.message 
       }, { status: 404 });
     }
+
+    const projectId = image.project_id || null;
+    console.log(`🔍 Project ID: ${projectId || 'null (using default prompt)'}`);
+
 
     // Fetch all detections that have cached FoodGraph results but no filtering done yet
     const { data: detections, error: detectionsError } = await supabase
@@ -123,7 +127,9 @@ export async function POST(request: NextRequest) {
             try {
               const isMatch = await compareProductImages(
                 base64Image,
-                fgResult.front_image_url
+                fgResult.front_image_url,
+                false, // Get boolean result
+                projectId // Use custom prompt if available
               );
               return { fgResult, isMatch };
             } catch {

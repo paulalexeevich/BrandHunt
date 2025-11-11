@@ -43,10 +43,10 @@ export async function POST(request: NextRequest) {
     // Create authenticated Supabase client
     const supabase = await createAuthenticatedSupabaseClient();
 
-    // Fetch the image data
+    // Fetch the image data with project info
     const { data: image, error: imageError } = await supabase
       .from('branghunt_images')
-      .select('*')
+      .select('*, project_id')
       .eq('id', imageId)
       .single();
 
@@ -56,6 +56,8 @@ export async function POST(request: NextRequest) {
         details: imageError?.message 
       }, { status: 404 });
     }
+
+    const projectId = image.project_id || null;
 
     // Fetch all detections that don't have brand info yet
     const { data: detections, error: detectionsError } = await supabase
@@ -102,7 +104,8 @@ export async function POST(request: NextRequest) {
           const productInfo = await extractProductInfo(
             imageBase64,
             mimeType,
-            detection.bounding_box
+            detection.bounding_box,
+            projectId
           );
 
           // Save to database immediately (regardless of isProduct status)

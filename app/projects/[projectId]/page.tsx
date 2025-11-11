@@ -25,11 +25,13 @@ import {
   Shield,
   Eye,
   Edit,
+  Settings,
 } from 'lucide-react';
 import AuthNav from '@/components/AuthNav';
 import { createClient } from '@/lib/supabase-browser';
 import { User } from '@supabase/supabase-js';
 import { getImageUrl } from '@/lib/image-utils';
+import PromptSettingsModal from '@/components/PromptSettingsModal';
 
 interface ProjectStats {
   project_id: string;
@@ -104,6 +106,9 @@ export default function ProjectViewPage() {
   const [newMemberUserId, setNewMemberUserId] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<'admin' | 'member' | 'viewer'>('member');
   const [memberLoading, setMemberLoading] = useState(false);
+  
+  // Prompt settings modal state
+  const [showPromptSettings, setShowPromptSettings] = useState(false);
   
   // Batch processing state
   const [batchDetecting, setBatchDetecting] = useState(false);
@@ -472,10 +477,19 @@ export default function ProjectViewPage() {
             </Link>
             {project && (
               <>
-                <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3 mt-2">
-                  <FolderOpen className="w-10 h-10 text-indigo-600" />
-                  {project.project_name}
-                </h1>
+                <div className="flex items-center gap-3 mt-2">
+                  <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
+                    <FolderOpen className="w-10 h-10 text-indigo-600" />
+                    {project.project_name}
+                  </h1>
+                  <button
+                    onClick={() => setShowPromptSettings(true)}
+                    className="ml-2 p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    title="AI Prompt Settings"
+                  >
+                    <Settings className="w-6 h-6" />
+                  </button>
+                </div>
                 {project.description && (
                   <p className="text-gray-600 mt-2">{project.description}</p>
                 )}
@@ -1008,6 +1022,13 @@ export default function ProjectViewPage() {
           </>
         )}
       </div>
+
+      {/* Prompt Settings Modal */}
+      <PromptSettingsModal
+        projectId={projectId}
+        isOpen={showPromptSettings}
+        onClose={() => setShowPromptSettings(false)}
+      />
     </div>
   );
 }

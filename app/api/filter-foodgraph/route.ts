@@ -15,6 +15,23 @@ export async function POST(request: NextRequest) {
     // Create authenticated Supabase client
     const supabase = await createAuthenticatedSupabaseClient();
 
+    // Fetch detection with image to get project_id
+    const { data: detection, error: detectionError } = await supabase
+      .from('branghunt_detections')
+      .select('*, image:branghunt_images(project_id)')
+      .eq('id', detectionId)
+      .single();
+
+    if (detectionError || !detection) {
+      console.error('Error fetching detection:', detectionError);
+      return NextResponse.json({ 
+        error: 'Detection not found' 
+      }, { status: 404 });
+    }
+
+    const projectId = detection.image?.project_id || null;
+    console.log(`🔍 Project ID: ${projectId || 'null (using default prompt)'}`);
+
     // Fetch ONLY the pre-filtered results (if provided), otherwise fallback to top 50
     let foodgraphResults;
     let fetchError;
@@ -70,7 +87,8 @@ export async function POST(request: NextRequest) {
         const comparisonDetails = await compareProductImages(
           croppedImageBase64,
           result.front_image_url,
-          true // Get detailed results with matchStatus, confidence, visualSimilarity, and reason
+          true, // Get detailed results with matchStatus, confidence, visualSimilarity, and reason
+          projectId // Use custom prompt if available
         );
         console.log(`   ✅ Result ${result.product_name}: ${comparisonDetails.matchStatus.toUpperCase()} (confidence: ${comparisonDetails.confidence}, visual similarity: ${comparisonDetails.visualSimilarity}) - ${comparisonDetails.reason}`);
         return { 
