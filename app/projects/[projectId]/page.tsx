@@ -343,51 +343,66 @@ export default function ProjectViewPage() {
         throw new Error('Failed to get response stream');
       }
 
+      console.log('📡 Starting SSE stream reader...');
       let buffer = '';
+      let chunkCount = 0;
+      
       while (true) {
         const { done, value } = await reader.read();
         
-        if (done) break;
+        if (done) {
+          console.log('📡 Stream complete, received', chunkCount, 'chunks');
+          break;
+        }
         
-        buffer += decoder.decode(value, { stream: true });
+        chunkCount++;
+        const chunk = decoder.decode(value, { stream: true });
+        console.log(`📡 Chunk ${chunkCount}:`, chunk.substring(0, 100));
+        
+        buffer += chunk;
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
         
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-            
-            if (data.type === 'start') {
-              setBatchProgress(`🚀 Starting: ${data.total} images to process...`);
-            } else if (data.type === 'progress') {
-              setBatchProgress(
-                `⚡ Processing: ${data.processed}/${data.total} images\n` +
-                `✅ ${data.successful} successful, ❌ ${data.failed} failed\n` +
-                `📦 ${data.totalDetections} products detected so far`
-              );
-            } else if (data.type === 'complete') {
-              const failedImages = data.results?.filter((r: any) => r.status === 'error') || [];
+            try {
+              const data = JSON.parse(line.slice(6));
+              console.log('📊 Received event:', data.type, data);
               
-              let progressMsg = `✅ Completed: ${data.summary.successful}/${data.summary.total} images successful, ${data.summary.totalDetections} products detected`;
-              
-              if (data.summary.failed > 0) {
-                progressMsg += `\n\n❌ ${data.summary.failed} Failed:\n`;
-                failedImages.forEach((img: any) => {
-                  progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
-                });
+              if (data.type === 'start') {
+                setBatchProgress(`🚀 Starting: ${data.total} images to process...`);
+              } else if (data.type === 'progress') {
+                setBatchProgress(
+                  `⚡ Processing: ${data.processed}/${data.total} images\n` +
+                  `✅ ${data.successful} successful, ❌ ${data.failed} failed\n` +
+                  `📦 ${data.totalDetections} products detected so far`
+                );
+              } else if (data.type === 'complete') {
+                const failedImages = data.results?.filter((r: any) => r.status === 'error') || [];
+                
+                let progressMsg = `✅ Completed: ${data.summary.successful}/${data.summary.total} images successful, ${data.summary.totalDetections} products detected`;
+                
+                if (data.summary.failed > 0) {
+                  progressMsg += `\n\n❌ ${data.summary.failed} Failed:\n`;
+                  failedImages.forEach((img: any) => {
+                    progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
+                  });
+                }
+                
+                setBatchProgress(progressMsg);
+                
+                // Refresh project data
+                await fetchProjectData();
+                
+                // Keep success messages for 5s, keep error messages indefinitely
+                if (data.summary.failed === 0) {
+                  setTimeout(() => setBatchProgress(''), 5000);
+                }
+              } else if (data.type === 'error') {
+                throw new Error(data.details || data.error || 'Batch detection failed');
               }
-              
-              setBatchProgress(progressMsg);
-              
-              // Refresh project data
-              await fetchProjectData();
-              
-              // Keep success messages for 5s, keep error messages indefinitely
-              if (data.summary.failed === 0) {
-                setTimeout(() => setBatchProgress(''), 5000);
-              }
-            } else if (data.type === 'error') {
-              throw new Error(data.details || data.error || 'Batch detection failed');
+            } catch (parseError) {
+              console.error('Failed to parse SSE data:', line, parseError);
             }
           }
         }
@@ -434,50 +449,65 @@ export default function ProjectViewPage() {
         throw new Error('Failed to get response stream');
       }
 
+      console.log('📡 Starting SSE stream reader for batch extract...');
       let buffer = '';
+      let chunkCount = 0;
+      
       while (true) {
         const { done, value } = await reader.read();
         
-        if (done) break;
+        if (done) {
+          console.log('📡 Stream complete, received', chunkCount, 'chunks');
+          break;
+        }
         
-        buffer += decoder.decode(value, { stream: true });
+        chunkCount++;
+        const chunk = decoder.decode(value, { stream: true });
+        console.log(`📡 Chunk ${chunkCount}:`, chunk.substring(0, 100));
+        
+        buffer += chunk;
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
         
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-            
-            if (data.type === 'start') {
-              setBatchProgress(`🚀 Starting: ${data.totalDetections} detections to extract...`);
-            } else if (data.type === 'progress') {
-              setBatchProgress(
-                `⚡ Extracting: ${data.processedDetections}/${data.totalDetections} detections\n` +
-                `✅ ${data.successful} images successful, ❌ ${data.failed} failed`
-              );
-            } else if (data.type === 'complete') {
-              const failedImages = data.results?.filter((r: any) => r.status === 'error') || [];
+            try {
+              const data = JSON.parse(line.slice(6));
+              console.log('📊 Received event:', data.type, data);
               
-              let progressMsg = `✅ Completed: ${data.summary.successful}/${data.summary.total} images successful, ${data.summary.totalDetections} products extracted`;
-              
-              if (data.summary.failed > 0) {
-                progressMsg += `\n\n❌ ${data.summary.failed} Failed:\n`;
-                failedImages.forEach((img: any) => {
-                  progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
-                });
+              if (data.type === 'start') {
+                setBatchProgress(`🚀 Starting: ${data.totalDetections} detections to extract...`);
+              } else if (data.type === 'progress') {
+                setBatchProgress(
+                  `⚡ Extracting: ${data.processedDetections}/${data.totalDetections} detections\n` +
+                  `✅ ${data.successful} images successful, ❌ ${data.failed} failed`
+                );
+              } else if (data.type === 'complete') {
+                const failedImages = data.results?.filter((r: any) => r.status === 'error') || [];
+                
+                let progressMsg = `✅ Completed: ${data.summary.successful}/${data.summary.total} images successful, ${data.summary.totalDetections} products extracted`;
+                
+                if (data.summary.failed > 0) {
+                  progressMsg += `\n\n❌ ${data.summary.failed} Failed:\n`;
+                  failedImages.forEach((img: any) => {
+                    progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
+                  });
+                }
+                
+                setBatchProgress(progressMsg);
+                
+                // Refresh project data
+                await fetchProjectData();
+                
+                // Keep success messages for 5s, keep error messages indefinitely
+                if (data.summary.failed === 0) {
+                  setTimeout(() => setBatchProgress(''), 5000);
+                }
+              } else if (data.type === 'error') {
+                throw new Error(data.details || data.error || 'Batch extraction failed');
               }
-              
-              setBatchProgress(progressMsg);
-              
-              // Refresh project data
-              await fetchProjectData();
-              
-              // Keep success messages for 5s, keep error messages indefinitely
-              if (data.summary.failed === 0) {
-                setTimeout(() => setBatchProgress(''), 5000);
-              }
-            } else if (data.type === 'error') {
-              throw new Error(data.details || data.error || 'Batch extraction failed');
+            } catch (parseError) {
+              console.error('Failed to parse SSE data:', line, parseError);
             }
           }
         }
