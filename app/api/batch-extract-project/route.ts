@@ -111,61 +111,71 @@ export async function POST(request: NextRequest) {
             }
 
             console.log(`  📦 Extracting info for ${detections.length} detections in parallel...`);
-            console.log(`  🔵 Image storage: type=${image.storage_type}, has_s3_url=${!!image.s3_url}, has_file_path=${!!image.file_path}`);
 
-            // Get image data once (handles both S3 URLs and base64 storage)
-            console.log(`  🔵 Calling getImageBase64ForProcessing...`);
-            const imageBase64 = await getImageBase64ForProcessing(image);
-            console.log(`  ✅ Got image base64: ${imageBase64.length} characters`);
-            
-            const mimeType = getImageMimeType(image);
-            console.log(`  ✅ MIME type: ${mimeType}`);
-            
-            // Process all detections in parallel for this image
-            console.log(`  🔵 Starting ${detections.length} parallel extractions...`);
+            // Process all detections in parallel (COPY OF WORKING CODE FROM batch-extract-info)
             let successCount = 0;
-            let extractionErrors = 0;
-            let dbUpdateErrors = 0;
-            
-            await Promise.all(
-              detections.map(async (detection, idx) => {
+            const extractionResults = await Promise.all(
+              detections.map(async (detection) => {
                 try {
-                  // Call Gemini API to extract product info
+                  console.log(`    [${detection.detection_index}] Extracting product info...`);
+                  
+                  // Get image data (handles both S3 URLs and base64 storage) - SAME AS WORKING CODE
+                  const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
+                  const imageBase64 = await getImageBase64ForProcessing(image);
+                  const mimeType = getImageMimeType(image);
+                  
                   const productInfo = await extractProductInfo(
                     imageBase64,
                     mimeType,
                     detection.bounding_box
                   );
 
-                  // Save to database
+                  // Save to database immediately (SAME AS WORKING CODE)
                   const { error: updateError } = await supabase
                     .from('branghunt_detections')
                     .update({
-                      brand_name: productInfo.brand || null,
-                      product_name: productInfo.productName || null,
-                      product_description: productInfo.description || null,
-                      brand_extracted: true,
-                      brand_extracted_at: new Date().toISOString(),
+                      // Classification fields
+                      is_product: productInfo.isProduct,
+                      details_visible: productInfo.detailsVisible,
+                      extraction_notes: productInfo.extractionNotes || null,
+                      // Product fields
+                      brand_name: productInfo.brand,
+                      product_name: productInfo.productName,
+                      category: productInfo.category,
+                      flavor: productInfo.flavor,
+                      size: productInfo.size,
+                      sku: productInfo.sku,
+                      description: productInfo.description,
+                      // Confidence scores
                       brand_confidence: productInfo.brandConfidence,
                       product_name_confidence: productInfo.productNameConfidence,
+                      category_confidence: productInfo.categoryConfidence,
+                      flavor_confidence: productInfo.flavorConfidence,
+                      size_confidence: productInfo.sizeConfidence,
+                      sku_confidence: productInfo.skuConfidence,
                       description_confidence: productInfo.descriptionConfidence,
+                      // Metadata
+                      brand_extraction_response: JSON.stringify(productInfo),
+                      updated_at: new Date().toISOString()
                     })
                     .eq('id', detection.id);
 
                   if (updateError) {
-                    console.error(`    ❌ DB update failed for detection ${detection.detection_index}:`, updateError.message);
-                    dbUpdateErrors++;
-                  } else {
-                    successCount++;
+                    throw new Error(`Database update failed: ${updateError.message}`);
                   }
+
+                  console.log(`    ✅ [${detection.detection_index}] Info extracted and saved`);
+                  return { success: true };
+
                 } catch (error) {
-                  console.error(`    ❌ Extraction failed for detection ${detection.detection_index}:`, error instanceof Error ? error.message : 'Unknown error');
-                  extractionErrors++;
+                  console.error(`    ❌ [${detection.detection_index}] Error:`, error);
+                  return { success: false, error };
                 }
               })
             );
 
-            console.log(`  ✅ Extracted info for ${successCount}/${detections.length} detections in ${image.original_filename} (${extractionErrors} Gemini errors, ${dbUpdateErrors} DB errors)`);
+            successCount = extractionResults.filter(r => r.success).length;
+            console.log(`  ✅ Extracted info for ${successCount}/${detections.length} detections in ${image.original_filename}`);
             
             result.status = 'success';
             result.processedDetections = successCount;
