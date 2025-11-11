@@ -2368,22 +2368,21 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 
                                 {/* Middle: Product Details */}
                               <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                {/* Product name and brand - compact */}
+                                {/* Product name and size - compact */}
                                 <div className="space-y-0.5">
-                                  <p className="text-sm font-semibold text-gray-900 line-clamp-1" title={result.product_name || 'Unnamed'}>
-                                    {result.product_name || 'Unnamed Product'}
+                                  {/* Product name - 2 lines */}
+                                  <p className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight" title={fgTitle}>
+                                    {fgTitle}
                                   </p>
-                                  <p className="text-xs text-gray-600 truncate">
-                                    {result.brand_name || 'Unknown Brand'}
-                                  </p>
-                                  {/* Index number */}
-                                  <p className="text-[10px] text-indigo-600 font-semibold">
-                                    #{index + 1}
+                                  
+                                  {/* Product size/measure */}
+                                  <p className="text-xs text-gray-600">
+                                    {fgSize}
                                   </p>
                                   
                                   {/* GTIN/UPC Code */}
                                   {fgGtin && (
-                                    <div className="flex items-center gap-1 mt-1">
+                                    <div className="flex items-center gap-1 mt-0.5">
                                       <span className="text-[10px] text-gray-500">UPC:</span>
                                       <span className="text-[10px] font-mono text-blue-600 font-semibold">
                                         {fgGtin}
