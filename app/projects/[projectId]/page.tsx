@@ -48,6 +48,16 @@ interface ProjectStats {
   detections_fully_analyzed: number;
 }
 
+interface ProductStatistics {
+  totalProducts: number;
+  notProduct: number;
+  detailsNotVisible: number;
+  notIdentified: number;
+  oneMatch: number;
+  noMatch: number;
+  multipleMatches: number;
+}
+
 interface ImageData {
   id: string;
   file_path: string | null;
@@ -98,6 +108,7 @@ export default function ProjectViewPage() {
   // Batch processing state
   const [batchDetecting, setBatchDetecting] = useState(false);
   const [batchExtracting, setBatchExtracting] = useState(false);
+  const [productStats, setProductStats] = useState<ProductStatistics | null>(null);
   const [batchProgress, setBatchProgress] = useState<string>('');
   
   const supabase = createClient();
@@ -131,6 +142,47 @@ export default function ProjectViewPage() {
     }
   }, [page, user]);
 
+  const fetchProductStatistics = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('branghunt_images')
+        .select(`
+          branghunt_detections (
+            id,
+            is_product,
+            details_visible,
+            brand_name,
+            fully_analyzed
+          )
+        `)
+        .eq('project_id', projectId);
+
+      if (error) throw error;
+
+      // Flatten all detections from all images
+      const allDetections = data?.flatMap((img: any) => img.branghunt_detections || []) || [];
+
+      // Calculate statistics
+      const stats: ProductStatistics = {
+        totalProducts: allDetections.length,
+        notProduct: allDetections.filter((d: any) => d.is_product === false).length,
+        detailsNotVisible: allDetections.filter((d: any) => d.is_product === true && d.details_visible === false).length,
+        notIdentified: allDetections.filter((d: any) => 
+          (d.is_product === true || d.is_product === null) && 
+          (d.details_visible === true || d.details_visible === null) &&
+          !d.brand_name
+        ).length,
+        oneMatch: allDetections.filter((d: any) => d.fully_analyzed === true).length,
+        noMatch: 0, // Will be calculated from foodgraph results if needed
+        multipleMatches: 0 // Will be calculated from foodgraph results if needed
+      };
+
+      setProductStats(stats);
+    } catch (err) {
+      console.error('Failed to fetch product statistics:', err);
+    }
+  };
+
   const fetchProjectData = async (pageNum: number = page) => {
     setLoading(true);
     setError(null);
@@ -161,6 +213,11 @@ export default function ProjectViewPage() {
       setProject(data.project);
       setImages(data.images || []);
       setPagination(data.pagination || null);
+
+      // Fetch product statistics
+      if (data.project && data.project.total_detections > 0) {
+        await fetchProductStatistics();
+      }
       
       // Also fetch members
       await fetchMembers();
@@ -506,55 +563,76 @@ export default function ProjectViewPage() {
               </div>
             </div>
 
-            {/* Processing Pipeline Status */}
-            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Processing Pipeline</h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* FoodGraph Search */}
-                <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg">
-                  <Search className="w-8 h-8 text-blue-600 flex-shrink-0" />
-                  <div>
-                    <div className="font-semibold text-gray-900">FoodGraph Search</div>
-                    <div className="text-sm text-gray-600">
-                      {project.detections_foodgraph_searched} / {project.total_detections}
-                    </div>
+            {/* Product Statistics Panel */}
+            {productStats && productStats.totalProducts > 0 && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-md p-6 mb-8 border border-indigo-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  📊 Product Statistics
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {/* Total Products */}
+                  <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-900 ring-2 ring-gray-900">
+                    <div className="text-2xl font-bold text-gray-900">{productStats.totalProducts}</div>
+                    <div className="text-xs text-gray-600 mt-1">Total Products</div>
+                    <div className="text-xs text-gray-900 font-semibold mt-1">● Active</div>
+                  </div>
+
+                  {/* Not Product */}
+                  <div className="bg-red-50 rounded-lg p-4 shadow-sm border border-red-200">
+                    <div className="text-2xl font-bold text-red-700">{productStats.notProduct}</div>
+                    <div className="text-xs text-red-600 mt-1">Not Product</div>
+                  </div>
+
+                  {/* Details Not Visible */}
+                  <div className="bg-orange-50 rounded-lg p-4 shadow-sm border border-orange-200">
+                    <div className="text-2xl font-bold text-orange-700">{productStats.detailsNotVisible}</div>
+                    <div className="text-xs text-orange-600 mt-1">Details Not Visible</div>
+                  </div>
+
+                  {/* Not Identified */}
+                  <div className="bg-gray-50 rounded-lg p-4 shadow-sm border border-gray-300">
+                    <div className="text-2xl font-bold text-gray-700">{productStats.notIdentified}</div>
+                    <div className="text-xs text-gray-600 mt-1">Not Identified</div>
+                  </div>
+
+                  {/* ONE Match */}
+                  <div className="bg-green-50 rounded-lg p-4 shadow-sm border border-green-200">
+                    <div className="text-2xl font-bold text-green-700">{productStats.oneMatch}</div>
+                    <div className="text-xs text-green-600 mt-1">✓ ONE Match</div>
+                  </div>
+
+                  {/* NO Match */}
+                  <div className="bg-yellow-50 rounded-lg p-4 shadow-sm border border-yellow-200">
+                    <div className="text-2xl font-bold text-yellow-700">{productStats.noMatch}</div>
+                    <div className="text-xs text-yellow-600 mt-1">NO Match</div>
+                  </div>
+
+                  {/* 2+ Matches */}
+                  <div className="bg-purple-50 rounded-lg p-4 shadow-sm border border-purple-200">
+                    <div className="text-2xl font-bold text-purple-700">{productStats.multipleMatches}</div>
+                    <div className="text-xs text-purple-600 mt-1">2+ Matches</div>
                   </div>
                 </div>
 
-                {/* AI Filtering */}
-                <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
-                  <Filter className="w-8 h-8 text-purple-600 flex-shrink-0" />
-                  <div>
-                    <div className="font-semibold text-gray-900">AI Filtered</div>
-                    <div className="text-sm text-gray-600">
-                      {project.detections_ai_filtered} / {project.total_detections}
-                    </div>
+                {/* Progress Bar */}
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs text-gray-600 mb-1">
+                    <span>Processing Progress</span>
+                    <span>{productStats.oneMatch} / {productStats.totalProducts} Completed ({Math.round((productStats.oneMatch / productStats.totalProducts) * 100)}%)</span>
                   </div>
-                </div>
-
-                {/* Fully Analyzed */}
-                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
-                  <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Completed</div>
-                    <div className="text-sm text-gray-600">
-                      {project.detections_fully_analyzed} / {project.total_detections}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Completion Rate */}
-                <div className="flex items-center gap-3 p-4 bg-indigo-50 rounded-lg">
-                  <Target className="w-8 h-8 text-indigo-600 flex-shrink-0" />
-                  <div>
-                    <div className="font-semibold text-gray-900">Completion</div>
-                    <div className="text-sm text-gray-600">
-                      {Math.round((project.detections_fully_analyzed / (project.total_detections || 1)) * 100)}%
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-1"
+                      style={{ width: `${(productStats.oneMatch / productStats.totalProducts) * 100}%` }}
+                    >
+                      {productStats.oneMatch > 0 && (
+                        <span className="text-[10px] font-bold text-white">✓</span>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Project Members */}
             <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
