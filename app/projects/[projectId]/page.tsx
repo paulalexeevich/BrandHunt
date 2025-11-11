@@ -431,7 +431,7 @@ export default function ProjectViewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           projectId,
-          concurrency: 15 // Process 15 images at a time (detections within each image in parallel = ~50-150 concurrent Gemini calls under 2K RPM limit)
+          concurrency: 150 // Detection-level parallelism: Process 150 detections at a time (~1500 RPM, under 2K limit, 10x faster!)
         }),
         credentials: 'include'
       });
