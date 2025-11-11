@@ -1620,25 +1620,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         </span>
                           )}
                         </div>
-                    
-                    {/* Progress Indicators */}
-                    <div className="flex gap-2 text-xs">
-                      <span className={`px-2 py-1 rounded ${detection.brand_name ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {detection.brand_name ? '✓' : '○'} Info
-                            </span>
-                      <span className={`px-2 py-1 rounded ${detection.price && detection.price !== 'Unknown' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {detection.price && detection.price !== 'Unknown' ? '✓' : '○'} Price
-                                    </span>
-                      <span className={`px-2 py-1 rounded ${(foodgraphResults.length > 0 || detection.fully_analyzed) ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {(foodgraphResults.length > 0 || detection.fully_analyzed) ? '✓' : '○'} Search
-                      </span>
-                      <span className={`px-2 py-1 rounded ${(preFilteredCount !== null || detection.fully_analyzed) ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {(preFilteredCount !== null || detection.fully_analyzed) ? '✓' : '○'} Pre-Filter
-                      </span>
-                      <span className={`px-2 py-1 rounded ${(filteredCount !== null || detection.fully_analyzed) ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {(filteredCount !== null || detection.fully_analyzed) ? '✓' : '○'} AI Filter
-                      </span>
-                                </div>
                 </div>
                 
                   {/* Extracted Product Information */}
