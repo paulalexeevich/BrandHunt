@@ -56,12 +56,13 @@ export async function POST(request: NextRequest) {
 
     // Fetch all detections that don't have brand info yet
     // SKIP products marked as is_product = false (not actual products)
+    // Include NULL values (not yet classified) and TRUE values (actual products)
     const { data: detections, error: detectionsError } = await supabase
       .from('branghunt_detections')
       .select('*')
       .eq('image_id', imageId)
       .is('brand_name', null)
-      .not('is_product', 'eq', false)  // Skip non-products
+      .or('is_product.is.null,is_product.eq.true')  // Include NULL and TRUE, exclude FALSE
       .order('detection_index');
 
     if (detectionsError) {

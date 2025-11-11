@@ -43,15 +43,15 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    // Fetch all detections that have brand info but no price yet
+    // Fetch all detections that have brand info
     // SKIP products marked as is_product = false (not actual products)
-    const { data: detections, error: detectionsError } = await supabase
+    // Include NULL values (not yet classified) and TRUE values (actual products)
+    const { data: allDetections, error: detectionsError } = await supabase
       .from('branghunt_detections')
       .select('*')
       .eq('image_id', imageId)
       .not('brand_name', 'is', null)
-      .not('is_product', 'eq', false)  // Skip non-products
-      .or('price.is.null,price.eq.Unknown')
+      .or('is_product.is.null,is_product.eq.true')  // Include NULL and TRUE, exclude FALSE
       .order('detection_index');
 
     if (detectionsError) {
@@ -61,9 +61,22 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    if (!detections || detections.length === 0) {
+    if (!allDetections || allDetections.length === 0) {
       return NextResponse.json({
         message: 'No products to process',
+        processed: 0,
+        results: []
+      });
+    }
+
+    // Filter to only those without price (null or 'Unknown')
+    const detections = allDetections.filter((d: any) => 
+      !d.price || d.price === 'Unknown'
+    );
+
+    if (detections.length === 0) {
+      return NextResponse.json({
+        message: 'All products already have prices',
         processed: 0,
         results: []
       });

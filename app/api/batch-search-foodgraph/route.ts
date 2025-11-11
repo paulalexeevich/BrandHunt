@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch all detections that have brand info but no FoodGraph results yet
     // SKIP products marked as is_product = false (not actual products)
+    // Include NULL values (not yet classified) and TRUE values (actual products)
     const { data: detections, error: detectionsError } = await supabase
       .from('branghunt_detections')
       .select(`
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
       `)
       .eq('image_id', imageId)
       .not('brand_name', 'is', null)
-      .not('is_product', 'eq', false)  // Skip non-products
+      .or('is_product.is.null,is_product.eq.true')  // Include NULL and TRUE, exclude FALSE
       .order('detection_index');
 
     if (detectionsError) {
