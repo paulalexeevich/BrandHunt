@@ -431,7 +431,7 @@ export default function ProjectViewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           projectId,
-          concurrency: 150 // Detection-level parallelism: Process 150 detections at a time (~1500 RPM, under 2K limit, 10x faster!)
+          concurrency: 300 // Testing 300 concurrent detections (~3000 RPM - may hit rate limit but let's test!)
         }),
         credentials: 'include'
       });
@@ -1008,9 +1008,9 @@ export default function ProjectViewPage() {
                 <p className="text-sm text-gray-900 font-semibold mb-1">About Batch Processing:</p>
                 <ul className="text-xs text-gray-700 space-y-1">
                   <li><strong>Batch Detect:</strong> Uses YOLO API for ultra-fast detection (~0.6s per image, 10 images in parallel)</li>
-                  <li><strong>Batch Extract:</strong> Detection-level parallelism - processes 150 detections simultaneously across all images</li>
-                  <li><strong>Gemini Rate Limit:</strong> 2000 requests/min - using ~1500 RPM with 150 concurrent detections (10x faster!)</li>
-                  <li><strong>Performance:</strong> ~1382 detections complete in 60-90 seconds with real-time progress updates</li>
+                  <li><strong>Batch Extract:</strong> Detection-level parallelism - processes 300 detections simultaneously (TESTING MAX SPEED!)</li>
+                  <li><strong>Gemini Rate Limit:</strong> 2000 requests/min - testing 300 concurrency (~3000 RPM, may hit limits)</li>
+                  <li><strong>Performance:</strong> Target ~30-45 seconds for 1382 detections (if rate limit allows)</li>
                 </ul>
               </div>
             </div>

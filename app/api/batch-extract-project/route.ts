@@ -34,7 +34,7 @@ interface DetectionWithImage {
 
 export async function POST(request: NextRequest) {
   try {
-    const { projectId, concurrency = 150 } = await request.json();  // Increased to 150 for detection-level parallelism
+    const { projectId, concurrency = 300 } = await request.json();  // Testing 300 concurrent detections (~3000 RPM - pushing limits!)
 
     if (!projectId) {
       return NextResponse.json({ 
