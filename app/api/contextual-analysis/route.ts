@@ -211,18 +211,32 @@ Return JSON only:
   // Remove data URI prefix if present
   const base64Data = expandedCropBase64.replace(/^data:image\/\w+;base64,/, '');
   
-  const result = await model.generateContent([
-    {
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: base64Data,
+  let text: string;
+  try {
+    console.log('[Contextual Analysis] Sending request to Gemini...');
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: base64Data,
+        },
       },
-    },
-    prompt,
-  ]);
-  
-  const response = result.response;
-  const text = response.text();
+      prompt,
+    ]);
+    
+    console.log('[Contextual Analysis] Got response from Gemini, extracting text...');
+    const response = await result.response;
+    text = response.text();
+    console.log(`[Contextual Analysis] Gemini response length: ${text.length} characters`);
+    
+    if (!text || text.trim().length === 0) {
+      console.error('[Contextual Analysis] Gemini returned empty response');
+      throw new Error('Gemini returned empty response');
+    }
+  } catch (error) {
+    console.error('[Contextual Analysis] Gemini API error:', error);
+    throw new Error(`Gemini API failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
   
   // Try to parse JSON from response
   try {
