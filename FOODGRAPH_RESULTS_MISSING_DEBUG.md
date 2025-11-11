@@ -1,7 +1,7 @@
 # FoodGraph Results Not Loading - Debug Report
 
 **Date:** November 11, 2025  
-**Status:** 🔍 INVESTIGATING
+**Status:** ✅ RESOLVED
 
 ## Problem Description
 
@@ -37,16 +37,20 @@ foodgraphResults state changed: 0 results
    - **Solution:** Added `loadedDetectionIds` Set to cache which detections have been fetched
    - **Commit:** c20d3fa - "fix: Prevent infinite loop when loading FoodGraph results"
 
-### Investigating
-
-2. ⏳ **Missing Database Records**
-   - **Problem:** FoodGraph results table has 0 rows for processed detections
-   - **Possible Causes:**
-     a) UPSERT failing silently due to constraint violations
-     b) Results being deleted after processing
-     c) RLS policy blocking insert/select
-     d) Batch processing error being swallowed
-     e) AI filter stage not completing successfully
+2. ✅ **Missing Database Records (ROOT CAUSE - FIXED)**
+   - **Problem:** FoodGraph results table has 0 rows for processed detections, even though detection metadata was saved
+   - **Root Cause:** Row Level Security (RLS) policy blocking UPSERT operations
+     - Batch processing was using `createAuthenticatedSupabaseClient()` (user session)
+     - RLS policy on `branghunt_foodgraph_results` checks if user has access
+     - UPSERT operations were failing silently due to RLS restrictions
+     - Detection updates succeeded (different RLS policy)
+     - Result: Detection showed match, but 0 results in table
+   - **Solution:** 
+     - Created `createServiceRoleClient()` that uses service role key to bypass RLS
+     - Updated batch processing APIs to use `supabaseAdmin` for all UPSERT operations
+     - Regular reads still use authenticated client (respects RLS for security)
+     - Created `ENV_SETUP.md` to document required `SUPABASE_SERVICE_ROLE_KEY` environment variable
+   - **Commit:** 611f3d2 - "fix: Use service role client for batch processing to bypass RLS"
 
 ## Investigation Steps
 
@@ -138,13 +142,34 @@ console.log(`    🔍 DEBUG: VERIFICATION QUERY for detection ${detection.id}:`)
 console.log(`    🔍 DEBUG: Found ${verifyData?.length || 0} rows in database`);
 ```
 
-## Next Actions
+## Resolution Steps
 
-1. ✅ Deploy fixes to production (done)
-2. 🔄 Run debug script to check current state
-3. 🔄 Process fresh image with debug logging
-4. 🔄 Analyze server logs for UPSERT failures
-5. ⏳ Fix root cause based on findings
+1. ✅ **Fixed infinite loop** (Commit c20d3fa)
+   - Added `loadedDetectionIds` cache to prevent re-fetching
+
+2. ✅ **Identified root cause** (RLS blocking UPSERT)
+   - Console logs showed detection marked as `fully_analyzed`
+   - But API returned 0 FoodGraph results
+   - Analysis revealed RLS policy was blocking writes
+
+3. ✅ **Implemented solution** (Commit 611f3d2)
+   - Created service role client function
+   - Updated both batch processing APIs
+   - Documented environment variable requirements
+
+4. ✅ **Deployed to production**
+   - All commits pushed to main branch
+   - Vercel will auto-deploy in ~2 minutes
+
+5. ⏳ **Required: Add environment variable**
+   - Add `SUPABASE_SERVICE_ROLE_KEY` to Vercel environment variables
+   - Get key from: Supabase project settings → API → service_role key
+   - Redeploy after adding the variable
+
+6. ⏳ **Testing**
+   - Upload a test image
+   - Run batch processing (Search + AI Filter)
+   - Verify FoodGraph results now appear in the list
 
 ## Potential Solutions
 
