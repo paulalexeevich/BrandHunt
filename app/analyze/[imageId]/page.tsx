@@ -2317,27 +2317,35 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     )}
                     
                     {/* Visual Match Button - Shows AFTER AI Filter when there are 2+ candidates */}
-                    {filteredCount !== null && matchStatusCounts && (matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 && !detection.fully_analyzed && (
-                      <button
-                        onClick={handleVisualMatch}
-                        disabled={visualMatching}
-                        className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2 shadow-md"
-                      >
-                        {visualMatching ? (
-                          <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            Visual Matching...
-                          </>
-                        ) : (
-                          <>
-                            🎯 Visual Match Selection
-                            <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                              {matchStatusCounts.identical + matchStatusCounts.almostSame} candidates
-                            </span>
-                          </>
-                        )}
-                      </button>
-                    )}
+                    {(() => {
+                      // Calculate match counts from actual results (works for both manual and batch processing)
+                      const identicalCount = foodgraphResults.filter(r => (r as any).match_status === 'identical').length;
+                      const almostSameCount = foodgraphResults.filter(r => (r as any).match_status === 'almost_same').length;
+                      const totalCandidates = identicalCount + almostSameCount;
+                      
+                      // Show button if we have 2+ candidates and detection is not fully analyzed
+                      return totalCandidates >= 2 && !detection.fully_analyzed && (
+                        <button
+                          onClick={handleVisualMatch}
+                          disabled={visualMatching}
+                          className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2 shadow-md"
+                        >
+                          {visualMatching ? (
+                            <>
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                              Visual Matching...
+                            </>
+                          ) : (
+                            <>
+                              🎯 Visual Match Selection
+                              <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                                {totalCandidates} candidates
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    })()}
                     
                     </div>
 
@@ -2410,7 +2418,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               </div>
                               
                               {/* Visual Match Button - Right below the status counts */}
-                              {(matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 && (
+                              {matchStatusCounts && (matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 && (
                                 <button
                                   onClick={handleVisualMatch}
                                   disabled={visualMatching}
