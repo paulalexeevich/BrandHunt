@@ -201,6 +201,28 @@ Progress updates are streamed in real-time using Server-Sent Events (SSE), provi
 - Perfect for one-way server-to-client updates
 - Works with existing HTTP infrastructure
 
+### Critical: Node.js Runtime Required
+
+**IMPORTANT:** For SSE streaming to work in Vercel production, routes MUST export Node.js runtime:
+
+```typescript
+// Enable Node.js runtime for streaming support
+export const runtime = 'nodejs';
+export const maxDuration = 300;
+```
+
+**Why This Matters:**
+- Vercel's **Edge runtime** (default) buffers responses for performance
+- Buffering prevents real-time SSE events from streaming
+- **Node.js runtime** immediately flushes each SSE event
+- Without this, users see only "Starting..." message (all events arrive at end)
+
+**Symptoms of Missing Runtime Config:**
+- Progress indicator stuck on "Starting" message
+- All progress updates arrive only after completion
+- Console shows all events received in single chunk
+- Frontend parsing works but receives buffered data
+
 **SSE Format:**
 ```
 data: {"type":"progress","processed":5,"total":10}\n\n
