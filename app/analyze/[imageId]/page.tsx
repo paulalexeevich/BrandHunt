@@ -52,6 +52,9 @@ interface Detection {
   fully_analyzed: boolean | null;
   analysis_completed_at: string | null;
   foodgraph_results?: FoodGraphResult[];
+  // Contextual analysis fields
+  corrected_by_contextual: boolean | null;
+  contextual_correction_notes: string | null;
 }
 
 interface FoodGraphResult {
@@ -1926,8 +1929,16 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           </div>
                         )}
                         <div className="flex items-start justify-between gap-2">
-                          <div>
+                          <div className="flex items-center gap-1.5">
                             <span className="font-semibold text-gray-700">Brand:</span> {detection.brand_name}
+                            {detection.corrected_by_contextual && (
+                              <span 
+                                className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800 border border-purple-300"
+                                title={detection.contextual_correction_notes || 'Brand corrected by contextual analysis'}
+                              >
+                                🔍 CONTEXTUAL
+                              </span>
+                            )}
                           </div>
                           {detection.brand_confidence !== null && detection.brand_confidence > 0 && (
                             <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
@@ -1979,8 +1990,16 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         )}
                         {detection.size && detection.size !== 'Unknown' && (
                           <div className="flex items-start justify-between gap-2">
-                            <div>
+                            <div className="flex items-center gap-1.5">
                               <span className="font-semibold text-gray-700">Size:</span> <span className="text-blue-600">{detection.size}</span>
+                              {detection.corrected_by_contextual && detection.contextual_correction_notes && detection.contextual_correction_notes.toLowerCase().includes('size') && (
+                                <span 
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800 border border-purple-300"
+                                  title={detection.contextual_correction_notes}
+                                >
+                                  🔍 CONTEXTUAL
+                                </span>
+                              )}
                             </div>
                             {detection.size_confidence !== null && detection.size_confidence > 0 && (
                               <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
