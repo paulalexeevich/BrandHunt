@@ -149,15 +149,24 @@ export async function extractProductInfo(
   mimeType: string,
   boundingBox: { y0: number; x0: number; y1: number; x1: number }
 ): Promise<ProductInfo> {
+  console.log('🔵 extractProductInfo called - START');
+  console.log(`   boundingBox:`, boundingBox);
+  console.log(`   imageBase64 length: ${imageBase64.length}`);
+  console.log(`   mimeType: ${mimeType}`);
+  
   if (!process.env.GOOGLE_GEMINI_API_KEY) {
-    console.error('❌ GOOGLE_GEMINI_API_KEY is not set');
+    console.error('❌ ❌ ❌ GOOGLE_GEMINI_API_KEY IS NOT SET ❌ ❌ ❌');
     throw new Error('Gemini API key is not configured');
   }
   
+  console.log('✅ API key found, proceeding with extraction...');
+  
   // First, crop the image to just the bounding box area
+  console.log('🔵 Cropping image to bounding box...');
   const { croppedBase64, width, height } = await cropImageToBoundingBox(imageBase64, boundingBox);
   
   console.log(`✂️ Cropped image to ${width}x${height}px for product extraction`);
+  console.log('🔵 Calling Gemini API...');
   
   const model = genAI.getGenerativeModel({ 
     model: 'gemini-2.5-flash',
@@ -230,16 +239,20 @@ Only return the JSON object, nothing else.
 
   let text: string;
   try {
+    console.log('🔵 Sending request to Gemini...');
     const result = await model.generateContent([prompt, imagePart]);
+    console.log('🔵 Got response from Gemini, extracting text...');
     const response = await result.response;
     text = response.text();
+    console.log(`🔵 Gemini response length: ${text.length} characters`);
     
     if (!text || text.trim().length === 0) {
       console.error('❌ Gemini returned empty response');
       throw new Error('Gemini returned empty response');
     }
   } catch (error) {
-    console.error('❌ Gemini API error:', error);
+    console.error('❌ ❌ ❌ GEMINI API ERROR ❌ ❌ ❌');
+    console.error('Error details:', error);
     throw new Error(`Gemini API failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
