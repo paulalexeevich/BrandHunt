@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Initialize Gemini AI - MUST match env variable name from lib/gemini.ts
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
 
 interface BoundingBox {
   y0: number;
@@ -95,6 +95,12 @@ async function analyzeWithContext(
   rightNeighbors: Detection[],
   promptVersion: string = 'v1'
 ): Promise<any> {
+  // Validate API key is set
+  if (!process.env.GOOGLE_GEMINI_API_KEY) {
+    console.error('❌ GOOGLE_GEMINI_API_KEY is not set');
+    throw new Error('Gemini API key is not configured');
+  }
+  
   const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
   
   // Build context about neighbors
