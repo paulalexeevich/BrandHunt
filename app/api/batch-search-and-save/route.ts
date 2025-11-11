@@ -591,6 +591,19 @@ export async function POST(request: NextRequest) {
               console.log(`  ✅ [#${detection.detection_index}] Complete`);
             } else if (needsManualReview) {
               // Multiple almost_same matches - requires user review
+              // Mark as fully_analyzed so frontend can load the results
+              const { error: updateError } = await supabase
+                .from('branghunt_detections')
+                .update({
+                  fully_analyzed: true,
+                  analysis_completed_at: new Date().toISOString()
+                })
+                .eq('id', detection.id);
+
+              if (updateError) {
+                console.error(`    ⚠️ Failed to mark detection as fully_analyzed: ${updateError.message}`);
+              }
+
               result.status = 'no_match'; // Keep as no_match so it shows in statistics
               result.error = `Manual review needed: ${almostSameMatches.length} similar matches found`;
               result.resultsSearched = comparisonResults.length;
@@ -604,11 +617,25 @@ export async function POST(request: NextRequest) {
                 total: detections.length
               });
 
-              console.log(`  ⏸️ [#${detection.detection_index}] Awaiting manual review`);
+              console.log(`  ⏸️ [#${detection.detection_index}] Awaiting manual review - ${almostSameMatches.length} results saved for review`);
             } else {
               // No matches found at all
+              // Mark as fully_analyzed so frontend can load the results (all will be "not_match")
+              const { error: updateError } = await supabase
+                .from('branghunt_detections')
+                .update({
+                  fully_analyzed: true,
+                  analysis_completed_at: new Date().toISOString()
+                })
+                .eq('id', detection.id);
+
+              if (updateError) {
+                console.error(`    ⚠️ Failed to mark detection as fully_analyzed: ${updateError.message}`);
+              }
+
               result.status = 'no_match';
               result.error = 'No matching product found after AI filtering';
+              result.resultsSearched = comparisonResults.length;
               
               sendProgress({
                 type: 'progress',
@@ -619,7 +646,7 @@ export async function POST(request: NextRequest) {
                 total: detections.length
               });
 
-              console.log(`  ⚠️ [#${detection.detection_index}] No match found`);
+              console.log(`  ⚠️ [#${detection.detection_index}] No match found - ${comparisonResults.length} results saved with "not_match" status`);
             }
 
           } catch (error) {
