@@ -51,7 +51,16 @@ export default function PromptSettingsModal({ projectId, isOpen, onClose }: Prom
     try {
       const response = await fetch(`/api/prompt-templates?project_id=${projectId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch prompts');
+        const errorData = await response.json().catch(() => ({}));
+        
+        // Check if it's a table doesn't exist error (migrations not run)
+        if (response.status === 500 || errorData.error?.includes('relation') || errorData.error?.includes('table')) {
+          setError('⚠️ Database not initialized. Please run the migrations first:\n1. migrations/create_prompt_templates_table.sql\n2. migrations/seed_default_prompt_templates.sql');
+          setLoading(false);
+          return;
+        }
+        
+        throw new Error(errorData.error || 'Failed to fetch prompts');
       }
       
       const data = await response.json();
@@ -67,7 +76,7 @@ export default function PromptSettingsModal({ projectId, isOpen, onClose }: Prom
       setTemplates(templatesByStep);
     } catch (err) {
       console.error('Error fetching templates:', err);
-      setError('Failed to load prompt templates');
+      setError(err instanceof Error ? err.message : 'Failed to load prompt templates. The database table may not exist yet.');
     } finally {
       setLoading(false);
     }
@@ -168,11 +177,22 @@ export default function PromptSettingsModal({ projectId, isOpen, onClose }: Prom
               )}
               
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-red-800">{error}</span>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-red-800 whitespace-pre-line">{error}</p>
+                      {error.includes('migrations') && (
+                        <div className="mt-3 p-3 bg-red-100 rounded text-xs text-red-900 font-mono">
+                          <p className="font-semibold mb-2">Run these SQL files in Supabase:</p>
+                          <p>📄 migrations/create_prompt_templates_table.sql</p>
+                          <p>📄 migrations/seed_default_prompt_templates.sql</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 

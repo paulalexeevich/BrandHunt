@@ -59,8 +59,18 @@ export async function GET(request: NextRequest) {
 
     if (templatesError) {
       console.error('Error fetching templates:', templatesError);
+      
+      // Check if table doesn't exist
+      const errorMessage = templatesError.message || '';
+      if (errorMessage.includes('relation') || errorMessage.includes('does not exist')) {
+        return NextResponse.json(
+          { error: 'Database table not initialized. Please run migrations.' },
+          { status: 500 }
+        );
+      }
+      
       return NextResponse.json(
-        { error: 'Failed to fetch prompt templates' },
+        { error: 'Failed to fetch prompt templates', details: errorMessage },
         { status: 500 }
       );
     }
@@ -68,8 +78,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ templates }, { status: 200 });
   } catch (error) {
     console.error('Error in GET /api/prompt-templates:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }
