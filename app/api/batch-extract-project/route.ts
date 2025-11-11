@@ -36,14 +36,7 @@ export async function POST(request: NextRequest) {
     // Fetch all images that have detections but haven't had info extracted yet
     const { data: images, error: imagesError } = await supabase
       .from('branghunt_images')
-      .select(`
-        id,
-        original_filename,
-        file_path,
-        s3_url,
-        storage_type,
-        mime_type
-      `)
+      .select('*')  // Get all columns like batch-extract-info does
       .eq('project_id', projectId)
       .eq('detection_completed', true)
       .order('created_at');
