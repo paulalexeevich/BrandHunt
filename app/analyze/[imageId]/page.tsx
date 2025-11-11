@@ -2082,11 +2082,17 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       
                       {/* Stage Filter Buttons - Always visible */}
                       {(() => {
+                        // Calculate current stage counts for filtering logic
+                        const searchCount = foodgraphResults.filter(r => r.processing_stage === 'search').length;
+                        const preFilterCount = foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length;
+                        const aiFilterCount = foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length;
+                        
+                        // Use cumulative counts for button labels (match pipeline statistics)
                         const stageStats = {
                           all: foodgraphResults.length,
-                          search: foodgraphResults.filter(r => r.processing_stage === 'search').length,
-                          pre_filter: foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length,
-                          ai_filter: foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length
+                          search: searchCount + preFilterCount + aiFilterCount,  // All returned by FoodGraph
+                          pre_filter: preFilterCount + aiFilterCount,  // All that passed pre-filter (≥85%)
+                          ai_filter: aiFilterCount  // All that passed AI filter
                         };
                         
                         return (
@@ -2105,11 +2111,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               </button>
                               <button
                                 onClick={() => setStageFilter('search')}
-                                disabled={stageStats.search === 0}
+                                disabled={searchCount + preFilterCount + aiFilterCount === 0}
                                 className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
                                   stageFilter === 'search'
                                     ? 'bg-blue-600 text-white ring-2 ring-blue-300 shadow-sm'
-                                    : stageStats.search > 0
+                                    : searchCount + preFilterCount + aiFilterCount > 0
                                       ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
                                       : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                                 }`}
@@ -2118,11 +2124,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               </button>
                               <button
                                 onClick={() => setStageFilter('pre_filter')}
-                                disabled={stageStats.pre_filter === 0}
+                                disabled={preFilterCount + aiFilterCount === 0}
                                 className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
                                   stageFilter === 'pre_filter'
                                     ? 'bg-orange-600 text-white ring-2 ring-orange-300 shadow-sm'
-                                    : stageStats.pre_filter > 0
+                                    : preFilterCount + aiFilterCount > 0
                                       ? 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
                                       : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                                 }`}
@@ -2131,11 +2137,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               </button>
                               <button
                                 onClick={() => setStageFilter('ai_filter')}
-                                disabled={stageStats.ai_filter === 0}
+                                disabled={aiFilterCount === 0}
                                 className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
                                   stageFilter === 'ai_filter'
                                     ? 'bg-purple-600 text-white ring-2 ring-purple-300 shadow-sm'
-                                    : stageStats.ai_filter > 0
+                                    : aiFilterCount > 0
                                       ? 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
                                       : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                                 }`}
@@ -2149,10 +2155,24 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       
                       <div className="space-y-2 max-h-96 overflow-y-auto">
                         {(() => {
-                          // Apply stage filter first
-                          let filteredResults = stageFilter === 'all' 
-                            ? foodgraphResults 
-                            : foodgraphResults.filter(r => r.processing_stage === stageFilter);
+                          // Apply stage filter with cumulative logic (matching button counts)
+                          let filteredResults;
+                          if (stageFilter === 'all') {
+                            filteredResults = foodgraphResults;
+                          } else if (stageFilter === 'search') {
+                            // Show all results returned by FoodGraph (all stages)
+                            filteredResults = foodgraphResults;
+                          } else if (stageFilter === 'pre_filter') {
+                            // Show results that passed pre-filter (≥85%) - includes both pre_filter and ai_filter stages
+                            filteredResults = foodgraphResults.filter(r => 
+                              r.processing_stage === 'pre_filter' || r.processing_stage === 'ai_filter'
+                            );
+                          } else if (stageFilter === 'ai_filter') {
+                            // Show results that passed AI filter - only ai_filter stage
+                            filteredResults = foodgraphResults.filter(r => r.processing_stage === 'ai_filter');
+                          } else {
+                            filteredResults = foodgraphResults;
+                          }
                           
                           // Sort by match status: identical first, then almost same, then no match
                           filteredResults = [...filteredResults].sort((a, b) => {
