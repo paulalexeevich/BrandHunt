@@ -6,22 +6,32 @@ Enhanced the Prompt Settings Modal to display the actual default prompt text ins
 
 ## Changes Made
 
-### 1. Export Default Prompts from `lib/gemini.ts`
+### 1. Create Separate File for Default Prompts (`lib/default-prompts.ts`)
 
 ```typescript
-// Changed from private constants to exported constants
+// Created new file with NO server dependencies
 export const DEFAULT_EXTRACT_INFO_PROMPT = `...`;
 export const DEFAULT_AI_FILTER_PROMPT = `...`;
 ```
 
-**Why**: Makes the default prompts reusable across the codebase while maintaining a single source of truth.
+**Why**: Separates prompts from server-only code (like `next/headers`), allowing safe imports from both client and server components. Prevents build errors when client components need to access these constants.
 
-### 2. Update `components/PromptSettingsModal.tsx`
+### 2. Update `lib/gemini.ts` to Import from New File
+
+```typescript
+import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT } from '@/lib/default-prompts';
+```
+
+**Why**: Server-side code can still use the prompts without duplicating them.
+
+### 3. Update `components/PromptSettingsModal.tsx`
 
 #### Import Default Prompts
 ```typescript
-import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT } from '@/lib/gemini';
+import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT } from '@/lib/default-prompts';
 ```
+
+**Why**: Client component can safely import from the new file without triggering Next.js server/client boundary errors.
 
 #### Create Mapping
 ```typescript
@@ -85,9 +95,21 @@ const DEFAULT_PROMPTS = {
 ## Technical Details
 
 ### Single Source of Truth
-- Default prompts defined once in `lib/gemini.ts`
-- Exported and imported where needed
-- Any changes to defaults automatically reflected in UI
+- Default prompts defined once in `lib/default-prompts.ts`
+- Pure constants file with NO server dependencies
+- Exported and imported by both server (`lib/gemini.ts`) and client (`PromptSettingsModal.tsx`) components
+- Any changes to defaults automatically reflected everywhere
+
+### Client/Server Separation
+The architecture separates concerns properly:
+```
+lib/default-prompts.ts (pure constants, no dependencies)
+    ↑                           ↑
+    |                           |
+lib/gemini.ts (server)    PromptSettingsModal.tsx (client)
+```
+
+This prevents the "needs next/headers" error that occurs when client components try to import from files with server-only dependencies.
 
 ### Backward Compatibility
 - No breaking changes
@@ -102,8 +124,9 @@ Ensures type-safe access to default prompts by step name.
 
 ## Files Modified
 
-1. `lib/gemini.ts` - Exported default prompts
-2. `components/PromptSettingsModal.tsx` - Updated UI to display defaults
+1. `lib/default-prompts.ts` - **NEW FILE** - Pure constants with no server dependencies
+2. `lib/gemini.ts` - Updated to import from `lib/default-prompts.ts`
+3. `components/PromptSettingsModal.tsx` - Updated to import from `lib/default-prompts.ts` and display defaults
 
 ## Testing
 
@@ -112,12 +135,26 @@ Ensures type-safe access to default prompts by step name.
 ✅ Edit button pre-fills with default prompt  
 ✅ Custom prompts still display correctly  
 ✅ No TypeScript or linter errors  
+✅ **Build succeeds** - No "needs next/headers" error  
+✅ Client component safely imports from `lib/default-prompts.ts`  
+✅ Server functions continue to work with prompts  
 
-## Commit
+## Commits
 
 ```bash
+# Initial implementation
 git commit -m "Display default prompts in settings modal"
+
+# Fix build error
+git commit -m "Fix build error: Extract default prompts to separate file"
 ```
 
 **Date**: November 11, 2025
+
+## Key Learnings
+
+1. **Next.js Client/Server Boundary**: Client components cannot import from files that use server-only APIs (like `next/headers`)
+2. **Solution**: Extract shared constants to a separate file with NO server dependencies
+3. **Architecture Pattern**: Pure constants file → imported by both client and server code
+4. **Prevention**: When creating shared utilities, consider which components will import them
 
