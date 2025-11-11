@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAuthenticatedSupabaseClient } from '@/lib/auth';
+import { createAuthenticatedSupabaseClient, createServiceRoleClient } from '@/lib/auth';
 import { searchProducts } from '@/lib/foodgraph';
 
 interface SearchResult {
@@ -22,8 +22,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔍 Starting batch FoodGraph search for image ${imageId}...`);
 
-    // Create authenticated Supabase client
+    // Create authenticated Supabase client for reading data (respects RLS)
     const supabase = await createAuthenticatedSupabaseClient();
+    
+    // Create service role client for writing FoodGraph results (bypasses RLS)
+    const supabaseAdmin = createServiceRoleClient();
 
     // Fetch all detections that have brand info but no FoodGraph results yet
     const { data: detections, error: detectionsError } = await supabase
@@ -125,7 +128,7 @@ export async function POST(request: NextRequest) {
             processing_stage: 'search' // Set processing stage to enable unique constraint
           }));
 
-          const { error: insertError } = await supabase
+          const { error: insertError } = await supabaseAdmin
             .from('branghunt_foodgraph_results')
             .upsert(resultsToSave, {
               onConflict: 'detection_id,product_gtin',

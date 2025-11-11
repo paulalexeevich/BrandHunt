@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createAuthenticatedSupabaseClient } from '@/lib/auth';
+import { createAuthenticatedSupabaseClient, createServiceRoleClient } from '@/lib/auth';
 import { searchProducts, getFrontImageUrl, preFilterFoodGraphResults } from '@/lib/foodgraph';
 import { compareProductImages, cropImageToBoundingBox, MatchStatus } from '@/lib/gemini';
 
@@ -53,8 +53,11 @@ export async function POST(request: NextRequest) {
       console.log(`⚡ Concurrency level: ${concurrency === 999999 ? 'ALL (unlimited)' : concurrency} products at a time`);
     }
 
-    // Create authenticated Supabase client
+    // Create authenticated Supabase client for reading data (respects RLS)
     const supabase = await createAuthenticatedSupabaseClient();
+    
+    // Create service role client for writing FoodGraph results (bypasses RLS)
+    const supabaseAdmin = createServiceRoleClient();
 
     // Fetch the image data
     const { data: image, error: imageError } = await supabase
@@ -232,9 +235,9 @@ export async function POST(request: NextRequest) {
               visual_similarity: null,
             }));
 
-            // Use UPSERT to insert or update existing results
+            // Use UPSERT with service role client (bypasses RLS) to insert or update existing results
             // This prevents duplicates and updates rows as they progress through stages
-            const { error: searchInsertError } = await supabase
+            const { error: searchInsertError } = await supabaseAdmin
               .from('branghunt_foodgraph_results')
               .upsert(searchInserts, {
                 onConflict: 'detection_id,product_gtin',
@@ -292,7 +295,7 @@ export async function POST(request: NextRequest) {
               visual_similarity: null,
             }));
 
-            const { error: preFilterInsertError } = await supabase
+            const { error: preFilterInsertError } = await supabaseAdmin
               .from('branghunt_foodgraph_results')
               .upsert(preFilterInserts, {
                 onConflict: 'detection_id,product_gtin',
@@ -470,10 +473,11 @@ export async function POST(request: NextRequest) {
             });
 
             // UPSERT AI-filtered results (updates existing rows from pre-filter stage)
+            // Use service role client to bypass RLS (fixes issue where results weren't being saved)
             console.log(`    🔍 DEBUG: About to UPSERT ${aiFilterInserts.length} AI-filtered results for detection ${detection.id}`);
             console.log(`    🔍 DEBUG: First result GTIN: ${aiFilterInserts[0]?.product_gtin}, processing_stage: ${aiFilterInserts[0]?.processing_stage}`);
             
-            const { error: aiFilterInsertError, data: aiFilterInsertData } = await supabase
+            const { error: aiFilterInsertError, data: aiFilterInsertData } = await supabaseAdmin
               .from('branghunt_foodgraph_results')
               .upsert(aiFilterInserts, {
                 onConflict: 'detection_id,product_gtin',
@@ -501,7 +505,7 @@ export async function POST(request: NextRequest) {
               console.log(`    🔍 DEBUG: Inserted rows GTINs: ${aiFilterInsertData?.map((r: any) => r.product_gtin).join(', ')}`);
               
               // VERIFY: Query back the results immediately to confirm they're in DB
-              const { data: verifyData, error: verifyError } = await supabase
+              const { data: verifyData, error: verifyError } = await supabaseAdmin
                 .from('branghunt_foodgraph_results')
                 .select('product_gtin, processing_stage')
                 .eq('detection_id', detection.id);

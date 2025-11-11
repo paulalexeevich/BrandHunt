@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 // Get authenticated user from cookies
@@ -74,5 +75,26 @@ export async function createAuthenticatedSupabaseClient() {
       },
     }
   );
+}
+
+/**
+ * Create a Supabase client with service role key that bypasses RLS
+ * USE ONLY for server-side operations like batch processing!
+ * This client has admin privileges and bypasses Row Level Security.
+ */
+export function createServiceRoleClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Missing Supabase URL or service role key');
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
 }
 
