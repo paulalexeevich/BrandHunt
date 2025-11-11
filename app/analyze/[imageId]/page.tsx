@@ -2317,7 +2317,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     )}
                     
                     {/* Visual Match Button - Shows when there are 2+ identical/almost_same matches after AI Filter */}
-                    {filteredCount !== null && matchStatusCounts && (matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 && (
+                    {filteredCount !== null && matchStatusCounts && (matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 ? (
                       <button
                         onClick={handleVisualMatch}
                         disabled={visualMatching}
@@ -2337,6 +2337,25 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           </>
                         )}
                       </button>
+                    ) : filteredCount !== null && matchStatusCounts && (
+                      // Debug info: Show why button isn't appearing
+                      <div className="w-full px-4 py-3 bg-blue-50 border-2 border-blue-200 rounded-lg text-sm">
+                        <p className="font-semibold text-blue-900 mb-1">🎯 Visual Match Selection</p>
+                        <p className="text-blue-700 text-xs">
+                          {(matchStatusCounts.identical + matchStatusCounts.almostSame) === 0 ? (
+                            <>No identical or almost_same matches found. Need at least 2 candidates for visual matching.</>
+                          ) : (matchStatusCounts.identical + matchStatusCounts.almostSame) === 1 ? (
+                            <>Only 1 candidate found - auto-selected, no visual matching needed.</>
+                          ) : (
+                            <>Ready! Found {matchStatusCounts.identical + matchStatusCounts.almostSame} candidates.</>
+                          )}
+                        </p>
+                        {(matchStatusCounts.identical + matchStatusCounts.almostSame) < 2 && (
+                          <p className="text-blue-600 text-xs mt-2 italic">
+                            Tip: AI Filter needs to find multiple similar matches for visual selection to be useful.
+                          </p>
+                        )}
+                      </div>
                     )}
                     </div>
 
