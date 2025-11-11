@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
-import { createClient } from '@/lib/supabase-server';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
 
@@ -131,7 +131,7 @@ export async function getPromptTemplate(projectId: string | null, stepName: stri
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = await createAuthenticatedSupabaseClient();
     
     const { data: template, error } = await supabase
       .from('branghunt_prompt_templates')
