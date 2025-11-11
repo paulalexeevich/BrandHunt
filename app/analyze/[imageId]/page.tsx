@@ -2323,8 +2323,20 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       const almostSameCount = foodgraphResults.filter(r => (r as any).match_status === 'almost_same').length;
                       const totalCandidates = identicalCount + almostSameCount;
                       
-                      // Show button if we have 2+ candidates and detection is not fully analyzed
-                      return totalCandidates >= 2 && !detection.fully_analyzed && (
+                      // Debug logging
+                      console.log('🎯 Visual Match Button Debug:', {
+                        foodgraphResultsCount: foodgraphResults.length,
+                        identicalCount,
+                        almostSameCount,
+                        totalCandidates,
+                        fullyAnalyzed: detection.fully_analyzed,
+                        selectedMatch: detection.selected_foodgraph_result_id,
+                        shouldShow: totalCandidates >= 2 && !detection.selected_foodgraph_result_id
+                      });
+                      
+                      // Show button if we have 2+ candidates AND no match has been selected yet
+                      // (Even if fully_analyzed is true, multiple candidates means it needs visual matching)
+                      return totalCandidates >= 2 && !detection.selected_foodgraph_result_id && (
                         <button
                           onClick={handleVisualMatch}
                           disabled={visualMatching}
@@ -2418,7 +2430,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               </div>
                               
                               {/* Visual Match Button - Right below the status counts */}
-                              {matchStatusCounts && (matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 && (
+                              {matchStatusCounts && (matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 && !detection.selected_foodgraph_result_id && (
                                 <button
                                   onClick={handleVisualMatch}
                                   disabled={visualMatching}
