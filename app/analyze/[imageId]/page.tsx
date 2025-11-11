@@ -2001,12 +2001,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         const preFilterCount = foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length;
                         const aiFilterCount = foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length;
                         
-                        // Count only IDENTICAL or ALMOST SAME matches for AI filter display
-                        const aiMatchesCount = foodgraphResults.filter(r => {
-                          const matchStatus = (r as any).match_status;
-                          return r.processing_stage === 'ai_filter' && 
-                                 (matchStatus === 'identical' || matchStatus === 'almost_same');
-                        }).length;
+                        // Count all AI-filtered results (including no matches)
+                        const aiMatchesCount = aiFilterCount;
                         
                         // Use cumulative counts for button labels
                         const stageStats = {
@@ -2076,12 +2072,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               r.processing_stage === 'pre_filter' || r.processing_stage === 'ai_filter'
                             );
                           } else if (stageFilter === 'ai_filter') {
-                            // Show results that passed AI filter - only IDENTICAL or ALMOST SAME matches
-                            filteredResults = foodgraphResults.filter(r => {
-                              const matchStatus = (r as any).match_status;
-                              return r.processing_stage === 'ai_filter' && 
-                                     (matchStatus === 'identical' || matchStatus === 'almost_same');
-                            });
+                            // Show all AI-filtered results (includes identical, almost_same, and not_match)
+                            filteredResults = foodgraphResults.filter(r => r.processing_stage === 'ai_filter');
                           } else {
                             filteredResults = foodgraphResults;
                           }
