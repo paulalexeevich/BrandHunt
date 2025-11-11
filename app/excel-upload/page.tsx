@@ -147,10 +147,10 @@ function ExcelUploadContent() {
                 console.log('[Excel Upload] Upload completed:', data.results);
                 setResults(data.results);
                 
-                // If all successful, redirect to gallery
-                if (data.results.failed === 0) {
+                // If all successful, redirect to project
+                if (data.results.failed === 0 && projectId) {
                   setTimeout(() => {
-                    router.push('/gallery');
+                    router.push(`/projects/${projectId}`);
                   }, 3000);
                 }
               }
@@ -406,12 +406,14 @@ function ExcelUploadContent() {
 
             {/* Action Buttons */}
             <div className="flex gap-4 mt-6">
-              <button
-                onClick={() => router.push('/gallery')}
-                className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-              >
-                View Gallery
-              </button>
+              {projectId && (
+                <button
+                  onClick={() => router.push(`/projects/${projectId}`)}
+                  className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Back to Project
+                </button>
+              )}
               <button
                 onClick={() => {
                   setFile(null);

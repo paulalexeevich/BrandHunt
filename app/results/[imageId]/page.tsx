@@ -94,8 +94,8 @@ export default function ResultsPage({ params }: { params: Promise<{ imageId: str
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Image not found</h2>
-          <Link href="/gallery" className="text-indigo-600 hover:text-indigo-800">
-            Return to Gallery
+          <Link href="/projects" className="text-indigo-600 hover:text-indigo-800">
+            Return to Projects
           </Link>
         </div>
       </div>

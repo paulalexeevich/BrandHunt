@@ -945,8 +945,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         throw new Error(errorData.details || 'Failed to delete image');
       }
 
-      // Redirect to gallery after successful deletion
-      router.push('/gallery');
+      // Redirect to project after successful deletion
+      if (image?.project_id) {
+        router.push(`/projects/${image.project_id}`);
+      } else {
+        router.push('/projects');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete image');
       setDeleting(false);
