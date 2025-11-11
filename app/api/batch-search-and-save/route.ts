@@ -232,15 +232,14 @@ export async function POST(request: NextRequest) {
               visual_similarity: null,
             }));
 
-            // Delete existing results for this detection before inserting new ones
-            await supabase
-              .from('branghunt_foodgraph_results')
-              .delete()
-              .eq('detection_id', detection.id);
-
+            // Use UPSERT to insert or update existing results
+            // This prevents duplicates and updates rows as they progress through stages
             const { error: searchInsertError } = await supabase
               .from('branghunt_foodgraph_results')
-              .insert(searchInserts);
+              .upsert(searchInserts, {
+                onConflict: 'detection_id,product_gtin',
+                ignoreDuplicates: false  // UPDATE existing rows
+              });
 
             if (searchInsertError) {
               console.error(`    ⚠️ Failed to save raw search results:`, searchInsertError.message);
@@ -295,7 +294,10 @@ export async function POST(request: NextRequest) {
 
             const { error: preFilterInsertError } = await supabase
               .from('branghunt_foodgraph_results')
-              .insert(preFilterInserts);
+              .upsert(preFilterInserts, {
+                onConflict: 'detection_id,product_gtin',
+                ignoreDuplicates: false  // UPDATE existing rows
+              });
 
             if (preFilterInsertError) {
               console.error(`    ⚠️ Failed to save pre-filtered results:`, preFilterInsertError.message);
@@ -467,10 +469,13 @@ export async function POST(request: NextRequest) {
               };
             });
 
-            // Insert AI-filtered results (we already have search and pre_filter results in DB)
+            // UPSERT AI-filtered results (updates existing rows from pre-filter stage)
             const { error: aiFilterInsertError, data: aiFilterInsertData } = await supabase
               .from('branghunt_foodgraph_results')
-              .insert(aiFilterInserts)
+              .upsert(aiFilterInserts, {
+                onConflict: 'detection_id,product_gtin',
+                ignoreDuplicates: false  // UPDATE existing rows
+              })
               .select();
 
             if (aiFilterInsertError) {

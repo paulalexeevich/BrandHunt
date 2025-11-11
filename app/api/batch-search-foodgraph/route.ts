@@ -111,13 +111,8 @@ export async function POST(request: NextRequest) {
         const foodgraphResults = searchResult.products;
         
         if (foodgraphResults.length > 0) {
-          // Delete any existing results for this detection to avoid duplicates
-          await supabase
-            .from('branghunt_foodgraph_results')
-            .delete()
-            .eq('detection_id', detection.id);
-
           // Save top 50 results to intermediate table (cache for step 4)
+          // Use UPSERT to prevent duplicates - updates existing rows instead of inserting
           const resultsToSave = foodgraphResults.slice(0, 50).map((r: any, index: number) => ({
             detection_id: detection.id,
             result_rank: index + 1,
@@ -132,7 +127,10 @@ export async function POST(request: NextRequest) {
 
           const { error: insertError } = await supabase
             .from('branghunt_foodgraph_results')
-            .insert(resultsToSave);
+            .upsert(resultsToSave, {
+              onConflict: 'detection_id,product_gtin',
+              ignoreDuplicates: false  // UPDATE existing rows
+            });
 
           if (insertError) {
             throw new Error(`Database insert failed: ${insertError.message}`);
