@@ -222,15 +222,17 @@ Return JSON only:
     }
     
     console.log('[Contextual Analysis] Sending request to Gemini...');
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: base64Data,
-        },
+    
+    // Prepare image part (matching lib/gemini.ts format)
+    const imagePart = {
+      inlineData: {
+        data: base64Data,
+        mimeType: 'image/jpeg',
       },
-      prompt,
-    ]);
+    };
+    
+    // IMPORTANT: Prompt must come first, then image (same order as lib/gemini.ts)
+    const result = await model.generateContent([prompt, imagePart]);
     
     console.log('[Contextual Analysis] Got response from Gemini, extracting text...');
     const response = await result.response;
