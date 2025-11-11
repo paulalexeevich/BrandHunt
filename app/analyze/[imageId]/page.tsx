@@ -1281,18 +1281,35 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             (d.is_product === true || d.is_product === null) && 
             !d.brand_name
           ).length;
-          const validWithMatch = detections.filter(d => d.fully_analyzed === true).length;
+          
+          // Products with a selected match OR exactly 1 FoodGraph result (ONE Match)
+          const validWithMatch = detections.filter(d => {
+            // Already has a selected match
+            if (d.fully_analyzed === true || (d.selected_foodgraph_gtin && d.selected_foodgraph_gtin.trim() !== '')) {
+              return true;
+            }
+            // Has extraction and exactly 1 FoodGraph result (auto-match)
+            if (d.brand_name && d.foodgraph_results && d.foodgraph_results.length === 1) {
+              return true;
+            }
+            return false;
+          }).length;
+          
+          // Products with extraction but no FoodGraph results found
           const validNoMatch = detections.filter(d => 
             d.brand_name && 
             !d.fully_analyzed && 
-            d.foodgraph_results && 
-            d.foodgraph_results.length === 0
+            !d.selected_foodgraph_gtin &&
+            (!d.foodgraph_results || d.foodgraph_results.length === 0)
           ).length;
+          
+          // Products with extraction and 2+ FoodGraph results (needs manual review)
           const validMultipleMatches = detections.filter(d => 
             d.brand_name && 
             !d.fully_analyzed && 
+            !d.selected_foodgraph_gtin &&
             d.foodgraph_results && 
-            d.foodgraph_results.length > 1
+            d.foodgraph_results.length >= 2
           ).length;
 
           return (
@@ -1416,18 +1433,28 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   return (detection.is_product === true || detection.is_product === null) && 
                          !detection.brand_name;
                 }
-                if (activeFilter === 'one_match') return detection.fully_analyzed === true;
+                if (activeFilter === 'one_match') {
+                  // Has a selected match OR exactly 1 FoodGraph result
+                  if (detection.fully_analyzed === true || (detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '')) {
+                    return true;
+                  }
+                  if (detection.brand_name && detection.foodgraph_results && detection.foodgraph_results.length === 1) {
+                    return true;
+                  }
+                  return false;
+                }
                 if (activeFilter === 'no_match') {
                   return detection.brand_name && 
                          !detection.fully_analyzed && 
-                         detection.foodgraph_results && 
-                         detection.foodgraph_results.length === 0;
+                         !detection.selected_foodgraph_gtin &&
+                         (!detection.foodgraph_results || detection.foodgraph_results.length === 0);
                 }
                 if (activeFilter === 'multiple_matches') {
                   return detection.brand_name && 
                          !detection.fully_analyzed && 
+                         !detection.selected_foodgraph_gtin &&
                          detection.foodgraph_results && 
-                         detection.foodgraph_results.length > 1;
+                         detection.foodgraph_results.length >= 2;
                 }
                 return false;
               });
@@ -1489,18 +1516,28 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   return (detection.is_product === true || detection.is_product === null) && 
                          !detection.brand_name;
                 }
-                if (activeFilter === 'one_match') return detection.fully_analyzed === true;
+                if (activeFilter === 'one_match') {
+                  // Has a selected match OR exactly 1 FoodGraph result
+                  if (detection.fully_analyzed === true || (detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '')) {
+                    return true;
+                  }
+                  if (detection.brand_name && detection.foodgraph_results && detection.foodgraph_results.length === 1) {
+                    return true;
+                  }
+                  return false;
+                }
                 if (activeFilter === 'no_match') {
                   return detection.brand_name && 
                          !detection.fully_analyzed && 
-                         detection.foodgraph_results && 
-                         detection.foodgraph_results.length === 0;
+                         !detection.selected_foodgraph_gtin &&
+                         (!detection.foodgraph_results || detection.foodgraph_results.length === 0);
                 }
                 if (activeFilter === 'multiple_matches') {
                   return detection.brand_name && 
                          !detection.fully_analyzed && 
+                         !detection.selected_foodgraph_gtin &&
                          detection.foodgraph_results && 
-                         detection.foodgraph_results.length > 1;
+                         detection.foodgraph_results.length >= 2;
                 }
                 return true;
               }).map((detection, index) => {
