@@ -105,7 +105,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [consolidationApplied, setConsolidationApplied] = useState(false);
   const [visualMatching, setVisualMatching] = useState(false);
   const [visualMatchResult, setVisualMatchResult] = useState<any | null>(null);
-  const [stageFilter, setStageFilter] = useState<'search' | 'pre_filter' | 'ai_filter'>('search');
+  const [stageFilter, setStageFilter] = useState<'search' | 'pre_filter' | 'ai_filter' | 'visual_match'>('search');
   const [matchStatusCounts, setMatchStatusCounts] = useState<{ identical: number; almostSame: number } | null>(null);
   const [loadedDetectionIds, setLoadedDetectionIds] = useState<Set<string>>(new Set());
   const [extractingPrice, setExtractingPrice] = useState(false);
@@ -125,7 +125,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     natural: { width: number; height: number };
     displayed: { width: number; height: number };
   } | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'processed' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches' | 'visual_matching'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'processed' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches'>('all');
   const [isFetching, setIsFetching] = useState(false);
   
   // Contextual analysis state
@@ -1525,11 +1525,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             d.foodgraph_results && 
             d.foodgraph_results.length >= 2
           ).length;
-          
-          // Visual Matching = Products matched using visual similarity analysis
-          const visualMatching = detections.filter(d => 
-            d.selection_method === 'visual_matching'
-          ).length;
 
           return (
             <div className="mb-3">
@@ -1637,21 +1632,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         {activeFilter === 'multiple_matches' && <span className="text-[10px] text-purple-600 font-semibold">● Active</span>}
                       </div>
                     </button>
-                    
-                    <button
-                      onClick={() => setActiveFilter('visual_matching')}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded border-2 transition-all hover:scale-[1.01] ${
-                        activeFilter === 'visual_matching' 
-                          ? 'bg-cyan-100 border-cyan-500 ring-1 ring-cyan-300' 
-                          : 'bg-white border-cyan-200 hover:border-cyan-300'
-                      }`}
-                    >
-                      <span className="text-xs font-medium text-gray-700">🎯 Visual Match</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xl font-bold text-cyan-600">{visualMatching}</span>
-                        {activeFilter === 'visual_matching' && <span className="text-[10px] text-cyan-600 font-semibold">● Active</span>}
-                      </div>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -1711,9 +1691,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                          detection.foodgraph_results && 
                          detection.foodgraph_results.length >= 2;
                 }
-                if (activeFilter === 'visual_matching') {
-                  return detection.selection_method === 'visual_matching';
-                }
                 return false;
               });
 
@@ -1723,8 +1700,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 'not_identified': 'Not Processed',
                 'one_match': '✓ Matched',
                 'no_match': 'Not Matched',
-                'multiple_matches': '2+ Matches',
-                'visual_matching': '🎯 Visual Match'
+                'multiple_matches': '2+ Matches'
               };
 
               const filterColors = {
@@ -1733,8 +1709,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 'not_identified': 'bg-gray-100 border-gray-300 text-gray-900',
                 'one_match': 'bg-green-100 border-green-300 text-green-900',
                 'no_match': 'bg-yellow-100 border-yellow-300 text-yellow-900',
-                'multiple_matches': 'bg-purple-100 border-purple-300 text-purple-900',
-                'visual_matching': 'bg-cyan-100 border-cyan-300 text-cyan-900'
+                'multiple_matches': 'bg-purple-100 border-purple-300 text-purple-900'
               };
 
               return (
@@ -1790,9 +1765,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                          !detection.selected_foodgraph_gtin &&
                          detection.foodgraph_results && 
                          detection.foodgraph_results.length >= 2;
-                }
-                if (activeFilter === 'visual_matching') {
-                  return detection.selection_method === 'visual_matching';
                 }
                 return true;
               }).map((detection, index) => {
@@ -2649,11 +2621,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                  (matchStatus === 'identical' || matchStatus === 'almost_same' || r.is_match === true);
                         }).length;
                         
+                        // Count products matched via visual matching (selection_method='visual_matching')
+                        const visualMatchCount = detection.selection_method === 'visual_matching' ? aiMatchesCount : 0;
+                        
                         // Use cumulative counts for button labels
                         const stageStats = {
                           search: searchCount + preFilterCount + aiFilterCount,  // All returned by FoodGraph (TOP 100)
                           pre_filter: preFilterCount + aiFilterCount,  // All that passed pre-filter (≥85%)
-                          ai_filter: aiMatchesCount  // Only actual matches (identical or almost same)
+                          ai_filter: aiMatchesCount,  // Only actual matches (identical or almost same)
+                          visual_match: visualMatchCount  // Products matched via visual analysis
                         };
                         
                         return (
@@ -2699,6 +2675,19 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               >
                                 🤖 AI Filter ({stageStats.ai_filter})
                               </button>
+                              <button
+                                onClick={() => setStageFilter('visual_match')}
+                                disabled={visualMatchCount === 0}
+                                className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
+                                  stageFilter === 'visual_match'
+                                    ? 'bg-cyan-600 text-white ring-2 ring-cyan-300 shadow-sm'
+                                    : visualMatchCount > 0
+                                      ? 'bg-cyan-50 text-cyan-700 border border-cyan-200 hover:bg-cyan-100'
+                                      : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                                }`}
+                              >
+                                🎯 Visual Match ({stageStats.visual_match})
+                              </button>
                             </div>
                           </div>
                         );
@@ -2707,7 +2696,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       <div className="space-y-2 max-h-96 overflow-y-auto">
                         {(() => {
                           // Apply stage filter with cumulative logic (matching button counts)
-                          let filteredResults;
+                          let filteredResults: typeof foodgraphResults;
                           if (stageFilter === 'search') {
                             // Show all results returned by FoodGraph (TOP 100, all stages)
                             filteredResults = foodgraphResults;
@@ -2719,6 +2708,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           } else if (stageFilter === 'ai_filter') {
                             // Show all AI-filtered results (includes identical, almost_same, and not_match)
                             filteredResults = foodgraphResults.filter(r => r.processing_stage === 'ai_filter');
+                          } else if (stageFilter === 'visual_match') {
+                            // Show only results for products matched via visual analysis
+                            if (detection.selection_method === 'visual_matching') {
+                              filteredResults = foodgraphResults.filter(r => r.processing_stage === 'ai_filter');
+                            } else {
+                              filteredResults = [];
+                            }
                           } else {
                             filteredResults = foodgraphResults;
                           }
