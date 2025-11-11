@@ -102,6 +102,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [preFiltering, setPreFiltering] = useState(false);
   const [preFilteredCount, setPreFilteredCount] = useState<number | null>(null);
   const [consolidationApplied, setConsolidationApplied] = useState(false);
+  const [visualMatching, setVisualMatching] = useState(false);
+  const [visualMatchResult, setVisualMatchResult] = useState<any | null>(null);
   const [stageFilter, setStageFilter] = useState<'search' | 'pre_filter' | 'ai_filter'>('search');
   const [matchStatusCounts, setMatchStatusCounts] = useState<{ identical: number; almostSame: number } | null>(null);
   const [loadedDetectionIds, setLoadedDetectionIds] = useState<Set<string>>(new Set());
@@ -813,6 +815,51 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       setError(err instanceof Error ? err.message : 'Failed to filter results');
     } finally {
       setFiltering(false);
+    }
+  };
+
+  const handleVisualMatch = async () => {
+    if (!selectedDetection) return;
+
+    const detection = detections.find(d => d.id === selectedDetection);
+    if (!detection) return;
+
+    setVisualMatching(true);
+    setError(null);
+    setVisualMatchResult(null);
+
+    try {
+      console.log(`🎯 Starting visual matching for detection ${selectedDetection}`);
+
+      // Call the visual match API
+      const response = await fetch('/api/visual-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          detectionId: selectedDetection
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || errorData.message || 'Failed to perform visual matching');
+      }
+
+      const data = await response.json();
+      console.log('Visual match result:', data);
+      
+      setVisualMatchResult(data);
+
+      // If a match was selected, reload the detection to see updated fields
+      if (data.selected) {
+        await fetchImage();
+      }
+      
+    } catch (err) {
+      console.error('Visual matching error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to perform visual matching');
+    } finally {
+      setVisualMatching(false);
     }
   };
 
@@ -2268,6 +2315,29 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         )}
                       </button>
                     )}
+                    
+                    {/* Visual Match Button - Shows when there are 2+ identical/almost_same matches after AI Filter */}
+                    {filteredCount !== null && matchStatusCounts && (matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 && (
+                      <button
+                        onClick={handleVisualMatch}
+                        disabled={visualMatching}
+                        className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2 shadow-md"
+                      >
+                        {visualMatching ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Visual Matching...
+                          </>
+                        ) : (
+                          <>
+                            🎯 Visual Match Selection
+                            <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                              {matchStatusCounts.identical + matchStatusCounts.almostSame} candidates
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
                     </div>
 
                   {/* FoodGraph Results */}
@@ -2336,6 +2406,88 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 <span className={`px-2 py-1 rounded font-medium ${showNoMatch ? 'bg-gray-200 text-gray-800' : 'bg-gray-100 text-gray-500'}`}>
                                   {showNoMatch ? '👁️' : ''} No Match: {foodgraphResults.length - matchStatusCounts.identical - matchStatusCounts.almostSame} {!showNoMatch && '(hidden)'}
                                 </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Visual Match Result - Show after visual matching completes */}
+                      {visualMatchResult && (
+                        <div className={`mb-3 p-3 border-l-4 rounded ${
+                          visualMatchResult.selected 
+                            ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500'
+                            : 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-500'
+                        }`}>
+                          <div className="flex items-start gap-2">
+                            <span className="text-2xl">{visualMatchResult.selected ? '✅' : '⚠️'}</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold mb-2 text-gray-900">
+                                Visual Match {visualMatchResult.selected ? 'Selected' : 'Result'} {visualMatchResult.autoSelected && '(Auto-Selected)'}
+                              </p>
+                              
+                              {visualMatchResult.selected && (
+                                <div className="mb-3 p-2 bg-white/50 rounded border border-green-200">
+                                  <p className="font-semibold text-green-900">{visualMatchResult.selected.productName}</p>
+                                  <p className="text-sm text-green-800">{visualMatchResult.selected.brandName}</p>
+                                  <p className="text-xs text-gray-600 mt-1">GTIN: {visualMatchResult.selected.gtin}</p>
+                                </div>
+                              )}
+                              
+                              <div className="space-y-2 text-xs">
+                                <div className="flex gap-4">
+                                  <span className="font-medium text-gray-700">Confidence:</span>
+                                  <span className={`font-semibold ${
+                                    visualMatchResult.confidence >= 0.8 ? 'text-green-700' :
+                                    visualMatchResult.confidence >= 0.6 ? 'text-yellow-700' :
+                                    'text-orange-700'
+                                  }`}>
+                                    {Math.round(visualMatchResult.confidence * 100)}%
+                                  </span>
+                                </div>
+                                
+                                {visualMatchResult.visualSimilarityScore !== undefined && (
+                                  <div className="flex gap-4">
+                                    <span className="font-medium text-gray-700">Visual Similarity:</span>
+                                    <span className="font-semibold text-purple-700">
+                                      {Math.round(visualMatchResult.visualSimilarityScore * 100)}%
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {(visualMatchResult.brandMatch !== undefined || visualMatchResult.sizeMatch !== undefined || visualMatchResult.flavorMatch !== undefined) && (
+                                  <div className="flex gap-4 flex-wrap">
+                                    <span className="font-medium text-gray-700">Matches:</span>
+                                    <div className="flex gap-2">
+                                      {visualMatchResult.brandMatch !== undefined && (
+                                        <span className={`px-2 py-0.5 rounded ${visualMatchResult.brandMatch ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                          {visualMatchResult.brandMatch ? '✓' : '✗'} Brand
+                                        </span>
+                                      )}
+                                      {visualMatchResult.sizeMatch !== undefined && (
+                                        <span className={`px-2 py-0.5 rounded ${visualMatchResult.sizeMatch ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                          {visualMatchResult.sizeMatch ? '✓' : '✗'} Size
+                                        </span>
+                                      )}
+                                      {visualMatchResult.flavorMatch !== undefined && (
+                                        <span className={`px-2 py-0.5 rounded ${visualMatchResult.flavorMatch ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                          {visualMatchResult.flavorMatch ? '✓' : '✗'} Flavor
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                <div className="pt-2 border-t border-gray-200">
+                                  <p className="font-medium text-gray-700 mb-1">Reasoning:</p>
+                                  <p className="text-gray-800 leading-relaxed">{visualMatchResult.reasoning}</p>
+                                </div>
+                                
+                                {visualMatchResult.totalCandidates && (
+                                  <p className="text-gray-600 italic">
+                                    Analyzed {visualMatchResult.totalCandidates} candidates
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </div>

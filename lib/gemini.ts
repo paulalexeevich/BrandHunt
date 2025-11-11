@@ -664,3 +664,261 @@ export async function compareProductImages(
     return true;
   }
 }
+
+/**
+ * Visual Matching Selection - Selects the best match from multiple similar candidates
+ * This is used after AI Filter when there are 2+ identical or almost_same matches
+ * 
+ * @param croppedProductBase64 - Base64 of the cropped product from shelf
+ * @param extractedInfo - Extracted product info (brand, size, flavor, etc.)
+ * @param candidates - Array of FoodGraph results that passed AI filter
+ * @param projectId - Optional project ID for custom prompts
+ * @returns The selected match with reasoning, or null if no good match found
+ */
+export interface VisualMatchCandidate {
+  id: string;
+  gtin: string;
+  productName: string;
+  brandName: string;
+  size: string;
+  category?: string;
+  ingredients?: string;
+  imageUrl: string;
+  matchStatus: MatchStatus; // From AI filter: 'identical' or 'almost_same'
+}
+
+export interface VisualMatchSelection {
+  selectedCandidateId: string | null; // null if no good match found
+  selectedGtin: string | null;
+  confidence: number; // 0.0-1.0
+  reasoning: string; // Explanation of why this was selected
+  visualSimilarityScore: number; // 0.0-1.0
+  brandMatch: boolean;
+  sizeMatch: boolean;
+  flavorMatch: boolean;
+}
+
+export async function selectBestMatchFromMultiple(
+  croppedProductBase64: string,
+  extractedInfo: {
+    brand: string;
+    productName: string;
+    size: string;
+    flavor: string;
+    category: string;
+  },
+  candidates: VisualMatchCandidate[],
+  projectId?: string | null
+): Promise<VisualMatchSelection> {
+  console.log(`🎯 Visual Matching Selection: Analyzing ${candidates.length} candidates for best match`);
+  console.log(`   Extracted Info: ${extractedInfo.brand} - ${extractedInfo.productName} (${extractedInfo.size})`);
+  
+  if (!process.env.GOOGLE_GEMINI_API_KEY) {
+    console.error('❌ GOOGLE_GEMINI_API_KEY is not set');
+    throw new Error('Gemini API key is not configured');
+  }
+
+  if (candidates.length === 0) {
+    return {
+      selectedCandidateId: null,
+      selectedGtin: null,
+      confidence: 0,
+      reasoning: 'No candidates provided',
+      visualSimilarityScore: 0,
+      brandMatch: false,
+      sizeMatch: false,
+      flavorMatch: false
+    };
+  }
+
+  // If only one candidate, return it directly
+  if (candidates.length === 1) {
+    return {
+      selectedCandidateId: candidates[0].id,
+      selectedGtin: candidates[0].gtin,
+      confidence: 0.95,
+      reasoning: 'Only one candidate available - auto-selected',
+      visualSimilarityScore: 0.95,
+      brandMatch: true,
+      sizeMatch: true,
+      flavorMatch: true
+    };
+  }
+
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      temperature: 0,
+      responseMimeType: 'application/json',
+    }
+  });
+
+  // Fetch all candidate images
+  const candidateImages: Array<{ id: string; gtin: string; base64: string }> = [];
+  for (const candidate of candidates) {
+    try {
+      const response = await fetch(candidate.imageUrl);
+      if (response.ok) {
+        const buffer = await response.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString('base64');
+        candidateImages.push({ id: candidate.id, gtin: candidate.gtin, base64 });
+      } else {
+        console.warn(`⚠️ Failed to fetch candidate image: ${candidate.imageUrl}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error fetching candidate ${candidate.gtin}:`, error);
+    }
+  }
+
+  if (candidateImages.length === 0) {
+    return {
+      selectedCandidateId: null,
+      selectedGtin: null,
+      confidence: 0,
+      reasoning: 'Failed to fetch any candidate images',
+      visualSimilarityScore: 0,
+      brandMatch: false,
+      sizeMatch: false,
+      flavorMatch: false
+    };
+  }
+
+  // Build the prompt
+  const candidateDescriptions = candidates.map((c, idx) => 
+    `Candidate ${idx + 1} (GTIN: ${c.gtin}):
+- Product Name: ${c.productName}
+- Brand: ${c.brandName}
+- Size: ${c.size}
+- Category: ${c.category || 'N/A'}
+- Match Status from AI Filter: ${c.matchStatus}
+${c.ingredients ? `- Ingredients: ${c.ingredients.substring(0, 200)}...` : ''}`
+  ).join('\n\n');
+
+  const prompt = `You are a visual product matching expert. Your task is to select the BEST MATCH from multiple product candidates.
+
+SHELF PRODUCT (what we detected):
+- Brand: ${extractedInfo.brand}
+- Product Name: ${extractedInfo.productName}
+- Size: ${extractedInfo.size}
+- Flavor: ${extractedInfo.flavor}
+- Category: ${extractedInfo.category}
+
+CANDIDATES (${candidates.length} options):
+${candidateDescriptions}
+
+IMAGES PROVIDED:
+- Image 1: The cropped product from the retail shelf (THIS IS THE REFERENCE)
+- Images 2-${candidateImages.length + 1}: Product images for each candidate
+
+MATCHING CRITERIA (in order of importance):
+1. Visual Similarity: Does the packaging, colors, design, logo match? Look at overall visual appearance.
+2. Brand Match: Does the brand name match exactly?
+3. Size Match: Does the package size match (oz, g, ml, count, etc.)?
+4. Flavor/Variant Match: Does the flavor or variant match?
+5. Product Name: Does the core product name match?
+
+INSTRUCTIONS:
+- Compare the shelf product (Image 1) with each candidate image
+- Consider both visual appearance AND metadata (brand, size, flavor)
+- If multiple candidates look identical, use metadata to differentiate
+- Be strict: Only select a match if you're confident it's the SAME product
+- If no candidate is a good match, return null
+
+Return a JSON object with this EXACT structure:
+{
+  "selectedCandidateIndex": 1-${candidates.length} or null if no good match,
+  "confidence": 0.0 to 1.0,
+  "reasoning": "Detailed explanation of why this candidate was selected or why no match was found",
+  "visualSimilarityScore": 0.0 to 1.0,
+  "brandMatch": true or false,
+  "sizeMatch": true or false,
+  "flavorMatch": true or false
+}
+
+Only return the JSON object, nothing else.`;
+
+  // Build image parts: cropped product + all candidates
+  const imageParts = [
+    {
+      inlineData: {
+        data: croppedProductBase64,
+        mimeType: 'image/jpeg',
+      },
+    },
+    ...candidateImages.map(img => ({
+      inlineData: {
+        data: img.base64,
+        mimeType: 'image/jpeg',
+      },
+    }))
+  ];
+
+  try {
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const response = await result.response;
+    let text = response.text();
+
+    // Clean up the response
+    text = text.trim();
+    if (text.startsWith('```json')) {
+      text = text.substring(7);
+    } else if (text.startsWith('```')) {
+      text = text.substring(3);
+    }
+    if (text.endsWith('```')) {
+      text = text.substring(0, text.length - 3);
+    }
+    text = text.trim();
+
+    const selection = JSON.parse(text) as {
+      selectedCandidateIndex: number | null;
+      confidence: number;
+      reasoning: string;
+      visualSimilarityScore: number;
+      brandMatch: boolean;
+      sizeMatch: boolean;
+      flavorMatch: boolean;
+    };
+
+    // Convert candidate index to candidate ID
+    let selectedCandidateId: string | null = null;
+    let selectedGtin: string | null = null;
+    
+    if (selection.selectedCandidateIndex !== null && 
+        selection.selectedCandidateIndex >= 1 && 
+        selection.selectedCandidateIndex <= candidates.length) {
+      const selectedCandidate = candidates[selection.selectedCandidateIndex - 1];
+      selectedCandidateId = selectedCandidate.id;
+      selectedGtin = selectedCandidate.gtin;
+      console.log(`✅ Visual Match Selected: Candidate ${selection.selectedCandidateIndex} - ${selectedCandidate.productName} (${selectedGtin})`);
+      console.log(`   Confidence: ${Math.round(selection.confidence * 100)}% | Visual: ${Math.round(selection.visualSimilarityScore * 100)}%`);
+      console.log(`   Reasoning: ${selection.reasoning}`);
+    } else {
+      console.log(`❌ No match selected - ${selection.reasoning}`);
+    }
+
+    return {
+      selectedCandidateId,
+      selectedGtin,
+      confidence: selection.confidence,
+      reasoning: selection.reasoning,
+      visualSimilarityScore: selection.visualSimilarityScore,
+      brandMatch: selection.brandMatch,
+      sizeMatch: selection.sizeMatch,
+      flavorMatch: selection.flavorMatch
+    };
+
+  } catch (error) {
+    console.error('❌ Visual matching selection error:', error);
+    return {
+      selectedCandidateId: null,
+      selectedGtin: null,
+      confidence: 0,
+      reasoning: `Error during visual matching: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      visualSimilarityScore: 0,
+      brandMatch: false,
+      sizeMatch: false,
+      flavorMatch: false
+    };
+  }
+}
