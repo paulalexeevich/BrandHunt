@@ -5,7 +5,7 @@ import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
 
 // Default prompts (used as fallback if no custom prompt is found)
-const DEFAULT_EXTRACT_INFO_PROMPT = `
+export const DEFAULT_EXTRACT_INFO_PROMPT = `
 Analyze this image and extract product information.
 
 FIRST, determine classification:
@@ -64,7 +64,7 @@ Important Guidelines:
 Only return the JSON object, nothing else.
 `;
 
-const DEFAULT_AI_FILTER_PROMPT = `
+export const DEFAULT_AI_FILTER_PROMPT = `
 Compare these two product images and determine their match status.
 
 Consider these factors:

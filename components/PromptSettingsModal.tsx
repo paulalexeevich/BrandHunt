@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Save, RotateCcw, History } from 'lucide-react';
+import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT } from '@/lib/gemini';
 
 interface PromptTemplate {
   id: string;
@@ -26,6 +27,11 @@ const STEP_NAMES = {
 const STEP_DESCRIPTIONS = {
   extract_info: 'This prompt instructs the AI to extract product details (brand, name, category, etc.) from shelf images.',
   ai_filter: 'This prompt instructs the AI to compare product images and determine if they match.',
+};
+
+const DEFAULT_PROMPTS = {
+  extract_info: DEFAULT_EXTRACT_INFO_PROMPT,
+  ai_filter: DEFAULT_AI_FILTER_PROMPT,
 };
 
 export default function PromptSettingsModal({ projectId, isOpen, onClose }: PromptSettingsModalProps) {
@@ -84,7 +90,8 @@ export default function PromptSettingsModal({ projectId, isOpen, onClose }: Prom
 
   const handleEdit = (stepName: string) => {
     setEditingStep(stepName);
-    setEditedPrompt(templates[stepName]?.prompt_template || '');
+    // Use existing custom prompt, or default to the default prompt
+    setEditedPrompt(templates[stepName]?.prompt_template || DEFAULT_PROMPTS[stepName as keyof typeof DEFAULT_PROMPTS]);
     setError(null);
     setSuccessMessage(null);
   };
@@ -268,10 +275,19 @@ export default function PromptSettingsModal({ projectId, isOpen, onClose }: Prom
                           </div>
                         </div>
                       ) : (
-                        <div className="bg-gray-50 rounded p-3 max-h-64 overflow-y-auto">
-                          <pre className="text-xs text-gray-700 font-mono whitespace-pre-wrap break-words">
-                            {template?.prompt_template || 'No custom prompt set (using default)'}
-                          </pre>
+                        <div>
+                          {!template && (
+                            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <p className="text-sm text-blue-800">
+                                <span className="font-semibold">Using Default Prompt</span> - No custom prompt configured yet. Click "Edit" to customize.
+                              </p>
+                            </div>
+                          )}
+                          <div className="bg-gray-50 rounded p-3 max-h-64 overflow-y-auto">
+                            <pre className="text-xs text-gray-700 font-mono whitespace-pre-wrap break-words">
+                              {template?.prompt_template || DEFAULT_PROMPTS[stepName as keyof typeof DEFAULT_PROMPTS]}
+                            </pre>
+                          </div>
                         </div>
                       )}
                     </div>
