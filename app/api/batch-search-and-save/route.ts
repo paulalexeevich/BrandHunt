@@ -556,34 +556,107 @@ export async function POST(request: NextRequest) {
             // CONSOLIDATION LOGIC: Check for identical and almost_same matches
             const identicalMatches = comparisonResults.filter(r => r.matchStatus === 'identical');
             const almostSameMatches = comparisonResults.filter(r => r.matchStatus === 'almost_same');
+            const totalCandidates = identicalMatches.length + almostSameMatches.length;
             
-            console.log(`    📊 Match status breakdown: Identical=${identicalMatches.length}, Almost Same=${almostSameMatches.length}`);
+            console.log(`    📊 Match status breakdown: Identical=${identicalMatches.length}, Almost Same=${almostSameMatches.length}, Total=${totalCandidates}`);
             
             let bestMatch = null;
             let consolidationApplied = false;
             let needsManualReview = false;
+            let visualMatchingApplied = false;
             
-            if (identicalMatches.length > 0) {
-              // Use first identical match - high confidence
-              bestMatch = identicalMatches[0].result;
-              console.log(`    ✅ Using IDENTICAL match: ${bestMatch.product_name}`);
-            } else if (almostSameMatches.length === 1) {
-              // Consolidation: Exactly one almost_same match with no identical matches
-              bestMatch = almostSameMatches[0].result;
-              consolidationApplied = true;
-              console.log(`    🔄 CONSOLIDATION: Promoting single "almost_same" match: ${bestMatch.product_name}`);
-            } else if (almostSameMatches.length > 1) {
-              // Multiple almost_same matches - needs manual review
-              needsManualReview = true;
-              console.log(`    👤 MANUAL REVIEW NEEDED: ${almostSameMatches.length} "almost_same" matches - saved to DB for user review`);
+            // STEP 1: Check if we have exactly 1 candidate (auto-select)
+            if (totalCandidates === 1) {
+              bestMatch = identicalMatches.length > 0 ? identicalMatches[0].result : almostSameMatches[0].result;
+              const matchType = identicalMatches.length > 0 ? 'IDENTICAL' : 'ALMOST_SAME';
+              console.log(`    ✅ Single ${matchType} match: ${bestMatch.product_name}`);
+            }
+            // STEP 2: Check if we have 2+ candidates (run visual matching)
+            else if (totalCandidates >= 2) {
+              console.log(`    🎯 VISUAL MATCHING: ${totalCandidates} candidates - running Gemini selection...`);
+              
+              sendProgress({
+                type: 'progress',
+                detectionIndex: detection.detection_index,
+                stage: 'visual-matching',
+                message: `🎯 Visual matching ${totalCandidates} candidates...`,
+                processed: globalIndex + 1,
+                total: detections.length
+              });
+              
+              try {
+                // Import visual matching function
+                const { selectBestMatchFromMultiple } = await import('@/lib/gemini');
+                
+                // Prepare candidates for visual matching
+                const candidates = [...identicalMatches, ...almostSameMatches].map(m => ({
+                  id: m.result.id || String(Math.random()),
+                  gtin: m.result.product_gtin || m.result.key || '',
+                  productName: m.result.product_name || m.result.title || '',
+                  brandName: m.result.brand_name || m.result.companyBrand || '',
+                  size: m.result.measures || '',
+                  category: m.result.category || '',
+                  ingredients: m.result.ingredients || '',
+                  imageUrl: m.result.front_image_url || '',
+                  matchStatus: m.matchStatus
+                }));
+                
+                // Prepare extracted info
+                const extractedInfo = {
+                  brand: detection.brand_name || 'Unknown',
+                  productName: detection.product_name || 'Unknown',
+                  size: detection.size || 'Unknown',
+                  flavor: detection.flavor || 'Unknown',
+                  category: detection.category || 'Unknown'
+                };
+                
+                // Run visual matching
+                const visualSelection = await selectBestMatchFromMultiple(
+                  croppedBase64,
+                  extractedInfo,
+                  candidates,
+                  image?.project_id || null
+                );
+                
+                console.log(`    🎯 Visual matching result: confidence=${Math.round(visualSelection.confidence * 100)}%`);
+                console.log(`    🎯 Reasoning: ${visualSelection.reasoning}`);
+                
+                // If visual matching selected a match with good confidence
+                if (visualSelection.selectedGtin && visualSelection.confidence >= 0.6) {
+                  // Find the selected match in our results
+                  const selectedResult = [...identicalMatches, ...almostSameMatches].find(
+                    m => (m.result.product_gtin || m.result.key) === visualSelection.selectedGtin
+                  );
+                  
+                  if (selectedResult) {
+                    bestMatch = selectedResult.result;
+                    visualMatchingApplied = true;
+                    console.log(`    ✅ Visual match selected: ${bestMatch.product_name} (confidence: ${Math.round(visualSelection.confidence * 100)}%)`);
+                  } else {
+                    console.log(`    ⚠️ Visual selection GTIN not found in results - falling back to manual review`);
+                    needsManualReview = true;
+                  }
+                } else {
+                  // Visual matching couldn't confidently select one
+                  console.log(`    ⚠️ Visual matching low confidence (${Math.round(visualSelection.confidence * 100)}%) - needs manual review`);
+                  needsManualReview = true;
+                }
+              } catch (error) {
+                console.error(`    ❌ Visual matching error:`, error);
+                console.log(`    ⚠️ Visual matching failed - falling back to manual review`);
+                needsManualReview = true;
+              }
+            }
+            // STEP 3: No matches found
+            else {
+              console.log(`    ⚠️ No matches found in ${resultsToCompare.length} results`);
             }
             
             if (bestMatch) {
-              console.log(`    ✅ MATCH FOUND: ${bestMatch.product_name}`);
+              const method = visualMatchingApplied ? 'VISUAL MATCH' : 'AUTO-SELECT';
+              console.log(`    ✅ ${method}: ${bestMatch.product_name}`);
             } else if (needsManualReview) {
-              console.log(`    ⏸️ Awaiting manual review: ${almostSameMatches.length} possible matches saved`);
-            } else {
-              console.log(`    ⚠️ No matches found in ${resultsToCompare.length} results`);
+              console.log(`    ⏸️ Awaiting manual review: ${totalCandidates} possible matches saved`);
             }
 
             // Step 3: Save match to DB
@@ -623,12 +696,23 @@ export async function POST(request: NextRequest) {
                 gtin: (bestMatch.product_gtin || 'Unknown') as string,
                 imageUrl: (bestMatch.front_image_url || '') as string
               };
+              
+              // Add metadata about which method was used
+              if (visualMatchingApplied) {
+                (result as any).selectionMethod = 'visual_matching';
+                (result as any).candidatesCount = totalCandidates;
+              } else if (consolidationApplied) {
+                (result as any).selectionMethod = 'consolidation';
+              } else {
+                (result as any).selectionMethod = 'auto_select';
+              }
 
+              const methodLabel = visualMatchingApplied ? '🎯 Visual match' : consolidationApplied ? '🔄 Consolidated' : '✓ Auto-select';
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'done',
-                message: `✓ Saved: ${bestMatch.product_name}`,
+                message: `${methodLabel}: ${bestMatch.product_name}`,
                 processed: globalIndex + 1,
                 total: detections.length
               });
