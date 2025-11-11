@@ -212,7 +212,6 @@ export async function POST(request: NextRequest) {
                   result.error = error instanceof Error ? error.message : 'Unknown error';
                   return result;
                 }
-              })
             });
 
             // Wait for each promise to complete and send progress update
