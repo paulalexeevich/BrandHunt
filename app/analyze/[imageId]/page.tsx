@@ -102,7 +102,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [preFiltering, setPreFiltering] = useState(false);
   const [preFilteredCount, setPreFilteredCount] = useState<number | null>(null);
   const [consolidationApplied, setConsolidationApplied] = useState(false);
-  const [stageFilter, setStageFilter] = useState<'all' | 'search' | 'pre_filter' | 'ai_filter'>('ai_filter');
+  const [stageFilter, setStageFilter] = useState<'search' | 'pre_filter' | 'ai_filter'>('search');
   const [matchStatusCounts, setMatchStatusCounts] = useState<{ identical: number; almostSame: number } | null>(null);
   const [showProductLabels, setShowProductLabels] = useState(true);
   const [extractingPrice, setExtractingPrice] = useState(false);
@@ -1950,64 +1950,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         </div>
                       )}
 
-                      {/* Show current stage info */}
-                      {(() => {
-                        // Calculate counts for each stage
-                        // NOTE: With UPSERT pattern, results progress through stages by updating processing_stage field
-                        // So we need to count cumulatively for pipeline display
-                        const searchCount = foodgraphResults.filter(r => r.processing_stage === 'search').length;
-                        const preFilterCount = foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length;
-                        const aiFilterCount = foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length;
-                        
-                        // Count only IDENTICAL or ALMOST SAME matches (actual AI matches)
-                        const aiMatchesCount = foodgraphResults.filter(r => {
-                          const matchStatus = (r as any).match_status;
-                          return r.processing_stage === 'ai_filter' && 
-                                 (matchStatus === 'identical' || matchStatus === 'almost_same');
-                        }).length;
-                        
-                        const stageStats = {
-                          all: foodgraphResults.length,
-                          search: searchCount,  // For filter button: results still at search stage
-                          pre_filter: preFilterCount,  // For filter button: results at pre-filter stage
-                          ai_filter: aiMatchesCount  // Only actual matches (identical or almost same)
-                        };
-                        
-                        // For pipeline display: show cumulative progress
-                        const pipelineStats = {
-                          returned: searchCount + preFilterCount + aiFilterCount,  // Total initial FoodGraph results
-                          preFiltered: preFilterCount + aiFilterCount,  // Results that passed pre-filter (≥85%)
-                          aiAnalyzed: aiMatchesCount  // Only actual matches (identical or almost same)
-                        };
-                        
-                        // Get current filtered count
-                        let currentCount = stageFilter === 'all' ? stageStats.all :
-                                         stageFilter === 'search' ? stageStats.search :
-                                         stageFilter === 'pre_filter' ? stageStats.pre_filter :
-                                         stageStats.ai_filter;
-                        
-                        // Further filter for NO MATCH if hidden
-                        if (stageFilter === 'ai_filter' && !showNoMatch && matchStatusCounts) {
-                          currentCount = matchStatusCounts.identical + matchStatusCounts.almostSame;
-                        }
-                        
-                        return (
-                          <div className="mb-3">
-                            <h4 className="font-semibold text-gray-900 mb-2">
-                              Viewing: {
-                                stageFilter === 'all' ? `All Results (${currentCount})` :
-                                stageFilter === 'search' ? `🔍 Search Results (${currentCount})` :
-                                stageFilter === 'pre_filter' ? `⚡ Pre-filtered Results (${currentCount})` :
-                                `🤖 AI Filtered Results (${currentCount}${!showNoMatch && matchStatusCounts ? ' - NO MATCH hidden' : ''})`
-                              }
-                            </h4>
-                            <p className="text-xs text-gray-600">
-                              Pipeline: FoodGraph returned {pipelineStats.returned} → Pre-filter selected {pipelineStats.preFiltered} (≥85%) → AI analyzed {pipelineStats.aiAnalyzed}
-                            </p>
-                          </div>
-                        );
-                      })()}
-                      
                       {/* Info banner when showing all with confidence */}
                       {showingAllWithConfidence && (
                         <div className="mb-3 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
@@ -2101,10 +2043,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                  (matchStatus === 'identical' || matchStatus === 'almost_same');
                         }).length;
                         
-                        // Use cumulative counts for button labels (match pipeline statistics)
+                        // Use cumulative counts for button labels
                         const stageStats = {
-                          all: foodgraphResults.length,
-                          search: searchCount + preFilterCount + aiFilterCount,  // All returned by FoodGraph
+                          search: searchCount + preFilterCount + aiFilterCount,  // All returned by FoodGraph (TOP 100)
                           pre_filter: preFilterCount + aiFilterCount,  // All that passed pre-filter (≥85%)
                           ai_filter: aiMatchesCount  // Only actual matches (identical or almost same)
                         };
@@ -2113,16 +2054,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                             <p className="text-sm font-semibold text-gray-700 mb-2">Filter by Processing Stage:</p>
                             <div className="flex flex-wrap gap-2">
-                              <button
-                                onClick={() => setStageFilter('all')}
-                                className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
-                                  stageFilter === 'all'
-                                    ? 'bg-indigo-600 text-white ring-2 ring-indigo-300 shadow-sm'
-                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                                }`}
-                              >
-                                All ({stageStats.all})
-                              </button>
                               <button
                                 onClick={() => setStageFilter('search')}
                                 disabled={searchCount + preFilterCount + aiFilterCount === 0}
@@ -2171,10 +2102,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         {(() => {
                           // Apply stage filter with cumulative logic (matching button counts)
                           let filteredResults;
-                          if (stageFilter === 'all') {
-                            filteredResults = foodgraphResults;
-                          } else if (stageFilter === 'search') {
-                            // Show all results returned by FoodGraph (all stages)
+                          if (stageFilter === 'search') {
+                            // Show all results returned by FoodGraph (TOP 100, all stages)
                             filteredResults = foodgraphResults;
                           } else if (stageFilter === 'pre_filter') {
                             // Show results that passed pre-filter (≥85%) - includes both pre_filter and ai_filter stages
@@ -2229,9 +2158,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 <div className="text-4xl mb-3">🔍</div>
                                 <p className="text-lg font-semibold text-yellow-900 mb-2">No FoodGraph Results Found</p>
                                 <p className="text-sm text-yellow-800">
-                                  {stageFilter !== 'all' 
-                                    ? `No results match the selected filter stage (${stageFilter}).` 
-                                    : 'The search completed but found no matching products in the FoodGraph database.'
+                                  {stageFilter === 'search'
+                                    ? 'The search completed but found no matching products in the FoodGraph database.'
+                                    : `No results match the selected filter stage (${stageFilter}).`
                                   }
                                 </p>
                                 {detection.fully_analyzed && (
@@ -2311,27 +2240,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                     </div>
                                   )}
 
-                                  {/* Processing Stage badge (only show when viewing All stages) */}
-                                  {stageFilter === 'all' && (
-                                    <div className="absolute -top-1 -right-1 z-10">
-                                      {result.processing_stage === 'search' ? (
-                                        <span className="px-1.5 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded">
-                                          🔍
-                                        </span>
-                                      ) : result.processing_stage === 'pre_filter' ? (
-                                        <span className="px-1.5 py-0.5 bg-orange-500 text-white text-[10px] font-bold rounded">
-                                          ⚡
-                                        </span>
-                                      ) : result.processing_stage === 'ai_filter' ? (
-                                        <span className="px-1.5 py-0.5 bg-purple-500 text-white text-[10px] font-bold rounded">
-                                          🤖
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                  )}
-
                                   {/* Match Status badge (only show after AI filtering) - smaller */}
-                                  {filteredCount !== null && stageFilter !== 'all' && (
+                                  {filteredCount !== null && (
                                     <div className="absolute -top-1 -right-1 z-10">
                                       {matchStatus === 'identical' ? (
                                         <span className="px-1.5 py-0.5 bg-green-600 text-white text-[10px] font-bold rounded flex items-center gap-1">
