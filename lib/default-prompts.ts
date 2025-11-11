@@ -49,20 +49,46 @@ Only return the JSON object, nothing else.
 export const DEFAULT_AI_FILTER_PROMPT = `
 Compare these two product images and determine their match status.
 
-Consider these factors:
-1. Brand name and logo
-2. Product name and type
-3. Packaging design and colors
-4. Flavor/variant information
-5. Size information
-6. Overall visual appearance
+Analyze these factors systematically:
+
+1. **Package Form & Shape**
+   - Container type: bottle, can, box, pouch, tube, jar, carton, etc.
+   - Overall shape and proportions
+   - Cap/closure style and color
+   - Container material (plastic, glass, metal, cardboard)
+
+2. **Color Analysis** (CRITICAL for matching)
+   - Primary package color(s) - exact shade matching
+   - Secondary/accent colors - placement and usage
+   - Color blocking patterns and layout
+   - Background vs foreground color scheme
+   - Gradient effects or solid colors
+
+3. **Unique Visual Elements** (CRITICAL for identifying identical products)
+   - Brand logo: exact design, placement, colors
+   - Graphics/illustrations: characters, images, patterns
+   - Visual motifs: stripes, waves, geometric patterns
+   - Icon sets: claims badges, certification marks
+   - Unique design elements: windows, cutouts, special effects
+
+4. **Text & Typography**
+   - Brand name and logo style
+   - Product name and positioning
+   - Flavor/variant callouts
+   - Size/quantity display
+   - Claims and benefits text
+
+5. **Overall Layout & Design**
+   - Information hierarchy and placement
+   - Visual balance and composition
+   - Design style (modern, traditional, minimalist)
 
 Return a JSON object with this structure:
 {
   "matchStatus": "identical" or "almost_same" or "not_match",
   "confidence": 0.0 to 1.0,
   "visualSimilarity": 0.0 to 1.0,
-  "reason": "Brief explanation of the match status"
+  "reason": "Brief explanation including key matching/mismatching elements"
 }
 
 CRITICAL DEFINITIONS:
@@ -70,21 +96,27 @@ CRITICAL DEFINITIONS:
 matchStatus - THREE possible values:
 
 1. "identical" - Both products are EXACTLY the same:
+   - SAME package form (both bottles, both cans, etc.)
+   - SAME color scheme (primary and accent colors match)
+   - SAME unique visual elements (logos, graphics, patterns identical)
    - Same brand, same product name
    - Same flavor/variant
    - Same size/quantity
-   - Same packaging design
    - All details match perfectly
-   
+
 2. "almost_same" - Same EXACT product with minor packaging variations:
-   - MUST match: brand, product name, flavor/variant, package type
+   - MUST match: package form, brand, product name, flavor/variant
+   - MUST match: core color scheme and primary visual elements
    - Very close or same size (within similar range, even if unclear/blurry)
-   - Almost identical visual design
+   - Almost identical visual design and layout
    - Same meaning in claims/benefits (wording may differ)
-   - Only differences: packaging refresh, claim text updates, regional variations
-   - Example: Same product with "Doctor Recommended" vs "Spray Protection" claim
+   - Only differences: packaging refresh, claim text updates, minor color tweaks, regional variations
+   - Example: Same product with "Doctor Recommended" vs "Spray Protection" claim, same colors and design
    
 3. "not_match" - Different products:
+   - Different package form (bottle vs can) = NOT_MATCH
+   - Different primary colors or color scheme = NOT_MATCH
+   - Different or missing unique visual elements = NOT_MATCH
    - Different flavor/variant (e.g., "Complete Clean" vs "Light & Fresh") = NOT_MATCH
    - Significantly different size (e.g., 3.8oz vs 10oz) = NOT_MATCH
    - Different product types/lines = NOT_MATCH
@@ -93,16 +125,23 @@ matchStatus - THREE possible values:
 confidence: How certain you are about the matchStatus decision (0.0 = uncertain, 1.0 = very certain)
 
 visualSimilarity: How similar the images LOOK overall (0.0 = completely different, 1.0 = nearly identical)
-  * Identical products = 0.9-1.0
-  * Almost same (packaging updates) = 0.7-0.9
-  * Same brand, different variant = 0.3-0.6
-  * Different brands = 0.0-0.3
+  * Identical products with same colors/design = 0.9-1.0
+  * Almost same (minor packaging updates, same core design) = 0.7-0.9
+  * Same brand/form, different variant/colors = 0.3-0.6
+  * Different brands or package forms = 0.0-0.3
+
+REASONING FORMAT:
+Always mention in your reason:
+- Package form match/mismatch (e.g., "Both white bottles with flip-top caps")
+- Color analysis (e.g., "Purple and white color scheme matches exactly")
+- Visual elements (e.g., "Same Secret logo and shield design")
+- Key differences if any (e.g., "Different scent: Powder Fresh vs Light & Clean")
 
 Examples:
-- Exact same: {matchStatus: "identical", confidence: 0.95, visualSimilarity: 0.95, reason: "Same brand, product, size, and flavor"}
-- Packaging refresh: {matchStatus: "almost_same", confidence: 0.9, visualSimilarity: 0.85, reason: "Same Secret Complete Clean 3.8oz, minor claim text difference"}
-- Different variant: {matchStatus: "not_match", confidence: 0.95, visualSimilarity: 0.7, reason: "Same brand/size but different scent: Fresh vs Powder"}
-- Different size: {matchStatus: "not_match", confidence: 0.95, visualSimilarity: 0.75, reason: "Same Tide detergent flavor, but 50oz vs 100oz"}
-- Different brands: {matchStatus: "not_match", confidence: 1.0, visualSimilarity: 0.2, reason: "Different brands entirely"}
+- Exact same: {matchStatus: "identical", confidence: 0.95, visualSimilarity: 0.95, reason: "Both 3.8oz white bottles with flip caps. Purple and white color scheme identical. Same Secret Complete Clean logo, shield design, and fresh scent indicator. Perfect match."}
+- Packaging refresh: {matchStatus: "almost_same", confidence: 0.9, visualSimilarity: 0.85, reason: "Both white bottles, same purple branding and Secret logo. Same Complete Clean variant. Minor text claim difference but core design and colors identical."}
+- Different variant: {matchStatus: "not_match", confidence: 0.95, visualSimilarity: 0.7, reason: "Same white bottle form and Secret brand, but different color scheme: purple (Fresh) vs pink (Powder). Different scent variants."}
+- Different form: {matchStatus: "not_match", confidence: 1.0, visualSimilarity: 0.4, reason: "Different package forms: aerosol spray can vs roll-on bottle. Different product types despite same brand."}
+- Different size: {matchStatus: "not_match", confidence: 0.95, visualSimilarity: 0.75, reason: "Same orange Tide bottle design and HE Turbo Clean variant, but significantly different sizes: 50oz vs 100oz"}
 `;
 
