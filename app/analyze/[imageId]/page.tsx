@@ -2621,8 +2621,18 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                  (matchStatus === 'identical' || matchStatus === 'almost_same' || r.is_match === true);
                         }).length;
                         
-                        // Count products matched via visual matching (selection_method='visual_matching')
-                        const visualMatchCount = detection.selection_method === 'visual_matching' ? aiMatchesCount : 0;
+                        // Count products for visual matching:
+                        // 1) Already matched via visual_matching, OR
+                        // 2) Has 2+ identical/almost_same results (pending visual match)
+                        const multipleMatchCandidates = foodgraphResults.filter(r => {
+                          const matchStatus = (r as any).match_status;
+                          return r.processing_stage === 'ai_filter' && 
+                                 (matchStatus === 'identical' || matchStatus === 'almost_same');
+                        }).length;
+                        
+                        const visualMatchCount = (detection.selection_method === 'visual_matching' || multipleMatchCandidates >= 2) 
+                          ? aiMatchesCount 
+                          : 0;
                         
                         // Use cumulative counts for button labels
                         const stageStats = {
@@ -2709,8 +2719,16 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             // Show all AI-filtered results (includes identical, almost_same, and not_match)
                             filteredResults = foodgraphResults.filter(r => r.processing_stage === 'ai_filter');
                           } else if (stageFilter === 'visual_match') {
-                            // Show only results for products matched via visual analysis
-                            if (detection.selection_method === 'visual_matching') {
+                            // Show results for products that use/need visual matching:
+                            // 1) Already matched via visual_matching, OR
+                            // 2) Has 2+ candidates (pending visual match)
+                            const candidateCount = foodgraphResults.filter(r => {
+                              const matchStatus = (r as any).match_status;
+                              return r.processing_stage === 'ai_filter' && 
+                                     (matchStatus === 'identical' || matchStatus === 'almost_same');
+                            }).length;
+                            
+                            if (detection.selection_method === 'visual_matching' || candidateCount >= 2) {
                               filteredResults = foodgraphResults.filter(r => r.processing_stage === 'ai_filter');
                             } else {
                               filteredResults = [];
