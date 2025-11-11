@@ -48,6 +48,7 @@ interface Detection {
   selected_foodgraph_category: string | null;
   selected_foodgraph_image_url: string | null;
   selected_foodgraph_result_id: string | null;
+  selection_method: 'visual_matching' | 'auto_select' | 'consolidation' | null;
   fully_analyzed: boolean | null;
   analysis_completed_at: string | null;
   foodgraph_results?: FoodGraphResult[];
@@ -124,7 +125,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     natural: { width: number; height: number };
     displayed: { width: number; height: number };
   } | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'processed' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'processed' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches' | 'visual_matching'>('all');
   const [isFetching, setIsFetching] = useState(false);
   
   // Contextual analysis state
@@ -1524,6 +1525,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             d.foodgraph_results && 
             d.foodgraph_results.length >= 2
           ).length;
+          
+          // Visual Matching = Products matched using visual similarity analysis
+          const visualMatching = detections.filter(d => 
+            d.selection_method === 'visual_matching'
+          ).length;
 
           return (
             <div className="mb-3">
@@ -1631,6 +1637,21 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         {activeFilter === 'multiple_matches' && <span className="text-[10px] text-purple-600 font-semibold">● Active</span>}
                       </div>
                     </button>
+                    
+                    <button
+                      onClick={() => setActiveFilter('visual_matching')}
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded border-2 transition-all hover:scale-[1.01] ${
+                        activeFilter === 'visual_matching' 
+                          ? 'bg-cyan-100 border-cyan-500 ring-1 ring-cyan-300' 
+                          : 'bg-white border-cyan-200 hover:border-cyan-300'
+                      }`}
+                    >
+                      <span className="text-xs font-medium text-gray-700">🎯 Visual Match</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xl font-bold text-cyan-600">{visualMatching}</span>
+                        {activeFilter === 'visual_matching' && <span className="text-[10px] text-cyan-600 font-semibold">● Active</span>}
+                      </div>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1690,6 +1711,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                          detection.foodgraph_results && 
                          detection.foodgraph_results.length >= 2;
                 }
+                if (activeFilter === 'visual_matching') {
+                  return detection.selection_method === 'visual_matching';
+                }
                 return false;
               });
 
@@ -1699,7 +1723,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 'not_identified': 'Not Processed',
                 'one_match': '✓ Matched',
                 'no_match': 'Not Matched',
-                'multiple_matches': '2+ Matches'
+                'multiple_matches': '2+ Matches',
+                'visual_matching': '🎯 Visual Match'
               };
 
               const filterColors = {
@@ -1708,7 +1733,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 'not_identified': 'bg-gray-100 border-gray-300 text-gray-900',
                 'one_match': 'bg-green-100 border-green-300 text-green-900',
                 'no_match': 'bg-yellow-100 border-yellow-300 text-yellow-900',
-                'multiple_matches': 'bg-purple-100 border-purple-300 text-purple-900'
+                'multiple_matches': 'bg-purple-100 border-purple-300 text-purple-900',
+                'visual_matching': 'bg-cyan-100 border-cyan-300 text-cyan-900'
               };
 
               return (
@@ -1764,6 +1790,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                          !detection.selected_foodgraph_gtin &&
                          detection.foodgraph_results && 
                          detection.foodgraph_results.length >= 2;
+                }
+                if (activeFilter === 'visual_matching') {
+                  return detection.selection_method === 'visual_matching';
                 }
                 return true;
               }).map((detection, index) => {
@@ -2613,8 +2642,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         const preFilterCount = foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length;
                         const aiFilterCount = foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length;
                         
-                        // Count all AI-filtered results (including no matches)
-                        const aiMatchesCount = aiFilterCount;
+                        // Count ONLY successful AI matches (identical or almost_same) - excludes not_match
+                        const aiMatchesCount = foodgraphResults.filter(r => {
+                          const matchStatus = (r as any).match_status;
+                          return r.processing_stage === 'ai_filter' && 
+                                 (matchStatus === 'identical' || matchStatus === 'almost_same' || r.is_match === true);
+                        }).length;
                         
                         // Use cumulative counts for button labels
                         const stageStats = {

@@ -71,6 +71,7 @@ export interface BranghuntDetection {
   selected_foodgraph_category: string | null;
   selected_foodgraph_image_url: string | null;
   selected_foodgraph_result_id: string | null;
+  selection_method: 'visual_matching' | 'auto_select' | 'consolidation' | null;
   fully_analyzed: boolean | null;
   analysis_completed_at: string | null;
   created_at: string;

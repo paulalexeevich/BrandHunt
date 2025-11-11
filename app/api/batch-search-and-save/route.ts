@@ -672,6 +672,13 @@ export async function POST(request: NextRequest) {
 
               console.log(`  [#${detection.detection_index}] Saving: ${bestMatch.product_name}`);
               
+              // Determine selection method
+              const selectionMethod = visualMatchingApplied 
+                ? 'visual_matching' 
+                : consolidationApplied 
+                  ? 'consolidation' 
+                  : 'auto_select';
+              
               const { error: updateError } = await supabase
                 .from('branghunt_detections')
                 .update({
@@ -680,6 +687,7 @@ export async function POST(request: NextRequest) {
                   selected_foodgraph_brand_name: bestMatch.brand_name,
                   selected_foodgraph_category: bestMatch.category,
                   selected_foodgraph_image_url: bestMatch.front_image_url,
+                  selection_method: selectionMethod,
                   fully_analyzed: true,
                   analysis_completed_at: new Date().toISOString()
                 })

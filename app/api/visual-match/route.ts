@@ -170,6 +170,7 @@ export async function POST(request: NextRequest) {
             selected_foodgraph_brand_name: selectedResult.brand_name,
             selected_foodgraph_category: selectedResult.category,
             selected_foodgraph_image_url: selectedResult.front_image_url,
+            selection_method: 'visual_matching',
             fully_analyzed: true,
             analysis_completed_at: new Date().toISOString(),
           })
