@@ -1526,102 +1526,128 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           ).length;
 
           return (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow p-3 mb-4 border border-indigo-100">
-              <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+            <div className="mb-4">
+              <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
                 📊 Product Statistics
               </h3>
               
-              {/* Row 1: Processing Status */}
-              <div className="mb-2">
-                <h4 className="text-[10px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Processing Status</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => setActiveFilter('processed')}
-                    className={`bg-blue-50 rounded p-2 border transition-all hover:scale-105 ${
-                      activeFilter === 'processed' ? 'border-blue-900 ring-1 ring-blue-900' : 'border-blue-200'
-                    }`}
-                  >
-                    <div className="text-xl font-bold text-blue-700">{processed}</div>
-                    <div className="text-[10px] text-blue-600 mt-0.5">Processed</div>
-                    {activeFilter === 'processed' && <div className="text-[9px] text-blue-900 font-semibold mt-0.5">● Active</div>}
-                  </button>
-
-                  <button
-                    onClick={() => setActiveFilter('not_identified')}
-                    className={`bg-gray-50 rounded p-2 border transition-all hover:scale-105 ${
-                      activeFilter === 'not_identified' ? 'border-gray-900 ring-1 ring-gray-900' : 'border-gray-300'
-                    }`}
-                  >
-                    <div className="text-xl font-bold text-gray-700">{notProcessed}</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">Not Processed</div>
-                    {activeFilter === 'not_identified' && <div className="text-[9px] text-gray-900 font-semibold mt-0.5">● Active</div>}
-                  </button>
-
-                  <button
-                    onClick={() => setActiveFilter('not_product')}
-                    className={`bg-red-50 rounded p-2 border transition-all hover:scale-105 ${
-                      activeFilter === 'not_product' ? 'border-red-900 ring-1 ring-red-900' : 'border-red-200'
-                    }`}
-                  >
-                    <div className="text-xl font-bold text-red-700">{notProduct}</div>
-                    <div className="text-[10px] text-red-600 mt-0.5">Not Product</div>
-                    {activeFilter === 'not_product' && <div className="text-[9px] text-red-900 font-semibold mt-0.5">● Active</div>}
-                  </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Block 1: Processing Status */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-sm p-4 border border-indigo-200">
+                  <h4 className="text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wide">Processing Status</h4>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setActiveFilter('processed')}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all hover:scale-[1.02] ${
+                        activeFilter === 'processed' 
+                          ? 'bg-blue-100 border-blue-500 ring-2 ring-blue-300' 
+                          : 'bg-white border-blue-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-gray-700">Processed</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-blue-600">{processed}</span>
+                        {activeFilter === 'processed' && <span className="text-xs text-blue-600 font-semibold">● Active</span>}
+                      </div>
+                    </button>
+                    
+                    <button
+                      onClick={() => setActiveFilter('not_identified')}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all hover:scale-[1.02] ${
+                        activeFilter === 'not_identified' 
+                          ? 'bg-gray-100 border-gray-500 ring-2 ring-gray-300' 
+                          : 'bg-white border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-gray-700">Not Processed</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-gray-600">{notProcessed}</span>
+                        {activeFilter === 'not_identified' && <span className="text-xs text-gray-600 font-semibold">● Active</span>}
+                      </div>
+                    </button>
+                    
+                    <button
+                      onClick={() => setActiveFilter('not_product')}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all hover:scale-[1.02] ${
+                        activeFilter === 'not_product' 
+                          ? 'bg-red-100 border-red-500 ring-2 ring-red-300' 
+                          : 'bg-white border-red-200 hover:border-red-300'
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-gray-700">Not Product</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-red-600">{notProduct}</span>
+                        {activeFilter === 'not_product' && <span className="text-xs text-red-600 font-semibold">● Active</span>}
+                      </div>
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Row 2: Match Status */}
-              <div>
-                <h4 className="text-[10px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Match Status</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => setActiveFilter('one_match')}
-                    className={`bg-green-50 rounded p-2 border transition-all hover:scale-105 ${
-                      activeFilter === 'one_match' ? 'border-green-900 ring-1 ring-green-900' : 'border-green-200'
-                    }`}
-                  >
-                    <div className="text-xl font-bold text-green-700">{matched}</div>
-                    <div className="text-[10px] text-green-600 mt-0.5">✓ Matched</div>
-                    {activeFilter === 'one_match' && <div className="text-[9px] text-green-900 font-semibold mt-0.5">● Active</div>}
-                  </button>
-
-                  <button
-                    onClick={() => setActiveFilter('no_match')}
-                    className={`bg-yellow-50 rounded p-2 border transition-all hover:scale-105 ${
-                      activeFilter === 'no_match' ? 'border-yellow-900 ring-1 ring-yellow-900' : 'border-yellow-200'
-                    }`}
-                  >
-                    <div className="text-xl font-bold text-yellow-700">{notMatched}</div>
-                    <div className="text-[10px] text-yellow-600 mt-0.5">Not Matched</div>
-                    {activeFilter === 'no_match' && <div className="text-[9px] text-yellow-900 font-semibold mt-0.5">● Active</div>}
-                  </button>
-
-                  <button
-                    onClick={() => setActiveFilter('multiple_matches')}
-                    className={`bg-purple-50 rounded p-2 border transition-all hover:scale-105 ${
-                      activeFilter === 'multiple_matches' ? 'border-purple-900 ring-1 ring-purple-900' : 'border-purple-200'
-                    }`}
-                  >
-                    <div className="text-xl font-bold text-purple-700">{multipleMatches}</div>
-                    <div className="text-[10px] text-purple-600 mt-0.5">2+ Matches</div>
-                    {activeFilter === 'multiple_matches' && <div className="text-[9px] text-purple-900 font-semibold mt-0.5">● Active</div>}
-                  </button>
+                {/* Block 2: Match Status */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-sm p-4 border border-green-200">
+                  <h4 className="text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wide">Match Status</h4>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setActiveFilter('one_match')}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all hover:scale-[1.02] ${
+                        activeFilter === 'one_match' 
+                          ? 'bg-green-100 border-green-500 ring-2 ring-green-300' 
+                          : 'bg-white border-green-200 hover:border-green-300'
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-gray-700">✓ Matched</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-green-600">{matched}</span>
+                        {activeFilter === 'one_match' && <span className="text-xs text-green-600 font-semibold">● Active</span>}
+                      </div>
+                    </button>
+                    
+                    <button
+                      onClick={() => setActiveFilter('no_match')}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all hover:scale-[1.02] ${
+                        activeFilter === 'no_match' 
+                          ? 'bg-yellow-100 border-yellow-500 ring-2 ring-yellow-300' 
+                          : 'bg-white border-yellow-200 hover:border-yellow-300'
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-gray-700">Not Matched</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-yellow-600">{notMatched}</span>
+                        {activeFilter === 'no_match' && <span className="text-xs text-yellow-600 font-semibold">● Active</span>}
+                      </div>
+                    </button>
+                    
+                    <button
+                      onClick={() => setActiveFilter('multiple_matches')}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all hover:scale-[1.02] ${
+                        activeFilter === 'multiple_matches' 
+                          ? 'bg-purple-100 border-purple-500 ring-2 ring-purple-300' 
+                          : 'bg-white border-purple-200 hover:border-purple-300'
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-gray-700">2+ Matches</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-purple-600">{multipleMatches}</span>
+                        {activeFilter === 'multiple_matches' && <span className="text-xs text-purple-600 font-semibold">● Active</span>}
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Progress Bar */}
-              <div className="mt-2.5">
-                <div className="flex justify-between text-[10px] text-gray-600 mb-1">
-                  <span>Processing Progress</span>
-                  <span>{matched} / {totalProducts} Saved ({Math.round((matched / totalProducts) * 100)}%)</span>
+              <div className="mt-4 bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+                <div className="flex justify-between text-sm text-gray-600 mb-2">
+                  <span className="font-medium">Processing Progress</span>
+                  <span className="font-semibold">{matched} / {totalProducts} Saved ({Math.round((matched / totalProducts) * 100)}%)</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                   <div 
-                    className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-0.5"
+                    className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-1"
                     style={{ width: `${(matched / totalProducts) * 100}%` }}
                   >
                     {matched > 0 && (
-                      <span className="text-[9px] font-bold text-white">✓</span>
+                      <span className="text-[10px] font-bold text-white">✓</span>
                     )}
                   </div>
                 </div>
