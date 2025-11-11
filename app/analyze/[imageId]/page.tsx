@@ -1672,31 +1672,35 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         <h4 className="font-semibold text-gray-900">Product Information</h4>
                       </div>
                       
-                      {/* Classification Badges */}
-                      {(detection.is_product !== null || detection.details_visible !== null) && (
-                        <div className="mb-3 flex flex-wrap gap-2">
-                          {detection.is_product === false && (
-                            <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium">
-                              ❌ Not a Product
-                            </span>
-                          )}
-                          {detection.is_product === true && detection.details_visible === 'clear' && (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                              ✅ Details Clear
-                            </span>
-                          )}
-                          {detection.is_product === true && detection.details_visible === 'partial' && (
-                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">
-                              ⚠️ Details Partial
-                            </span>
-                          )}
-                          {detection.is_product === true && detection.details_visible === 'none' && (
-                            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs font-medium">
-                              ❌ Details None
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      {/* Classification Badges - Always show when brand_name exists */}
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {detection.is_product === false && (
+                          <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium">
+                            ❌ Not a Product
+                          </span>
+                        )}
+                        {detection.is_product === true && detection.details_visible === 'clear' && (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                            ✅ Details Clear
+                          </span>
+                        )}
+                        {detection.is_product === true && detection.details_visible === 'partial' && (
+                          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">
+                            ⚠️ Details Partial
+                          </span>
+                        )}
+                        {detection.is_product === true && detection.details_visible === 'none' && (
+                          <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs font-medium">
+                            ❌ Details None
+                          </span>
+                        )}
+                        {/* Legacy boolean support - show "Unknown Status" for old data */}
+                        {detection.is_product === true && detection.details_visible !== 'clear' && detection.details_visible !== 'partial' && detection.details_visible !== 'none' && (
+                          <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                            ℹ️ Status: Not Set (Re-extract to update)
+                          </span>
+                        )}
+                      </div>
                       
                       {/* Extraction Notes */}
                       {detection.extraction_notes && (
