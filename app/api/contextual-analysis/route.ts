@@ -213,6 +213,14 @@ Return JSON only:
   
   let text: string;
   try {
+    // Check base64 data size
+    const imageSizeMB = (base64Data.length * 3) / (4 * 1024 * 1024);
+    console.log(`[Contextual Analysis] Image size: ${imageSizeMB.toFixed(2)} MB`);
+    
+    if (imageSizeMB > 20) {
+      throw new Error(`Image too large: ${imageSizeMB.toFixed(2)} MB (max 20 MB)`);
+    }
+    
     console.log('[Contextual Analysis] Sending request to Gemini...');
     const result = await model.generateContent([
       {
@@ -399,10 +407,12 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('[Contextual Analysis] Error:', error);
+    console.error('[Contextual Analysis] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
       { 
         error: 'Contextual analysis failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     );
