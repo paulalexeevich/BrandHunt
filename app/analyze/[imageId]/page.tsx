@@ -2316,47 +2316,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       </button>
                     )}
                     
-                    {/* Visual Match Button - Shows when there are 2+ identical/almost_same matches after AI Filter */}
-                    {filteredCount !== null && matchStatusCounts && (matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 ? (
-                      <button
-                        onClick={handleVisualMatch}
-                        disabled={visualMatching}
-                        className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2 shadow-md"
-                      >
-                        {visualMatching ? (
-                          <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            Visual Matching...
-                          </>
-                        ) : (
-                          <>
-                            🎯 Visual Match Selection
-                            <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                              {matchStatusCounts.identical + matchStatusCounts.almostSame} candidates
-                            </span>
-                          </>
-                        )}
-                      </button>
-                    ) : filteredCount !== null && matchStatusCounts && (
-                      // Debug info: Show why button isn't appearing
-                      <div className="w-full px-4 py-3 bg-blue-50 border-2 border-blue-200 rounded-lg text-sm">
-                        <p className="font-semibold text-blue-900 mb-1">🎯 Visual Match Selection</p>
-                        <p className="text-blue-700 text-xs">
-                          {(matchStatusCounts.identical + matchStatusCounts.almostSame) === 0 ? (
-                            <>No identical or almost_same matches found. Need at least 2 candidates for visual matching.</>
-                          ) : (matchStatusCounts.identical + matchStatusCounts.almostSame) === 1 ? (
-                            <>Only 1 candidate found - auto-selected, no visual matching needed.</>
-                          ) : (
-                            <>Ready! Found {matchStatusCounts.identical + matchStatusCounts.almostSame} candidates.</>
-                          )}
-                        </p>
-                        {(matchStatusCounts.identical + matchStatusCounts.almostSame) < 2 && (
-                          <p className="text-blue-600 text-xs mt-2 italic">
-                            Tip: AI Filter needs to find multiple similar matches for visual selection to be useful.
-                          </p>
-                        )}
-                      </div>
-                    )}
                     </div>
 
                   {/* FoodGraph Results */}
@@ -2426,6 +2385,29 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                   {showNoMatch ? '👁️' : ''} No Match: {foodgraphResults.length - matchStatusCounts.identical - matchStatusCounts.almostSame} {!showNoMatch && '(hidden)'}
                                 </span>
                               </div>
+                              
+                              {/* Visual Match Button - Right below the status counts */}
+                              {(matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 && (
+                                <button
+                                  onClick={handleVisualMatch}
+                                  disabled={visualMatching}
+                                  className="w-full mt-3 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2 shadow-md"
+                                >
+                                  {visualMatching ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      Visual Matching...
+                                    </>
+                                  ) : (
+                                    <>
+                                      🎯 Run Visual Match Selection
+                                      <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                                        {matchStatusCounts.identical + matchStatusCounts.almostSame} candidates
+                                      </span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
