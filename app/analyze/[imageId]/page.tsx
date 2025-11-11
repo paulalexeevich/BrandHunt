@@ -220,7 +220,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 d.id === detection.id ? { ...d, foodgraph_results: data.results } : d
               ));
               
-              if (data.results && data.results.length > 0) {
+              // ALWAYS set state, even for 0 results (NO MATCH case)
+              if (data.results) {
                 setFoodgraphResults(data.results);
                 const hasFilteredResults = data.results.some((r: any) => r.hasOwnProperty('is_match'));
                 if (hasFilteredResults) {
@@ -1929,7 +1930,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </div>
 
                   {/* FoodGraph Results */}
-                  {foodgraphResults.length > 0 && (
+                  {(foodgraphResults.length > 0 || (detection.fully_analyzed && preFilteredCount !== null)) && (
                     <div>
                       {/* Show banner for saved products indicating which was selected */}
                       {detection.fully_analyzed && detection.selected_foodgraph_result_id && (
@@ -2169,6 +2170,27 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           const resultsToShow = filteredCount !== null
                             ? filteredResults // Show all (already sorted by confidence from backend)
                             : filteredResults.slice(0, 50);
+                          
+                          // Show empty state message if no results
+                          if (resultsToShow.length === 0) {
+                            return (
+                              <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 text-center">
+                                <div className="text-4xl mb-3">🔍</div>
+                                <p className="text-lg font-semibold text-yellow-900 mb-2">No FoodGraph Results Found</p>
+                                <p className="text-sm text-yellow-800">
+                                  {stageFilter !== 'all' 
+                                    ? `No results match the selected filter stage (${stageFilter}).` 
+                                    : 'The search completed but found no matching products in the FoodGraph database.'
+                                  }
+                                </p>
+                                {detection.fully_analyzed && (
+                                  <div className="mt-3 text-xs text-yellow-700 bg-yellow-100 px-3 py-2 rounded inline-block">
+                                    ✓ Processing Complete - No Match Found
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
                           
                           return resultsToShow.map((result, index) => {
                             const isSaved = detection.selected_foodgraph_result_id === result.id;
