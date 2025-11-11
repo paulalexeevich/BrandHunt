@@ -1008,9 +1008,9 @@ export default function ProjectViewPage() {
                 <p className="text-sm text-gray-900 font-semibold mb-1">About Batch Processing:</p>
                 <ul className="text-xs text-gray-700 space-y-1">
                   <li><strong>Batch Detect:</strong> Uses YOLO API for ultra-fast detection (~0.6s per image, 10 images in parallel)</li>
-                  <li><strong>Batch Extract:</strong> Extracts brand, name, and description from detected products (15 images in parallel, unlimited detections per image)</li>
-                  <li><strong>Gemini Rate Limit:</strong> 2000 requests/min - optimized for 50-150 concurrent extraction calls</li>
-                  <li><strong>Parallel Processing:</strong> Multiple images processed simultaneously - 20x faster than sequential</li>
+                  <li><strong>Batch Extract:</strong> Detection-level parallelism - processes 150 detections simultaneously across all images</li>
+                  <li><strong>Gemini Rate Limit:</strong> 2000 requests/min - using ~1500 RPM with 150 concurrent detections (10x faster!)</li>
+                  <li><strong>Performance:</strong> ~1382 detections complete in 60-90 seconds with real-time progress updates</li>
                 </ul>
               </div>
             </div>
