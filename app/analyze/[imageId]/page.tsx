@@ -1953,11 +1953,24 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       {/* Show current stage info */}
                       {(() => {
                         // Calculate counts for each stage
+                        // NOTE: With UPSERT pattern, results progress through stages by updating processing_stage field
+                        // So we need to count cumulatively for pipeline display
+                        const searchCount = foodgraphResults.filter(r => r.processing_stage === 'search').length;
+                        const preFilterCount = foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length;
+                        const aiFilterCount = foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length;
+                        
                         const stageStats = {
                           all: foodgraphResults.length,
-                          search: foodgraphResults.filter(r => r.processing_stage === 'search').length,
-                          pre_filter: foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length,
-                          ai_filter: foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length
+                          search: searchCount,  // For filter button: results still at search stage
+                          pre_filter: preFilterCount,  // For filter button: results at pre-filter stage
+                          ai_filter: aiFilterCount  // For filter button: results at AI filter stage
+                        };
+                        
+                        // For pipeline display: show cumulative progress
+                        const pipelineStats = {
+                          returned: searchCount + preFilterCount + aiFilterCount,  // Total initial FoodGraph results
+                          preFiltered: preFilterCount + aiFilterCount,  // Results that passed pre-filter (≥85%)
+                          aiAnalyzed: aiFilterCount  // Results that passed AI filter
                         };
                         
                         // Get current filtered count
@@ -1982,7 +1995,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               }
                             </h4>
                             <p className="text-xs text-gray-600">
-                              Pipeline: FoodGraph returned {stageStats.search} → Pre-filter selected {stageStats.pre_filter} (≥85%) → AI analyzed {stageStats.ai_filter}
+                              Pipeline: FoodGraph returned {pipelineStats.returned} → Pre-filter selected {pipelineStats.preFiltered} (≥85%) → AI analyzed {pipelineStats.aiAnalyzed}
                             </p>
                           </div>
                         );
