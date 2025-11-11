@@ -124,7 +124,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     natural: { width: number; height: number };
     displayed: { width: number; height: number };
   } | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'details_clear' | 'details_partial' | 'details_none' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'details_clear' | 'details_partial' | 'details_none' | 'not_identified' | 'one_match' | 'pending_save' | 'no_match' | 'multiple_matches'>('all');
   const [isFetching, setIsFetching] = useState(false);
   
   // Contextual analysis state
@@ -1474,18 +1474,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             !d.brand_name
           ).length;
           
-          // Products with a selected match OR exactly 1 FoodGraph result (ONE Match)
-          const validWithMatch = detections.filter(d => {
-            // Already has a selected match
-            if (d.fully_analyzed === true || (d.selected_foodgraph_gtin && d.selected_foodgraph_gtin.trim() !== '')) {
-              return true;
-            }
-            // Has extraction and exactly 1 FoodGraph result (auto-match)
-            if (d.brand_name && d.foodgraph_results && d.foodgraph_results.length === 1) {
-              return true;
-            }
-            return false;
-          }).length;
+          // Products that are SAVED (fully analyzed with selected match)
+          const savedProducts = detections.filter(d => 
+            d.fully_analyzed === true || (d.selected_foodgraph_gtin && d.selected_foodgraph_gtin.trim() !== '')
+          ).length;
           
           // Products with extraction but no FoodGraph results found
           const validNoMatch = detections.filter(d => 
@@ -1503,13 +1495,22 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             d.foodgraph_results && 
             d.foodgraph_results.length >= 2
           ).length;
+          
+          // Products with extraction and exactly 1 FoodGraph result (pending save)
+          const pendingSave = detections.filter(d => 
+            d.brand_name && 
+            !d.fully_analyzed && 
+            !d.selected_foodgraph_gtin &&
+            d.foodgraph_results && 
+            d.foodgraph_results.length === 1
+          ).length;
 
           return (
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-md p-6 mb-6 border border-indigo-100">
               <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                 📊 Product Statistics
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {/* Total Products */}
                 <button
                   onClick={() => setActiveFilter('all')}
@@ -1546,17 +1547,31 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   {activeFilter === 'not_identified' && <div className="text-xs text-gray-900 font-semibold mt-1">● Active</div>}
                 </button>
 
-                {/* Valid with ONE Match */}
+                {/* SAVED Products */}
                 <button
                   onClick={() => setActiveFilter('one_match')}
                   className={`bg-green-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
                     activeFilter === 'one_match' ? 'border-green-900 ring-2 ring-green-900' : 'border-green-200'
                   }`}
                 >
-                  <div className="text-2xl font-bold text-green-700">{validWithMatch}</div>
-                  <div className="text-xs text-green-600 mt-1">✓ ONE Match</div>
+                  <div className="text-2xl font-bold text-green-700">{savedProducts}</div>
+                  <div className="text-xs text-green-600 mt-1">✓ Saved</div>
                   {activeFilter === 'one_match' && <div className="text-xs text-green-900 font-semibold mt-1">● Active</div>}
                 </button>
+
+                {/* Pending Save (1 match not saved yet) */}
+                {pendingSave > 0 && (
+                  <button
+                    onClick={() => setActiveFilter('pending_save')}
+                    className={`bg-blue-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                      activeFilter === 'pending_save' ? 'border-blue-900 ring-2 ring-blue-900' : 'border-blue-200'
+                    }`}
+                  >
+                    <div className="text-2xl font-bold text-blue-700">{pendingSave}</div>
+                    <div className="text-xs text-blue-600 mt-1">Pending Save</div>
+                    {activeFilter === 'pending_save' && <div className="text-xs text-blue-900 font-semibold mt-1">● Active</div>}
+                  </button>
+                )}
 
                 {/* Valid NO Match */}
                 <button
@@ -1587,14 +1602,14 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               <div className="mt-4">
                 <div className="flex justify-between text-xs text-gray-600 mb-1">
                   <span>Processing Progress</span>
-                  <span>{validWithMatch} / {totalProducts} Completed ({Math.round((validWithMatch / totalProducts) * 100)}%)</span>
+                  <span>{savedProducts} / {totalProducts} Saved ({Math.round((savedProducts / totalProducts) * 100)}%)</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-1"
-                    style={{ width: `${(validWithMatch / totalProducts) * 100}%` }}
+                    style={{ width: `${(savedProducts / totalProducts) * 100}%` }}
                   >
-                    {validWithMatch > 0 && (
+                    {savedProducts > 0 && (
                       <span className="text-[10px] font-bold text-white">✓</span>
                     )}
                   </div>
@@ -1620,14 +1635,16 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                          !detection.brand_name;
                 }
                 if (activeFilter === 'one_match') {
-                  // Has a selected match OR exactly 1 FoodGraph result
-                  if (detection.fully_analyzed === true || (detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '')) {
-                    return true;
-                  }
-                  if (detection.brand_name && detection.foodgraph_results && detection.foodgraph_results.length === 1) {
-                    return true;
-                  }
-                  return false;
+                  // SAVED products only
+                  return detection.fully_analyzed === true || (detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '');
+                }
+                if (activeFilter === 'pending_save') {
+                  // Products with exactly 1 FoodGraph result but not saved yet
+                  return detection.brand_name && 
+                         !detection.fully_analyzed && 
+                         !detection.selected_foodgraph_gtin &&
+                         detection.foodgraph_results && 
+                         detection.foodgraph_results.length === 1;
                 }
                 if (activeFilter === 'no_match') {
                   return detection.brand_name && 
@@ -1651,7 +1668,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 'details_partial': 'Details: Partial',
                 'details_none': 'Details: None',
                 'not_identified': 'Not Identified',
-                'one_match': '✓ ONE Match',
+                'one_match': '✓ Saved',
+                'pending_save': 'Pending Save',
                 'no_match': 'NO Match',
                 'multiple_matches': '2+ Matches'
               };
@@ -1663,6 +1681,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 'details_none': 'bg-orange-100 border-orange-300 text-orange-900',
                 'not_identified': 'bg-gray-100 border-gray-300 text-gray-900',
                 'one_match': 'bg-green-100 border-green-300 text-green-900',
+                'pending_save': 'bg-blue-100 border-blue-300 text-blue-900',
                 'no_match': 'bg-yellow-100 border-yellow-300 text-yellow-900',
                 'multiple_matches': 'bg-purple-100 border-purple-300 text-purple-900'
               };
@@ -1703,14 +1722,16 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                          !detection.brand_name;
                 }
                 if (activeFilter === 'one_match') {
-                  // Has a selected match OR exactly 1 FoodGraph result
-                  if (detection.fully_analyzed === true || (detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '')) {
-                    return true;
-                  }
-                  if (detection.brand_name && detection.foodgraph_results && detection.foodgraph_results.length === 1) {
-                    return true;
-                  }
-                  return false;
+                  // SAVED products only
+                  return detection.fully_analyzed === true || (detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '');
+                }
+                if (activeFilter === 'pending_save') {
+                  // Products with exactly 1 FoodGraph result but not saved yet
+                  return detection.brand_name && 
+                         !detection.fully_analyzed && 
+                         !detection.selected_foodgraph_gtin &&
+                         detection.foodgraph_results && 
+                         detection.foodgraph_results.length === 1;
                 }
                 if (activeFilter === 'no_match') {
                   return detection.brand_name && 
