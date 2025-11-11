@@ -273,19 +273,36 @@ export default function ProjectViewPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Batch detection failed');
+        throw new Error(result.details || result.error || 'Batch detection failed');
       }
 
-      setBatchProgress(`✅ Completed: ${result.summary.successful} successful, ${result.summary.totalDetections} products detected`);
+      // Show detailed results
+      const { summary, results } = result;
+      const failedImages = results?.filter((r: any) => r.status === 'error') || [];
+      
+      let progressMsg = `✅ Completed: ${summary.successful}/${summary.total} images successful, ${summary.totalDetections} products detected`;
+      
+      if (summary.failed > 0) {
+        progressMsg += `\n\n❌ ${summary.failed} Failed:\n`;
+        failedImages.forEach((img: any) => {
+          progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
+        });
+      }
+      
+      setBatchProgress(progressMsg);
       
       // Refresh project data
       await fetchProjectData();
       
-      setTimeout(() => setBatchProgress(''), 5000);
+      // Keep success messages for 5s, keep error messages indefinitely
+      if (summary.failed === 0) {
+        setTimeout(() => setBatchProgress(''), 5000);
+      }
     } catch (error) {
       console.error('Batch detection error:', error);
-      setBatchProgress(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setTimeout(() => setBatchProgress(''), 5000);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      setBatchProgress(`❌ Batch Detection Failed:\n${errorMsg}\n\nCheck browser console (F12) for details.`);
+      // Keep error messages visible - don't auto-hide
     } finally {
       setBatchDetecting(false);
     }
@@ -313,19 +330,36 @@ export default function ProjectViewPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Batch extraction failed');
+        throw new Error(result.details || result.error || 'Batch extraction failed');
       }
 
-      setBatchProgress(`✅ Completed: ${result.summary.successful} images, ${result.summary.totalDetections} products processed`);
+      // Show detailed results
+      const { summary, results } = result;
+      const failedImages = results?.filter((r: any) => r.status === 'error') || [];
+      
+      let progressMsg = `✅ Completed: ${summary.successful}/${summary.total} images successful, ${summary.totalDetections} products extracted`;
+      
+      if (summary.failed > 0) {
+        progressMsg += `\n\n❌ ${summary.failed} Failed:\n`;
+        failedImages.forEach((img: any) => {
+          progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
+        });
+      }
+      
+      setBatchProgress(progressMsg);
       
       // Refresh project data
       await fetchProjectData();
       
-      setTimeout(() => setBatchProgress(''), 5000);
+      // Keep success messages for 5s, keep error messages indefinitely
+      if (summary.failed === 0) {
+        setTimeout(() => setBatchProgress(''), 5000);
+      }
     } catch (error) {
       console.error('Batch extraction error:', error);
-      setBatchProgress(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setTimeout(() => setBatchProgress(''), 5000);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      setBatchProgress(`❌ Batch Extraction Failed:\n${errorMsg}\n\nCheck browser console (F12) for details.`);
+      // Keep error messages visible - don't auto-hide
     } finally {
       setBatchExtracting(false);
     }
@@ -754,20 +788,28 @@ export default function ProjectViewPage() {
                   batchProgress.includes('❌') ? 'bg-red-50 border border-red-200' :
                   'bg-blue-50 border border-blue-200'
                 }`}>
-                  <p className={`text-sm font-medium ${
+                  <p className={`text-sm font-medium whitespace-pre-line ${
                     batchProgress.includes('✅') ? 'text-green-900' :
                     batchProgress.includes('❌') ? 'text-red-900' :
                     'text-blue-900'
                   }`}>
                     {batchProgress}
                   </p>
+                  {batchProgress.includes('❌') && (
+                    <button
+                      onClick={() => setBatchProgress('')}
+                      className="mt-3 px-3 py-1 bg-white border border-gray-300 rounded text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Dismiss
+                    </button>
+                  )}
                 </div>
               )}
               <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                 <p className="text-sm text-gray-900 font-semibold mb-1">About Batch Processing:</p>
                 <ul className="text-xs text-gray-700 space-y-1">
-                  <li><strong>Batch Detect:</strong> Uses YOLO API for ultra-fast detection (~0.6s per image, 3 at a time)</li>
-                  <li><strong>Batch Extract:</strong> Extracts brand, name, and description from detected products (2 images at a time)</li>
+                  <li><strong>Batch Detect:</strong> Uses YOLO API for ultra-fast detection (~0.6s per image, 10 images in parallel)</li>
+                  <li><strong>Batch Extract:</strong> Extracts brand, name, and description from detected products (5 images in parallel)</li>
                   <li><strong>Parallel Processing:</strong> Multiple images processed simultaneously - 17x faster than sequential</li>
                 </ul>
               </div>
