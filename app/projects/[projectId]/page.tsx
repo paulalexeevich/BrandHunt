@@ -483,15 +483,27 @@ export default function ProjectViewPage() {
                   `✅ ${data.successful} images successful, ❌ ${data.failed} failed`
                 );
               } else if (data.type === 'complete') {
-                const failedImages = data.results?.filter((r: any) => r.status === 'error') || [];
+                // Handle both old format (images) and new format (detections)
+                const isDetectionLevel = data.summary.totalDetections !== undefined;
                 
-                let progressMsg = `✅ Completed: ${data.summary.successful}/${data.summary.total} images successful, ${data.summary.totalDetections} products extracted`;
-                
-                if (data.summary.failed > 0) {
-                  progressMsg += `\n\n❌ ${data.summary.failed} Failed:\n`;
-                  failedImages.forEach((img: any) => {
-                    progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
-                  });
+                let progressMsg;
+                if (isDetectionLevel) {
+                  // New detection-level format
+                  progressMsg = `✅ Completed: ${data.summary.successful}/${data.summary.totalDetections} detections successful`;
+                  if (data.summary.failed > 0) {
+                    progressMsg += ` (${data.summary.failed} failed)`;
+                  }
+                } else {
+                  // Old image-level format
+                  const failedImages = data.results?.filter((r: any) => r.status === 'error') || [];
+                  progressMsg = `✅ Completed: ${data.summary.successful}/${data.summary.total} images successful, ${data.summary.totalDetections} products extracted`;
+                  
+                  if (data.summary.failed > 0) {
+                    progressMsg += `\n\n❌ ${data.summary.failed} Failed:\n`;
+                    failedImages.forEach((img: any) => {
+                      progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
+                    });
+                  }
                 }
                 
                 setBatchProgress(progressMsg);
