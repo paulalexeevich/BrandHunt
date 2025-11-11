@@ -252,7 +252,7 @@ Return JSON only:
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { detectionId, expandedCropBase64, promptVersion = 'v1', minNeighbors = 3 } = body;
+    const { detectionId, expandedCropBase64, promptVersion = 'v1', minNeighbors = 3, saveResults = false } = body;
     
     if (!detectionId || !expandedCropBase64) {
       return NextResponse.json({ 
@@ -311,8 +311,66 @@ export async function POST(request: NextRequest) {
     
     console.log('[Contextual Analysis] Gemini response:', analysis);
     
+    // Optionally save results to database
+    if (saveResults && !analysis.parse_error) {
+      console.log('[Contextual Analysis] Saving results to database...');
+      
+      const updateData: any = {
+        contextual_prompt_version: promptVersion,
+        contextual_analyzed_at: new Date().toISOString(),
+        contextual_left_neighbor_count: left.length,
+        contextual_right_neighbor_count: right.length,
+      };
+      
+      // Handle different prompt response formats
+      if (analysis.inferred_brand || analysis.brand) {
+        updateData.contextual_brand = analysis.inferred_brand || analysis.brand;
+        updateData.contextual_brand_confidence = analysis.brand_confidence;
+        updateData.contextual_brand_reasoning = analysis.brand_reasoning || analysis.brand_method || analysis.reasoning;
+      }
+      
+      if (analysis.inferred_size || analysis.size) {
+        updateData.contextual_size = analysis.inferred_size || analysis.size;
+        updateData.contextual_size_confidence = analysis.size_confidence;
+        updateData.contextual_size_reasoning = analysis.size_reasoning || analysis.size_method;
+      }
+      
+      if (analysis.visual_similarity) {
+        updateData.contextual_visual_similarity_left = analysis.visual_similarity.left_similarity || analysis.left_neighbor_similarity;
+        updateData.contextual_visual_similarity_right = analysis.visual_similarity.right_similarity || analysis.right_neighbor_similarity;
+      } else {
+        // Handle flat structure (v3 prompt)
+        if (analysis.left_neighbor_similarity !== undefined) {
+          updateData.contextual_visual_similarity_left = analysis.left_neighbor_similarity;
+        }
+        if (analysis.right_neighbor_similarity !== undefined) {
+          updateData.contextual_visual_similarity_right = analysis.right_neighbor_similarity;
+        }
+      }
+      
+      if (analysis.overall_confidence !== undefined) {
+        updateData.contextual_overall_confidence = analysis.overall_confidence;
+      }
+      
+      if (analysis.notes || analysis.explanation) {
+        updateData.contextual_notes = analysis.notes || analysis.explanation;
+      }
+      
+      const { error: updateError } = await supabase
+        .from('branghunt_detections')
+        .update(updateData)
+        .eq('id', detectionId);
+      
+      if (updateError) {
+        console.error('[Contextual Analysis] Failed to save results:', updateError);
+      } else {
+        console.log('[Contextual Analysis] Results saved successfully');
+      }
+    }
+    
     return NextResponse.json({
       success: true,
+      saved: saveResults && !analysis.parse_error,
       detection: {
         id: detection.id,
         detection_index: detection.detection_index,

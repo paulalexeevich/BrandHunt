@@ -130,6 +130,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [analyzingContext, setAnalyzingContext] = useState(false);
   const [contextPromptVersion, setContextPromptVersion] = useState('v1');
   const [showContextAnalysis, setShowContextAnalysis] = useState(false);
+  const [contextSaveResults, setContextSaveResults] = useState(true);
 
   useEffect(() => {
     fetchImage();
@@ -556,7 +557,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           detectionId,
           expandedCropBase64,
           promptVersion: contextPromptVersion,
-          minNeighbors: 3
+          minNeighbors: 3,
+          saveResults: contextSaveResults
         }),
       });
 
@@ -1962,18 +1964,33 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               <strong>How it works:</strong> Analyzes a larger shelf area including 3+ products on each side. 
                               Gemini uses visual patterns and neighbor context to predict brand/size when labels are partially hidden.
                             </p>
-                            <div className="mt-3 flex items-center gap-2">
-                              <label className="text-xs font-semibold text-gray-700">Prompt Version:</label>
-                              <select
-                                value={contextPromptVersion}
-                                onChange={(e) => setContextPromptVersion(e.target.value)}
-                                className="px-2 py-1 border border-gray-300 rounded text-xs"
-                                disabled={analyzingContext}
-                              >
-                                <option value="v1">V1 - Detailed Context</option>
-                                <option value="v2">V2 - Strategy-Based</option>
-                                <option value="v3">V3 - Concise</option>
-                              </select>
+                            <div className="mt-3 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <label className="text-xs font-semibold text-gray-700">Prompt Version:</label>
+                                <select
+                                  value={contextPromptVersion}
+                                  onChange={(e) => setContextPromptVersion(e.target.value)}
+                                  className="px-2 py-1 border border-gray-300 rounded text-xs"
+                                  disabled={analyzingContext}
+                                >
+                                  <option value="v1">V1 - Detailed Context</option>
+                                  <option value="v2">V2 - Strategy-Based</option>
+                                  <option value="v3">V3 - Concise</option>
+                                </select>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id="contextSaveResults"
+                                  checked={contextSaveResults}
+                                  onChange={(e) => setContextSaveResults(e.target.checked)}
+                                  disabled={analyzingContext}
+                                  className="rounded border-gray-300"
+                                />
+                                <label htmlFor="contextSaveResults" className="text-xs text-gray-700">
+                                  Save results to database
+                                </label>
+                              </div>
                             </div>
                           </div>
                           
@@ -1995,6 +2012,21 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           {/* Contextual Analysis Results */}
                           {contextualAnalysis && (
                             <div className="space-y-3">
+                              {/* Saved Success Message */}
+                              {contextualAnalysis.saved && (
+                                <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded">
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle className="w-4 h-4 text-green-600" />
+                                    <p className="text-sm font-semibold text-green-800">
+                                      Results saved to database
+                                    </p>
+                                  </div>
+                                  <p className="text-xs text-green-700 mt-1">
+                                    Contextual analysis results have been stored and can be accessed later.
+                                  </p>
+                                </div>
+                              )}
+                              
                               {/* Expanded Crop Preview */}
                               {contextualAnalysis.expanded_crop_preview && (
                                 <div className="p-3 bg-white rounded border border-orange-200">
