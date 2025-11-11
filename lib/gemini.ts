@@ -10,7 +10,10 @@ Analyze this image and extract product information.
 
 FIRST, determine classification:
 1. Is this actually a product? (vs shelf fixture, price tag, empty space, or non-product item)
-2. Are product details clearly visible? (can you read brand, product name, or other text?)
+2. What is the visibility level of product details?
+   - "clear": All CRITICAL details are clearly visible and readable (brand, product name, flavor)
+   - "partial": Some details visible but not all critical information can be extracted
+   - "none": No product details are visible (too far, blurry, obstructed, or angle prevents reading)
 
 THEN, extract the following information:
 1. Brand name (manufacturer/brand, e.g., "Tru Fru", "Reese's", "bettergoods")
@@ -32,8 +35,8 @@ For EACH extracted field, provide a confidence score from 0.0 to 1.0:
 Return a JSON object with this EXACT structure:
 {
   "isProduct": true or false,
-  "detailsVisible": true or false,
-  "extractionNotes": "Brief note explaining classification or extraction issues (e.g., 'Not a product - price tag only', 'Product too far/blurry', 'Clear view of all details')",
+  "detailsVisible": "clear" or "partial" or "none",
+  "extractionNotes": "Brief note explaining classification or extraction issues (e.g., 'Not a product - price tag only', 'Product too far/blurry', 'All critical details clearly visible')",
   "brand": "brand name or Unknown",
   "brandConfidence": 0.0 to 1.0,
   "productName": "full product name or Unknown",
@@ -51,8 +54,10 @@ Return a JSON object with this EXACT structure:
 }
 
 Important Guidelines:
-- If isProduct = false, set all confidence scores to 0.0 and all fields to "Unknown"
-- If detailsVisible = false, you can still set isProduct = true, but confidence scores should be low (0.0-0.4)
+- If isProduct = false, set detailsVisible = "none", all confidence scores to 0.0, and all fields to "Unknown"
+- If detailsVisible = "clear", confidence scores for critical fields (brand, productName, flavor) should be high (0.7-1.0)
+- If detailsVisible = "partial", some confidence scores may be moderate (0.4-0.7) but not all critical fields are complete
+- If detailsVisible = "none", all confidence scores should be very low (0.0-0.3)
 - Use Unknown for any field you cannot determine
 - Be honest about confidence - lower scores for partially visible or unclear text
 
