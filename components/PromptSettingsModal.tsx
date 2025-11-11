@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Save, RotateCcw, History } from 'lucide-react';
-import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT } from '@/lib/gemini';
+import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT } from '@/lib/default-prompts';
 
 interface PromptTemplate {
   id: string;
