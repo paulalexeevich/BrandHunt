@@ -470,6 +470,9 @@ export async function POST(request: NextRequest) {
             });
 
             // UPSERT AI-filtered results (updates existing rows from pre-filter stage)
+            console.log(`    🔍 DEBUG: About to UPSERT ${aiFilterInserts.length} AI-filtered results for detection ${detection.id}`);
+            console.log(`    🔍 DEBUG: First result GTIN: ${aiFilterInserts[0]?.product_gtin}, processing_stage: ${aiFilterInserts[0]?.processing_stage}`);
+            
             const { error: aiFilterInsertError, data: aiFilterInsertData } = await supabase
               .from('branghunt_foodgraph_results')
               .upsert(aiFilterInserts, {
@@ -495,6 +498,20 @@ export async function POST(request: NextRequest) {
             } else {
               console.log(`    ✅ Saved ${aiFilterInserts.length} AI-filtered results to database`);
               console.log(`    📊 Insert confirmation: ${aiFilterInsertData?.length || 0} rows inserted`);
+              console.log(`    🔍 DEBUG: Inserted rows GTINs: ${aiFilterInsertData?.map((r: any) => r.product_gtin).join(', ')}`);
+              
+              // VERIFY: Query back the results immediately to confirm they're in DB
+              const { data: verifyData, error: verifyError } = await supabase
+                .from('branghunt_foodgraph_results')
+                .select('product_gtin, processing_stage')
+                .eq('detection_id', detection.id);
+              
+              console.log(`    🔍 DEBUG: VERIFICATION QUERY for detection ${detection.id}:`);
+              console.log(`    🔍 DEBUG: Found ${verifyData?.length || 0} rows in database`);
+              if (verifyError) {
+                console.error(`    🔍 DEBUG: Verification query error:`, verifyError);
+              }
+              
               console.log(`    📊 Total results in DB for this detection: ${searchInserts.length} search + ${preFilterInserts.length} pre-filter + ${aiFilterInserts.length} AI-filter`);
               
               // Send progress update with all save counts
