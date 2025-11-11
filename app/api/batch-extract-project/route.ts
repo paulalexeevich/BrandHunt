@@ -20,7 +20,7 @@ interface ExtractionResult {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { projectId, concurrency = 2 } = await request.json();
+    const { projectId, concurrency = 5 } = await request.json();
 
     if (!projectId) {
       return NextResponse.json({ 

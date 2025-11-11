@@ -45,7 +45,7 @@ interface DetectionResult {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { projectId, concurrency = 3 } = await request.json();
+    const { projectId, concurrency = 10 } = await request.json();
 
     if (!projectId) {
       return NextResponse.json({ 

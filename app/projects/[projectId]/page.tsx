@@ -265,7 +265,7 @@ export default function ProjectViewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           projectId,
-          concurrency: 3 // Process 3 images at a time
+          concurrency: 10 // Process 10 images at a time for faster batch processing
         }),
         credentials: 'include'
       });
@@ -305,7 +305,7 @@ export default function ProjectViewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           projectId,
-          concurrency: 2 // Process 2 images at a time
+          concurrency: 5 // Process 5 images at a time (detections within each image are processed in parallel)
         }),
         credentials: 'include'
       });
