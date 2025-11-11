@@ -330,33 +330,67 @@ export default function ProjectViewPage() {
         credentials: 'include'
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
+        const result = await response.json();
         throw new Error(result.details || result.error || 'Batch detection failed');
       }
 
-      // Show detailed results
-      const { summary, results } = result;
-      const failedImages = results?.filter((r: any) => r.status === 'error') || [];
-      
-      let progressMsg = `✅ Completed: ${summary.successful}/${summary.total} images successful, ${summary.totalDetections} products detected`;
-      
-      if (summary.failed > 0) {
-        progressMsg += `\n\n❌ ${summary.failed} Failed:\n`;
-        failedImages.forEach((img: any) => {
-          progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
-        });
+      // Handle Server-Sent Events stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Failed to get response stream');
       }
-      
-      setBatchProgress(progressMsg);
-      
-      // Refresh project data
-      await fetchProjectData();
-      
-      // Keep success messages for 5s, keep error messages indefinitely
-      if (summary.failed === 0) {
-        setTimeout(() => setBatchProgress(''), 5000);
+
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+            
+            if (data.type === 'start') {
+              setBatchProgress(`🚀 Starting: ${data.total} images to process...`);
+            } else if (data.type === 'progress') {
+              setBatchProgress(
+                `⚡ Processing: ${data.processed}/${data.total} images\n` +
+                `✅ ${data.successful} successful, ❌ ${data.failed} failed\n` +
+                `📦 ${data.totalDetections} products detected so far`
+              );
+            } else if (data.type === 'complete') {
+              const failedImages = data.results?.filter((r: any) => r.status === 'error') || [];
+              
+              let progressMsg = `✅ Completed: ${data.summary.successful}/${data.summary.total} images successful, ${data.summary.totalDetections} products detected`;
+              
+              if (data.summary.failed > 0) {
+                progressMsg += `\n\n❌ ${data.summary.failed} Failed:\n`;
+                failedImages.forEach((img: any) => {
+                  progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
+                });
+              }
+              
+              setBatchProgress(progressMsg);
+              
+              // Refresh project data
+              await fetchProjectData();
+              
+              // Keep success messages for 5s, keep error messages indefinitely
+              if (data.summary.failed === 0) {
+                setTimeout(() => setBatchProgress(''), 5000);
+              }
+            } else if (data.type === 'error') {
+              throw new Error(data.details || data.error || 'Batch detection failed');
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Batch detection error:', error);
@@ -387,33 +421,66 @@ export default function ProjectViewPage() {
         credentials: 'include'
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
+        const result = await response.json();
         throw new Error(result.details || result.error || 'Batch extraction failed');
       }
 
-      // Show detailed results
-      const { summary, results } = result;
-      const failedImages = results?.filter((r: any) => r.status === 'error') || [];
-      
-      let progressMsg = `✅ Completed: ${summary.successful}/${summary.total} images successful, ${summary.totalDetections} products extracted`;
-      
-      if (summary.failed > 0) {
-        progressMsg += `\n\n❌ ${summary.failed} Failed:\n`;
-        failedImages.forEach((img: any) => {
-          progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
-        });
+      // Handle Server-Sent Events stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Failed to get response stream');
       }
-      
-      setBatchProgress(progressMsg);
-      
-      // Refresh project data
-      await fetchProjectData();
-      
-      // Keep success messages for 5s, keep error messages indefinitely
-      if (summary.failed === 0) {
-        setTimeout(() => setBatchProgress(''), 5000);
+
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+            
+            if (data.type === 'start') {
+              setBatchProgress(`🚀 Starting: ${data.totalDetections} detections to extract...`);
+            } else if (data.type === 'progress') {
+              setBatchProgress(
+                `⚡ Extracting: ${data.processedDetections}/${data.totalDetections} detections\n` +
+                `✅ ${data.successful} images successful, ❌ ${data.failed} failed`
+              );
+            } else if (data.type === 'complete') {
+              const failedImages = data.results?.filter((r: any) => r.status === 'error') || [];
+              
+              let progressMsg = `✅ Completed: ${data.summary.successful}/${data.summary.total} images successful, ${data.summary.totalDetections} products extracted`;
+              
+              if (data.summary.failed > 0) {
+                progressMsg += `\n\n❌ ${data.summary.failed} Failed:\n`;
+                failedImages.forEach((img: any) => {
+                  progressMsg += `• ${img.originalFilename}: ${img.error}\n`;
+                });
+              }
+              
+              setBatchProgress(progressMsg);
+              
+              // Refresh project data
+              await fetchProjectData();
+              
+              // Keep success messages for 5s, keep error messages indefinitely
+              if (data.summary.failed === 0) {
+                setTimeout(() => setBatchProgress(''), 5000);
+              }
+            } else if (data.type === 'error') {
+              throw new Error(data.details || data.error || 'Batch extraction failed');
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Batch extraction error:', error);

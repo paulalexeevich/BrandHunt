@@ -17,6 +17,7 @@ interface ExtractionResult {
  * POST /api/batch-extract-project
  * Extract product info (brand, name, description) from detected products across multiple images
  * Processes images in parallel with configurable concurrency
+ * Returns streaming progress updates
  */
 export async function POST(request: NextRequest) {
   try {
@@ -60,153 +61,220 @@ export async function POST(request: NextRequest) {
 
     console.log(`📸 Found ${images.length} images with detections for project ${projectId}`);
 
-    // Process images with controlled concurrency
-    const results: ExtractionResult[] = [];
-    
-    for (let i = 0; i < images.length; i += concurrency) {
-      const batch = images.slice(i, i + concurrency);
-      console.log(`\n📦 Processing batch ${Math.floor(i/concurrency) + 1}/${Math.ceil(images.length/concurrency)} (${batch.length} images)...`);
-      
-      const batchResults = await Promise.all(
-        batch.map(async (image) => {
-          const result: ExtractionResult = {
-            imageId: image.id,
-            originalFilename: image.original_filename,
-            status: 'error'
-          };
+    // First, count total detections to extract
+    let totalDetectionsToExtract = 0;
+    for (const image of images) {
+      const { data: detections } = await supabase
+        .from('branghunt_detections')
+        .select('id', { count: 'exact' })
+        .eq('image_id', image.id)
+        .is('brand_name', null)
+        .or('is_product.is.null,is_product.eq.true');
+      totalDetectionsToExtract += detections?.length || 0;
+    }
 
-          try {
-            console.log(`  📋 Extracting info from ${image.original_filename} (image_id: ${image.id})...`);
+    console.log(`📊 Total detections to extract: ${totalDetectionsToExtract}`);
+
+    // Create a streaming response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const sendProgress = (data: any) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
+
+        try {
+          // Send initial progress
+          sendProgress({
+            type: 'start',
+            totalDetections: totalDetectionsToExtract,
+            processedDetections: 0,
+            message: `Starting extraction for ${totalDetectionsToExtract} detections across ${images.length} images...`
+          });
+
+          // Process images with controlled concurrency
+          const results: ExtractionResult[] = [];
+          let processedDetectionsCount = 0;
+          
+          for (let i = 0; i < images.length; i += concurrency) {
+            const batch = images.slice(i, i + concurrency);
+            console.log(`\n📦 Processing batch ${Math.floor(i/concurrency) + 1}/${Math.ceil(images.length/concurrency)} (${batch.length} images)...`);
             
-            // Check authentication
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            console.log(`  🔵 Authenticated user: ${user?.id || 'NONE'}`);
-            if (authError) {
-              console.error(`  ❌ Auth error:`, authError);
-            }
+            const batchResults = await Promise.all(
+              batch.map(async (image) => {
+                const result: ExtractionResult = {
+                  imageId: image.id,
+                  originalFilename: image.original_filename,
+                  status: 'error'
+                };
 
-            // Fetch detections that don't have brand info yet
-            // SKIP products marked as is_product = false (not actual products)
-            // Include NULL values (not yet classified) and TRUE values (actual products)
-            console.log(`  🔵 Querying detections for image_id: ${image.id}`);
-            const { data: detections, error: detectionsError } = await supabase
-              .from('branghunt_detections')
-              .select('*')
-              .eq('image_id', image.id)
-              .is('brand_name', null)
-              .or('is_product.is.null,is_product.eq.true')  // Include NULL and TRUE, exclude FALSE
-              .order('detection_index');
-            
-            console.log(`  🔵 Detections query returned: ${detections?.length || 0} results, error: ${detectionsError ? 'YES' : 'NO'}`);
-
-            if (detectionsError) {
-              console.error(`  ❌ Error fetching detections:`, detectionsError);
-              throw new Error(`Failed to fetch detections: ${detectionsError.message}`);
-            }
-
-            console.log(`  🔍 Found ${detections?.length || 0} detections needing extraction for ${image.original_filename}`);
-
-            if (!detections || detections.length === 0) {
-              console.log(`  ℹ️  No unprocessed detections in ${image.original_filename} (all already have brand_name)`);
-              result.status = 'success';
-              result.processedDetections = 0;
-              return result;
-            }
-
-            console.log(`  📦 Extracting info for ${detections.length} detections in parallel...`);
-
-            // Process all detections in parallel (COPY OF WORKING CODE FROM batch-extract-info)
-            let successCount = 0;
-            const extractionResults = await Promise.all(
-              detections.map(async (detection) => {
                 try {
-                  console.log(`    [${detection.detection_index}] Extracting product info...`);
+                  console.log(`  📋 Extracting info from ${image.original_filename} (image_id: ${image.id})...`);
                   
-                  // Get image data (handles both S3 URLs and base64 storage) - SAME AS WORKING CODE
-                  const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
-                  const imageBase64 = await getImageBase64ForProcessing(image);
-                  const mimeType = getImageMimeType(image);
-                  
-                  const productInfo = await extractProductInfo(
-                    imageBase64,
-                    mimeType,
-                    detection.bounding_box
-                  );
-
-                  // Save to database immediately (SAME AS WORKING CODE)
-                  const { error: updateError } = await supabase
+                  // Fetch detections that don't have brand info yet
+                  // SKIP products marked as is_product = false (not actual products)
+                  // Include NULL values (not yet classified) and TRUE values (actual products)
+                  console.log(`  🔵 Querying detections for image_id: ${image.id}`);
+                  const { data: detections, error: detectionsError } = await supabase
                     .from('branghunt_detections')
-                    .update({
-                      // Classification fields
-                      is_product: productInfo.isProduct,
-                      extraction_notes: productInfo.extractionNotes || null,
-                      // Product fields
-                      brand_name: productInfo.brand,
-                      product_name: productInfo.productName,
-                      category: productInfo.category,
-                      flavor: productInfo.flavor,
-                      size: productInfo.size,
-                      // Confidence scores
-                      brand_confidence: productInfo.brandConfidence,
-                      product_name_confidence: productInfo.productNameConfidence,
-                      category_confidence: productInfo.categoryConfidence,
-                      flavor_confidence: productInfo.flavorConfidence,
-                      size_confidence: productInfo.sizeConfidence,
-                      // Metadata
-                      brand_extraction_response: JSON.stringify(productInfo),
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq('id', detection.id);
+                    .select('*')
+                    .eq('image_id', image.id)
+                    .is('brand_name', null)
+                    .or('is_product.is.null,is_product.eq.true')  // Include NULL and TRUE, exclude FALSE
+                    .order('detection_index');
+                  
+                  console.log(`  🔵 Detections query returned: ${detections?.length || 0} results, error: ${detectionsError ? 'YES' : 'NO'}`);
 
-                  if (updateError) {
-                    throw new Error(`Database update failed: ${updateError.message}`);
+                  if (detectionsError) {
+                    console.error(`  ❌ Error fetching detections:`, detectionsError);
+                    throw new Error(`Failed to fetch detections: ${detectionsError.message}`);
                   }
 
-                  console.log(`    ✅ [${detection.detection_index}] Info extracted and saved`);
-                  return { success: true };
+                  console.log(`  🔍 Found ${detections?.length || 0} detections needing extraction for ${image.original_filename}`);
+
+                  if (!detections || detections.length === 0) {
+                    console.log(`  ℹ️  No unprocessed detections in ${image.original_filename} (all already have brand_name)`);
+                    result.status = 'success';
+                    result.processedDetections = 0;
+                    return result;
+                  }
+
+                  console.log(`  📦 Extracting info for ${detections.length} detections in parallel...`);
+
+                  // Process all detections in parallel (COPY OF WORKING CODE FROM batch-extract-info)
+                  let successCount = 0;
+                  const extractionResults = await Promise.all(
+                    detections.map(async (detection) => {
+                      try {
+                        console.log(`    [${detection.detection_index}] Extracting product info...`);
+                        
+                        // Get image data (handles both S3 URLs and base64 storage) - SAME AS WORKING CODE
+                        const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
+                        const imageBase64 = await getImageBase64ForProcessing(image);
+                        const mimeType = getImageMimeType(image);
+                        
+                        const productInfo = await extractProductInfo(
+                          imageBase64,
+                          mimeType,
+                          detection.bounding_box
+                        );
+
+                        // Save to database immediately (SAME AS WORKING CODE)
+                        const { error: updateError } = await supabase
+                          .from('branghunt_detections')
+                          .update({
+                            // Classification fields
+                            is_product: productInfo.isProduct,
+                            extraction_notes: productInfo.extractionNotes || null,
+                            // Product fields
+                            brand_name: productInfo.brand,
+                            product_name: productInfo.productName,
+                            category: productInfo.category,
+                            flavor: productInfo.flavor,
+                            size: productInfo.size,
+                            // Confidence scores
+                            brand_confidence: productInfo.brandConfidence,
+                            product_name_confidence: productInfo.productNameConfidence,
+                            category_confidence: productInfo.categoryConfidence,
+                            flavor_confidence: productInfo.flavorConfidence,
+                            size_confidence: productInfo.sizeConfidence,
+                            // Metadata
+                            brand_extraction_response: JSON.stringify(productInfo),
+                            updated_at: new Date().toISOString()
+                          })
+                          .eq('id', detection.id);
+
+                        if (updateError) {
+                          throw new Error(`Database update failed: ${updateError.message}`);
+                        }
+
+                        console.log(`    ✅ [${detection.detection_index}] Info extracted and saved`);
+                        return { success: true };
+
+                      } catch (error) {
+                        console.error(`    ❌ [${detection.detection_index}] Error:`, error);
+                        return { success: false, error };
+                      }
+                    })
+                  );
+
+                  successCount = extractionResults.filter(r => r.success).length;
+                  console.log(`  ✅ Extracted info for ${successCount}/${detections.length} detections in ${image.original_filename}`);
+                  
+                  result.status = 'success';
+                  result.processedDetections = successCount;
+                  return result;
 
                 } catch (error) {
-                  console.error(`    ❌ [${detection.detection_index}] Error:`, error);
-                  return { success: false, error };
+                  console.error(`  ❌ Error processing ${image.original_filename}:`, error);
+                  result.error = error instanceof Error ? error.message : 'Unknown error';
+                  return result;
                 }
               })
             );
 
-            successCount = extractionResults.filter(r => r.success).length;
-            console.log(`  ✅ Extracted info for ${successCount}/${detections.length} detections in ${image.original_filename}`);
+            results.push(...batchResults);
             
-            result.status = 'success';
-            result.processedDetections = successCount;
-            return result;
+            // Update processed count
+            const batchDetections = batchResults.reduce((sum, r) => sum + (r.processedDetections || 0), 0);
+            processedDetectionsCount += batchDetections;
 
-          } catch (error) {
-            console.error(`  ❌ Error processing ${image.original_filename}:`, error);
-            result.error = error instanceof Error ? error.message : 'Unknown error';
-            return result;
+            // Send progress update after each batch
+            const successful = results.filter(r => r.status === 'success').length;
+            const failed = results.filter(r => r.status === 'error').length;
+
+            sendProgress({
+              type: 'progress',
+              totalDetections: totalDetectionsToExtract,
+              processedDetections: processedDetectionsCount,
+              successful,
+              failed,
+              message: `Processed ${processedDetectionsCount}/${totalDetectionsToExtract} detections (${successful} images successful, ${failed} failed)`
+            });
           }
-        })
-      );
 
-      results.push(...batchResults);
-    }
+          // Calculate final summary
+          const successful = results.filter(r => r.status === 'success').length;
+          const failed = results.filter(r => r.status === 'error').length;
+          const totalDetections = results.reduce((sum, r) => sum + (r.processedDetections || 0), 0);
 
-    // Calculate summary
-    const successful = results.filter(r => r.status === 'success').length;
-    const failed = results.filter(r => r.status === 'error').length;
-    const totalDetections = results.reduce((sum, r) => sum + (r.processedDetections || 0), 0);
+          console.log(`\n✅ Batch extraction complete: ${successful}/${results.length} images successful, ${failed} failed, ${totalDetections} total detections processed`);
+          console.log(`   Project: ${projectId}, Concurrency: ${concurrency}`);
 
-    console.log(`\n✅ Batch extraction complete: ${successful}/${results.length} images successful, ${failed} failed, ${totalDetections} total detections processed`);
-    console.log(`   Project: ${projectId}, Concurrency: ${concurrency}`);
+          // Send completion message
+          sendProgress({
+            type: 'complete',
+            totalDetections: totalDetectionsToExtract,
+            processedDetections: processedDetectionsCount,
+            summary: {
+              total: results.length,
+              successful,
+              failed,
+              totalDetections
+            },
+            results,
+            message: `Completed: ${successful}/${results.length} images successful, ${totalDetections} products extracted`
+          });
 
-    return NextResponse.json({
-      message: `Processed ${results.length} images`,
-      summary: {
-        total: results.length,
-        successful,
-        failed,
-        totalDetections
+          controller.close();
+        } catch (error) {
+          console.error('Error in batch extraction:', error);
+          sendProgress({
+            type: 'error',
+            error: 'Batch extraction failed',
+            details: error instanceof Error ? error.message : 'Unknown error'
+          });
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
       },
-      results
     });
 
   } catch (error) {

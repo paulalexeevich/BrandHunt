@@ -42,6 +42,7 @@ interface DetectionResult {
  * POST /api/batch-detect-project
  * Run product detection on multiple undetected images in a project
  * Processes images in parallel with configurable concurrency
+ * Returns streaming progress updates
  */
 export async function POST(request: NextRequest) {
   try {
@@ -84,164 +85,223 @@ export async function POST(request: NextRequest) {
 
     console.log(`📸 Found ${images.length} images to process`);
 
-    // Process images with controlled concurrency
-    const results: DetectionResult[] = [];
-    
-    for (let i = 0; i < images.length; i += concurrency) {
-      const batch = images.slice(i, i + concurrency);
-      console.log(`\n📦 Processing batch ${Math.floor(i/concurrency) + 1}/${Math.ceil(images.length/concurrency)} (${batch.length} images)...`);
-      
-      const batchResults = await Promise.all(
-        batch.map(async (image) => {
-          const result: DetectionResult = {
-            imageId: image.id,
-            originalFilename: image.original_filename,
-            status: 'error'
-          };
+    // Create a streaming response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const sendProgress = (data: any) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
 
-          try {
-            console.log(`  🔍 Detecting products in ${image.original_filename}...`);
+        try {
+          // Send initial progress
+          sendProgress({
+            type: 'start',
+            total: images.length,
+            processed: 0,
+            message: `Starting detection for ${images.length} images...`
+          });
+
+          // Process images with controlled concurrency
+          const results: DetectionResult[] = [];
+          let processedCount = 0;
+          
+          for (let i = 0; i < images.length; i += concurrency) {
+            const batch = images.slice(i, i + concurrency);
+            console.log(`\n📦 Processing batch ${Math.floor(i/concurrency) + 1}/${Math.ceil(images.length/concurrency)} (${batch.length} images)...`);
             
-            // Update status to detecting
-            await supabase
-              .from('branghunt_images')
-              .update({ processing_status: 'detecting' })
-              .eq('id', image.id);
+            const batchResults = await Promise.all(
+              batch.map(async (image) => {
+                const result: DetectionResult = {
+                  imageId: image.id,
+                  originalFilename: image.original_filename,
+                  status: 'error'
+                };
 
-            // Get image data (handles both S3 URLs and base64 storage)
-            const imageBase64 = await getImageBase64ForProcessing(image);
-            const mimeType = getImageMimeType(image);
+                try {
+                  console.log(`  🔍 Detecting products in ${image.original_filename}...`);
+                  
+                  // Update status to detecting
+                  await supabase
+                    .from('branghunt_images')
+                    .update({ processing_status: 'detecting' })
+                    .eq('id', image.id);
 
-            // Convert base64 to buffer for YOLO API
-            const buffer = Buffer.from(imageBase64, 'base64');
-            
-            // Call YOLO API with multipart/form-data
-            const formData = new FormData();
-            const blob = new Blob([buffer], { type: mimeType || 'image/jpeg' });
-            formData.append('file', blob, 'image.jpg');
+                  // Get image data (handles both S3 URLs and base64 storage)
+                  const imageBase64 = await getImageBase64ForProcessing(image);
+                  const mimeType = getImageMimeType(image);
 
-            const yoloResponse = await fetch(YOLO_API_URL, {
-              method: 'POST',
-              body: formData,
-            });
+                  // Convert base64 to buffer for YOLO API
+                  const buffer = Buffer.from(imageBase64, 'base64');
+                  
+                  // Call YOLO API with multipart/form-data
+                  const formData = new FormData();
+                  const blob = new Blob([buffer], { type: mimeType || 'image/jpeg' });
+                  formData.append('file', blob, 'image.jpg');
 
-            if (!yoloResponse.ok) {
-              throw new Error(`YOLO API error: ${yoloResponse.status}`);
-            }
+                  const yoloResponse = await fetch(YOLO_API_URL, {
+                    method: 'POST',
+                    body: formData,
+                  });
 
-            const yoloData: YOLOResponse = await yoloResponse.json();
+                  if (!yoloResponse.ok) {
+                    throw new Error(`YOLO API error: ${yoloResponse.status}`);
+                  }
 
-            if (!yoloData.success || !yoloData.detections) {
-              throw new Error('YOLO API returned invalid response');
-            }
+                  const yoloData: YOLOResponse = await yoloResponse.json();
 
-            // Filter low-confidence detections
-            const filteredDetections = yoloData.detections.filter(
-              det => det.confidence >= CONFIDENCE_THRESHOLD
+                  if (!yoloData.success || !yoloData.detections) {
+                    throw new Error('YOLO API returned invalid response');
+                  }
+
+                  // Filter low-confidence detections
+                  const filteredDetections = yoloData.detections.filter(
+                    det => det.confidence >= CONFIDENCE_THRESHOLD
+                  );
+
+                  console.log(`  ✅ Detected ${filteredDetections.length}/${yoloData.total_detections} products (confidence >= ${CONFIDENCE_THRESHOLD * 100}%)`);
+
+                  if (filteredDetections.length === 0) {
+                    console.log(`  ℹ️  No high-confidence products in ${image.original_filename}`);
+                    
+                    // Mark as completed even with no detections
+                    await supabase
+                      .from('branghunt_images')
+                      .update({ 
+                        detection_completed: true,
+                        detection_completed_at: new Date().toISOString(),
+                        processing_status: 'completed',
+                        status: 'detected'
+                      })
+                      .eq('id', image.id);
+
+                    result.status = 'success';
+                    result.detectionsCount = 0;
+                    return result;
+                  }
+
+                  // Convert YOLO format to BrangHunt format
+                  // YOLO returns pixel coordinates, convert to normalized (0-1000)
+                  const yoloWidth = yoloData.image_dimensions.width;
+                  const yoloHeight = yoloData.image_dimensions.height;
+
+                  const detectionsToInsert = filteredDetections.map((detection, index) => {
+                    // Convert YOLO bbox (x1, y1, x2, y2) to normalized coordinates
+                    const y0 = Math.round((detection.bbox.y1 / yoloHeight) * 1000);
+                    const x0 = Math.round((detection.bbox.x1 / yoloWidth) * 1000);
+                    const y1 = Math.round((detection.bbox.y2 / yoloHeight) * 1000);
+                    const x1 = Math.round((detection.bbox.x2 / yoloWidth) * 1000);
+
+                    return {
+                      image_id: image.id,
+                      detection_index: index,
+                      label: detection.class_name,
+                      bounding_box: { y0, x0, y1, x1 },
+                      confidence: detection.confidence,
+                    };
+                  });
+
+                  const { error: insertError } = await supabase
+                    .from('branghunt_detections')
+                    .insert(detectionsToInsert);
+
+                  if (insertError) {
+                    console.error(`  ❌ Failed to save detections for ${image.original_filename}:`, insertError);
+                    throw new Error(`Failed to save detections: ${insertError.message}`);
+                  }
+
+                  // Mark detection as completed
+                  await supabase
+                    .from('branghunt_images')
+                    .update({ 
+                      detection_completed: true,
+                      detection_completed_at: new Date().toISOString(),
+                      processing_status: 'completed',
+                      status: 'detected'
+                    })
+                    .eq('id', image.id);
+
+                  console.log(`  ✅ Saved ${filteredDetections.length} products for ${image.original_filename}`);
+                  
+                  result.status = 'success';
+                  result.detectionsCount = filteredDetections.length;
+                  return result;
+
+                } catch (error) {
+                  console.error(`  ❌ Error detecting ${image.original_filename}:`, error);
+                  
+                  // Update status to error
+                  await supabase
+                    .from('branghunt_images')
+                    .update({ processing_status: 'error' })
+                    .eq('id', image.id);
+
+                  result.error = error instanceof Error ? error.message : 'Unknown error';
+                  return result;
+                }
+              })
             );
 
-            console.log(`  ✅ Detected ${filteredDetections.length}/${yoloData.total_detections} products (confidence >= ${CONFIDENCE_THRESHOLD * 100}%)`);
+            results.push(...batchResults);
+            processedCount += batchResults.length;
 
-            if (filteredDetections.length === 0) {
-              console.log(`  ℹ️  No high-confidence products in ${image.original_filename}`);
-              
-              // Mark as completed even with no detections
-              await supabase
-                .from('branghunt_images')
-                .update({ 
-                  detection_completed: true,
-                  detection_completed_at: new Date().toISOString(),
-                  processing_status: 'completed',
-                  status: 'detected'
-                })
-                .eq('id', image.id);
+            // Send progress update after each batch
+            const successful = results.filter(r => r.status === 'success').length;
+            const failed = results.filter(r => r.status === 'error').length;
+            const totalDetections = results.reduce((sum, r) => sum + (r.detectionsCount || 0), 0);
 
-              result.status = 'success';
-              result.detectionsCount = 0;
-              return result;
-            }
-
-            // Convert YOLO format to BrangHunt format
-            // YOLO returns pixel coordinates, convert to normalized (0-1000)
-            const yoloWidth = yoloData.image_dimensions.width;
-            const yoloHeight = yoloData.image_dimensions.height;
-
-            const detectionsToInsert = filteredDetections.map((detection, index) => {
-              // Convert YOLO bbox (x1, y1, x2, y2) to normalized coordinates
-              const y0 = Math.round((detection.bbox.y1 / yoloHeight) * 1000);
-              const x0 = Math.round((detection.bbox.x1 / yoloWidth) * 1000);
-              const y1 = Math.round((detection.bbox.y2 / yoloHeight) * 1000);
-              const x1 = Math.round((detection.bbox.x2 / yoloWidth) * 1000);
-
-              return {
-                image_id: image.id,
-                detection_index: index,
-                label: detection.class_name,
-                bounding_box: { y0, x0, y1, x1 },
-                confidence: detection.confidence,
-              };
+            sendProgress({
+              type: 'progress',
+              total: images.length,
+              processed: processedCount,
+              successful,
+              failed,
+              totalDetections,
+              message: `Processed ${processedCount}/${images.length} images (${successful} successful, ${failed} failed, ${totalDetections} products detected)`
             });
-
-            const { error: insertError } = await supabase
-              .from('branghunt_detections')
-              .insert(detectionsToInsert);
-
-            if (insertError) {
-              console.error(`  ❌ Failed to save detections for ${image.original_filename}:`, insertError);
-              throw new Error(`Failed to save detections: ${insertError.message}`);
-            }
-
-            // Mark detection as completed
-            await supabase
-              .from('branghunt_images')
-              .update({ 
-                detection_completed: true,
-                detection_completed_at: new Date().toISOString(),
-                processing_status: 'completed',
-                status: 'detected'
-              })
-              .eq('id', image.id);
-
-            console.log(`  ✅ Saved ${filteredDetections.length} products for ${image.original_filename}`);
-            
-            result.status = 'success';
-            result.detectionsCount = filteredDetections.length;
-            return result;
-
-          } catch (error) {
-            console.error(`  ❌ Error detecting ${image.original_filename}:`, error);
-            
-            // Update status to error
-            await supabase
-              .from('branghunt_images')
-              .update({ processing_status: 'error' })
-              .eq('id', image.id);
-
-            result.error = error instanceof Error ? error.message : 'Unknown error';
-            return result;
           }
-        })
-      );
 
-      results.push(...batchResults);
-    }
+          // Calculate final summary
+          const successful = results.filter(r => r.status === 'success').length;
+          const failed = results.filter(r => r.status === 'error').length;
+          const totalDetections = results.reduce((sum, r) => sum + (r.detectionsCount || 0), 0);
 
-    // Calculate summary
-    const successful = results.filter(r => r.status === 'success').length;
-    const failed = results.filter(r => r.status === 'error').length;
-    const totalDetections = results.reduce((sum, r) => sum + (r.detectionsCount || 0), 0);
+          console.log(`\n✅ YOLO batch detection complete: ${successful} successful, ${failed} failed, ${totalDetections} total detections`);
 
-    console.log(`\n✅ YOLO batch detection complete: ${successful} successful, ${failed} failed, ${totalDetections} total detections`);
+          // Send completion message
+          sendProgress({
+            type: 'complete',
+            total: images.length,
+            processed: processedCount,
+            summary: {
+              total: results.length,
+              successful,
+              failed,
+              totalDetections
+            },
+            results,
+            message: `Completed: ${successful}/${images.length} images successful, ${totalDetections} products detected`
+          });
 
-    return NextResponse.json({
-      message: `Processed ${results.length} images`,
-      summary: {
-        total: results.length,
-        successful,
-        failed,
-        totalDetections
+          controller.close();
+        } catch (error) {
+          console.error('Error in batch detection:', error);
+          sendProgress({
+            type: 'error',
+            error: 'Batch detection failed',
+            details: error instanceof Error ? error.message : 'Unknown error'
+          });
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
       },
-      results
     });
 
   } catch (error) {
