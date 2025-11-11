@@ -84,14 +84,24 @@ export async function POST(request: NextRequest) {
 
           try {
             console.log(`  📋 Extracting info from ${image.original_filename} (image_id: ${image.id})...`);
+            
+            // Check authentication
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            console.log(`  🔵 Authenticated user: ${user?.id || 'NONE'}`);
+            if (authError) {
+              console.error(`  ❌ Auth error:`, authError);
+            }
 
             // Fetch detections that don't have brand info yet
+            console.log(`  🔵 Querying detections for image_id: ${image.id}`);
             const { data: detections, error: detectionsError } = await supabase
               .from('branghunt_detections')
               .select('*')
               .eq('image_id', image.id)
               .is('brand_name', null)
               .order('detection_index');
+            
+            console.log(`  🔵 Detections query returned: ${detections?.length || 0} results, error: ${detectionsError ? 'YES' : 'NO'}`);
 
             if (detectionsError) {
               console.error(`  ❌ Error fetching detections:`, detectionsError);
