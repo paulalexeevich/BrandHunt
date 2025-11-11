@@ -162,7 +162,7 @@ export interface DetectedProduct {
 export interface ProductInfo {
   // Classification fields
   isProduct: boolean;
-  detailsVisible: boolean;
+  detailsVisible: 'clear' | 'partial' | 'none';  // Three-level visibility status
   extractionNotes?: string;
   
   // Product fields
@@ -381,7 +381,7 @@ export async function extractProductInfo(
     // Fallback when parsing fails
     return {
       isProduct: false,
-      detailsVisible: false,
+      detailsVisible: 'none',
       extractionNotes: 'Failed to parse AI response',
       brand: 'Unknown',
       brandConfidence: 0,

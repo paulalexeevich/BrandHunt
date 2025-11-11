@@ -8,7 +8,7 @@ interface ExtractionResult {
   status: 'success' | 'error';
   productInfo?: {
     isProduct: boolean;
-    detailsVisible: boolean;
+    detailsVisible: 'clear' | 'partial' | 'none';
     extractionNotes?: string;
     brand: string;
     productName: string;

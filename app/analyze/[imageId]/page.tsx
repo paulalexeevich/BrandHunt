@@ -20,7 +20,7 @@ interface Detection {
   label: string | null;
   // Classification fields
   is_product: boolean | null;
-  details_visible: boolean | null;
+  details_visible: 'clear' | 'partial' | 'none' | null;  // Three-level visibility status
   extraction_notes: string | null;
   // Product fields
   brand_name: string | null;
@@ -76,7 +76,7 @@ interface ImageData {
   id: string;
   original_filename: string;
   file_path: string | null;
-  s3_url?: string | null;
+  s3_url: string | null;
   storage_type?: 's3_url' | 'base64';
   mime_type?: string | null;
   processing_status: string;
@@ -123,7 +123,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     natural: { width: number; height: number };
     displayed: { width: number; height: number };
   } | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'details_not_visible' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'details_clear' | 'details_partial' | 'details_none' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches'>('all');
   const [isFetching, setIsFetching] = useState(false);
 
   useEffect(() => {
@@ -1278,10 +1278,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           // Calculate statistics
           const totalProducts = detections.length;
           const notProduct = detections.filter(d => d.is_product === false).length;
-          const detailsNotVisible = detections.filter(d => d.is_product === true && d.details_visible === false).length;
+          const detailsNone = detections.filter(d => d.is_product === true && d.details_visible === 'none').length;
+          const detailsPartial = detections.filter(d => d.is_product === true && d.details_visible === 'partial').length;
+          const detailsClear = detections.filter(d => d.is_product === true && d.details_visible === 'clear').length;
           const validNotProcessed = detections.filter(d => 
             (d.is_product === true || d.is_product === null) && 
-            (d.details_visible === true || d.details_visible === null) &&
+            (d.details_visible === 'clear' || d.details_visible === null) &&
             !d.brand_name
           ).length;
           const validWithMatch = detections.filter(d => d.fully_analyzed === true).length;
@@ -1303,7 +1305,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                 📊 Product Statistics
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {/* Total Products */}
                 <button
                   onClick={() => setActiveFilter('all')}
@@ -1328,16 +1330,40 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   {activeFilter === 'not_product' && <div className="text-xs text-red-900 font-semibold mt-1">● Active</div>}
                 </button>
 
-                {/* Details Not Visible */}
+                {/* Details: Clear */}
                 <button
-                  onClick={() => setActiveFilter('details_not_visible')}
-                  className={`bg-orange-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
-                    activeFilter === 'details_not_visible' ? 'border-orange-900 ring-2 ring-orange-900' : 'border-orange-200'
+                  onClick={() => setActiveFilter('details_clear')}
+                  className={`bg-blue-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                    activeFilter === 'details_clear' ? 'border-blue-900 ring-2 ring-blue-900' : 'border-blue-200'
                   }`}
                 >
-                  <div className="text-2xl font-bold text-orange-700">{detailsNotVisible}</div>
-                  <div className="text-xs text-orange-600 mt-1">Details Not Visible</div>
-                  {activeFilter === 'details_not_visible' && <div className="text-xs text-orange-900 font-semibold mt-1">● Active</div>}
+                  <div className="text-2xl font-bold text-blue-700">{detailsClear}</div>
+                  <div className="text-xs text-blue-600 mt-1">Details: Clear</div>
+                  {activeFilter === 'details_clear' && <div className="text-xs text-blue-900 font-semibold mt-1">● Active</div>}
+                </button>
+
+                {/* Details: Partial */}
+                <button
+                  onClick={() => setActiveFilter('details_partial')}
+                  className={`bg-yellow-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                    activeFilter === 'details_partial' ? 'border-yellow-900 ring-2 ring-yellow-900' : 'border-yellow-200'
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-yellow-700">{detailsPartial}</div>
+                  <div className="text-xs text-yellow-600 mt-1">Details: Partial</div>
+                  {activeFilter === 'details_partial' && <div className="text-xs text-yellow-900 font-semibold mt-1">● Active</div>}
+                </button>
+
+                {/* Details: None */}
+                <button
+                  onClick={() => setActiveFilter('details_none')}
+                  className={`bg-orange-50 rounded-lg p-4 shadow-sm border transition-all hover:scale-105 hover:shadow-md ${
+                    activeFilter === 'details_none' ? 'border-orange-900 ring-2 ring-orange-900' : 'border-orange-200'
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-orange-700">{detailsNone}</div>
+                  <div className="text-xs text-orange-600 mt-1">Details: None</div>
+                  {activeFilter === 'details_none' && <div className="text-xs text-orange-900 font-semibold mt-1">● Active</div>}
                 </button>
 
                 {/* Valid Not Processed */}
@@ -1427,10 +1453,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             {activeFilter !== 'all' && (() => {
               const filteredDetections = detections.filter((detection) => {
                 if (activeFilter === 'not_product') return detection.is_product === false;
-                if (activeFilter === 'details_not_visible') return detection.is_product === true && detection.details_visible === false;
+                if (activeFilter === 'details_clear') return detection.is_product === true && detection.details_visible === 'clear';
+                if (activeFilter === 'details_partial') return detection.is_product === true && detection.details_visible === 'partial';
+                if (activeFilter === 'details_none') return detection.is_product === true && detection.details_visible === 'none';
                 if (activeFilter === 'not_identified') {
                   return (detection.is_product === true || detection.is_product === null) && 
-                         (detection.details_visible === true || detection.details_visible === null) &&
+                         (detection.details_visible === 'clear' || detection.details_visible === null) &&
                          !detection.brand_name;
                 }
                 if (activeFilter === 'one_match') return detection.fully_analyzed === true;
@@ -1451,7 +1479,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
 
               const filterLabels = {
                 'not_product': 'Not Product',
-                'details_not_visible': 'Details Not Visible',
+                'details_clear': 'Details: Clear',
+                'details_partial': 'Details: Partial',
+                'details_none': 'Details: None',
                 'not_identified': 'Not Identified',
                 'one_match': '✓ ONE Match',
                 'no_match': 'NO Match',
@@ -1460,7 +1490,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
 
               const filterColors = {
                 'not_product': 'bg-red-100 border-red-300 text-red-900',
-                'details_not_visible': 'bg-orange-100 border-orange-300 text-orange-900',
+                'details_clear': 'bg-blue-100 border-blue-300 text-blue-900',
+                'details_partial': 'bg-yellow-100 border-yellow-300 text-yellow-900',
+                'details_none': 'bg-orange-100 border-orange-300 text-orange-900',
                 'not_identified': 'bg-gray-100 border-gray-300 text-gray-900',
                 'one_match': 'bg-green-100 border-green-300 text-green-900',
                 'no_match': 'bg-yellow-100 border-yellow-300 text-yellow-900',
@@ -1498,10 +1530,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 // Filter based on active filter
                 if (activeFilter === 'all') return true;
                 if (activeFilter === 'not_product') return detection.is_product === false;
-                if (activeFilter === 'details_not_visible') return detection.is_product === true && detection.details_visible === false;
+                if (activeFilter === 'details_clear') return detection.is_product === true && detection.details_visible === 'clear';
+                if (activeFilter === 'details_partial') return detection.is_product === true && detection.details_visible === 'partial';
+                if (activeFilter === 'details_none') return detection.is_product === true && detection.details_visible === 'none';
                 if (activeFilter === 'not_identified') {
                   return (detection.is_product === true || detection.is_product === null) && 
-                         (detection.details_visible === true || detection.details_visible === null) &&
+                         (detection.details_visible === 'clear' || detection.details_visible === null) &&
                          !detection.brand_name;
                 }
                 if (activeFilter === 'one_match') return detection.fully_analyzed === true;
@@ -1646,14 +1680,19 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               ❌ Not a Product
                             </span>
                           )}
-                          {detection.is_product === true && detection.details_visible === false && (
-                            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs font-medium">
-                              ⚠️ Details Not Visible
+                          {detection.is_product === true && detection.details_visible === 'clear' && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                              ✅ Details Clear
                             </span>
                           )}
-                          {detection.is_product === true && detection.details_visible === true && (
-                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                              ✅ Valid Product
+                          {detection.is_product === true && detection.details_visible === 'partial' && (
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">
+                              ⚠️ Details Partial
+                            </span>
+                          )}
+                          {detection.is_product === true && detection.details_visible === 'none' && (
+                            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs font-medium">
+                              ❌ Details None
                             </span>
                           )}
                         </div>
