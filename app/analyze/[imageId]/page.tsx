@@ -1959,18 +1959,25 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         const preFilterCount = foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length;
                         const aiFilterCount = foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length;
                         
+                        // Count only IDENTICAL or ALMOST SAME matches (actual AI matches)
+                        const aiMatchesCount = foodgraphResults.filter(r => {
+                          const matchStatus = (r as any).match_status;
+                          return r.processing_stage === 'ai_filter' && 
+                                 (matchStatus === 'identical' || matchStatus === 'almost_same');
+                        }).length;
+                        
                         const stageStats = {
                           all: foodgraphResults.length,
                           search: searchCount,  // For filter button: results still at search stage
                           pre_filter: preFilterCount,  // For filter button: results at pre-filter stage
-                          ai_filter: aiFilterCount  // For filter button: results at AI filter stage
+                          ai_filter: aiMatchesCount  // Only actual matches (identical or almost same)
                         };
                         
                         // For pipeline display: show cumulative progress
                         const pipelineStats = {
                           returned: searchCount + preFilterCount + aiFilterCount,  // Total initial FoodGraph results
                           preFiltered: preFilterCount + aiFilterCount,  // Results that passed pre-filter (≥85%)
-                          aiAnalyzed: aiFilterCount  // Results that passed AI filter
+                          aiAnalyzed: aiMatchesCount  // Only actual matches (identical or almost same)
                         };
                         
                         // Get current filtered count
@@ -2087,12 +2094,19 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         const preFilterCount = foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length;
                         const aiFilterCount = foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length;
                         
+                        // Count only IDENTICAL or ALMOST SAME matches for AI filter display
+                        const aiMatchesCount = foodgraphResults.filter(r => {
+                          const matchStatus = (r as any).match_status;
+                          return r.processing_stage === 'ai_filter' && 
+                                 (matchStatus === 'identical' || matchStatus === 'almost_same');
+                        }).length;
+                        
                         // Use cumulative counts for button labels (match pipeline statistics)
                         const stageStats = {
                           all: foodgraphResults.length,
                           search: searchCount + preFilterCount + aiFilterCount,  // All returned by FoodGraph
                           pre_filter: preFilterCount + aiFilterCount,  // All that passed pre-filter (≥85%)
-                          ai_filter: aiFilterCount  // All that passed AI filter
+                          ai_filter: aiMatchesCount  // Only actual matches (identical or almost same)
                         };
                         
                         return (
@@ -2137,11 +2151,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               </button>
                               <button
                                 onClick={() => setStageFilter('ai_filter')}
-                                disabled={aiFilterCount === 0}
+                                disabled={aiMatchesCount === 0}
                                 className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
                                   stageFilter === 'ai_filter'
                                     ? 'bg-purple-600 text-white ring-2 ring-purple-300 shadow-sm'
-                                    : aiFilterCount > 0
+                                    : aiMatchesCount > 0
                                       ? 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
                                       : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                                 }`}
@@ -2168,8 +2182,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               r.processing_stage === 'pre_filter' || r.processing_stage === 'ai_filter'
                             );
                           } else if (stageFilter === 'ai_filter') {
-                            // Show results that passed AI filter - only ai_filter stage
-                            filteredResults = foodgraphResults.filter(r => r.processing_stage === 'ai_filter');
+                            // Show results that passed AI filter - only IDENTICAL or ALMOST SAME matches
+                            filteredResults = foodgraphResults.filter(r => {
+                              const matchStatus = (r as any).match_status;
+                              return r.processing_stage === 'ai_filter' && 
+                                     (matchStatus === 'identical' || matchStatus === 'almost_same');
+                            });
                           } else {
                             filteredResults = foodgraphResults;
                           }
