@@ -5,87 +5,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, CheckCircle, Package, Trash2, ChevronDown, Settings, Cpu } from 'lucide-react';
 import { getImageUrl } from '@/lib/image-utils';
-
-interface BoundingBox {
-  y0: number;
-  x0: number;
-  y1: number;
-  x1: number;
-}
-
-interface Detection {
-  id: string;
-  detection_index: number;
-  bounding_box: BoundingBox;
-  label: string | null;
-  // Classification fields
-  is_product: boolean | null;
-  extraction_notes: string | null;
-  // Product fields
-  brand_name: string | null;
-  category: string | null;
-  sku: string | null;
-  product_name: string | null;
-  flavor: string | null;
-  size: string | null;
-  description: string | null;
-  // Confidence scores
-  brand_confidence: number | null;
-  product_name_confidence: number | null;
-  category_confidence: number | null;
-  flavor_confidence: number | null;
-  size_confidence: number | null;
-  description_confidence: number | null;
-  sku_confidence: number | null;
-  // Price fields
-  price: string | null;
-  price_currency: string | null;
-  price_confidence: number | null;
-  // FoodGraph match fields
-  selected_foodgraph_gtin: string | null;
-  selected_foodgraph_product_name: string | null;
-  selected_foodgraph_brand_name: string | null;
-  selected_foodgraph_category: string | null;
-  selected_foodgraph_image_url: string | null;
-  selected_foodgraph_result_id: string | null;
-  selection_method: 'visual_matching' | 'auto_select' | 'consolidation' | null;
-  fully_analyzed: boolean | null;
-  analysis_completed_at: string | null;
-  foodgraph_results?: FoodGraphResult[];
-  // Contextual analysis fields
-  corrected_by_contextual: boolean | null;
-  contextual_correction_notes: string | null;
-}
-
-interface FoodGraphResult {
-  id: string;
-  key?: string;
-  title?: string;
-  product_name: string | null;
-  brand_name: string | null;
-  front_image_url: string | null;
-  result_rank: number;
-  is_match?: boolean | null;
-  match_confidence?: number | null;
-  processing_stage?: 'search' | 'pre_filter' | 'ai_filter' | 'visual_match' | null;
-  companyBrand?: string | null;
-  companyManufacturer?: string | null;
-  measures?: string | null;
-  category?: string | null;
-  ingredients?: string;
-}
-
-interface ImageData {
-  id: string;
-  original_filename: string;
-  file_path: string | null;
-  s3_url: string | null;
-  storage_type?: 's3_url' | 'base64';
-  mime_type?: string | null;
-  processing_status: string;
-  store_name?: string | null;
-  project_id?: string | null;
-}
+import { ImageStatisticsPanel } from '@/components/ImageStatisticsPanel';
+import type { 
+  Detection, 
+  FoodGraphResult, 
+  ImageData, 
+  FilterType, 
+  ProcessingStage, 
+  StageStats 
+} from '@/types/analyze';
 
 export default function AnalyzePage({ params }: { params: Promise<{ imageId: string }> }) {
   const resolvedParams = use(params);
@@ -135,7 +63,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     natural: { width: number; height: number };
     displayed: { width: number; height: number };
   } | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'not_product' | 'processed' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches'>('all');
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [isFetching, setIsFetching] = useState(false);
   
   // Contextual analysis state
@@ -1804,197 +1732,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         )}
 
         {/* Product Statistics Panel */}
-        {productsDetected && detections.length > 0 && (() => {
-          // Calculate statistics
-          const totalProducts = detections.length;
-          const notProduct = detections.filter(d => d.is_product === false).length;
-          const actualProducts = totalProducts - notProduct;
-          
-          // Processing Status
-          const notProcessed = detections.filter(d => 
-            (d.is_product === true || d.is_product === null) && 
-            !d.brand_name
-          ).length;
-          const processed = detections.filter(d => 
-            (d.is_product === true || d.is_product === null) && 
-            d.brand_name
-          ).length;
-          
-          // Match Status (only for processed products)
-          // Matched = ONLY products with selected_foodgraph_gtin (actually saved)
-          const matchedDetections = detections.filter(d => 
-            d.selected_foodgraph_gtin && d.selected_foodgraph_gtin.trim() !== ''
-          );
-          const matched = matchedDetections.length;
-          
-          // Not Matched = Products that are processed but NOT saved (no selected_foodgraph_gtin)
-          const notMatchedDetections = detections.filter(d => 
-            d.brand_name && 
-            (!d.selected_foodgraph_gtin || d.selected_foodgraph_gtin.trim() === '')
-          );
-          const notMatched = notMatchedDetections.length;
-          
-          // Debug logging
-          console.log('📊 STATISTICS DEBUG:');
-          console.log(`   Total detections: ${detections.length}`);
-          console.log(`   Processed (has brand): ${processed}`);
-          console.log(`   Matched: ${matched}`);
-          console.log(`   Not Matched: ${notMatched}`);
-          console.log('   Matched products:', matchedDetections.map(d => ({
-            idx: d.detection_index,
-            brand: d.brand_name,
-            fully_analyzed: d.fully_analyzed,
-            has_gtin: !!d.selected_foodgraph_gtin,
-            results_count: d.foodgraph_results?.length || 0
-          })));
-          console.log('   Not Matched products:', notMatchedDetections.map(d => ({
-            idx: d.detection_index,
-            brand: d.brand_name,
-            fully_analyzed: d.fully_analyzed,
-            has_gtin: !!d.selected_foodgraph_gtin,
-            results_count: d.foodgraph_results?.length || 0
-          })));
-          
-          // 2+ Matches = Products with multiple results needing manual review
-          const multipleMatches = detections.filter(d => 
-            d.brand_name && 
-            !d.fully_analyzed && 
-            !d.selected_foodgraph_gtin &&
-            d.foodgraph_results && 
-            d.foodgraph_results.length >= 2
-          ).length;
-
-          return (
-            <div className="mb-3">
-              <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-                📊 Product Statistics
-              </h3>
-              
-              {/* Two-block layout: Processing Status & Match Status */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Block 1: Processing Status */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-sm p-2.5 border border-indigo-200">
-                  <h4 className="text-[10px] font-semibold text-gray-500 mb-2 uppercase tracking-wide">Processing Status</h4>
-                  <div className="space-y-1.5">
-                    <button
-                      onClick={() => setActiveFilter('processed')}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded border-2 transition-all hover:scale-[1.01] ${
-                        activeFilter === 'processed' 
-                          ? 'bg-blue-100 border-blue-500 ring-1 ring-blue-300' 
-                          : 'bg-white border-blue-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <span className="text-xs font-medium text-gray-700">Processed</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xl font-bold text-blue-600">{processed}</span>
-                        {activeFilter === 'processed' && <span className="text-[10px] text-blue-600 font-semibold">● Active</span>}
-                      </div>
-                    </button>
-                    
-                    <button
-                      onClick={() => setActiveFilter('not_identified')}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded border-2 transition-all hover:scale-[1.01] ${
-                        activeFilter === 'not_identified' 
-                          ? 'bg-gray-100 border-gray-500 ring-1 ring-gray-300' 
-                          : 'bg-white border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <span className="text-xs font-medium text-gray-700">Not Processed</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xl font-bold text-gray-600">{notProcessed}</span>
-                        {activeFilter === 'not_identified' && <span className="text-[10px] text-gray-600 font-semibold">● Active</span>}
-                      </div>
-                    </button>
-                    
-                    <button
-                      onClick={() => setActiveFilter('not_product')}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded border-2 transition-all hover:scale-[1.01] ${
-                        activeFilter === 'not_product' 
-                          ? 'bg-red-100 border-red-500 ring-1 ring-red-300' 
-                          : 'bg-white border-red-200 hover:border-red-300'
-                      }`}
-                    >
-                      <span className="text-xs font-medium text-gray-700">Not Product</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xl font-bold text-red-600">{notProduct}</span>
-                        {activeFilter === 'not_product' && <span className="text-[10px] text-red-600 font-semibold">● Active</span>}
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Block 2: Match Status */}
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-sm p-2.5 border border-green-200">
-                  <h4 className="text-[10px] font-semibold text-gray-500 mb-2 uppercase tracking-wide">Match Status</h4>
-                  <div className="space-y-1.5">
-                    <button
-                      onClick={() => setActiveFilter('one_match')}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded border-2 transition-all hover:scale-[1.01] ${
-                        activeFilter === 'one_match' 
-                          ? 'bg-green-100 border-green-500 ring-1 ring-green-300' 
-                          : 'bg-white border-green-200 hover:border-green-300'
-                      }`}
-                    >
-                      <span className="text-xs font-medium text-gray-700">✓ Matched</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xl font-bold text-green-600">{matched}</span>
-                        {activeFilter === 'one_match' && <span className="text-[10px] text-green-600 font-semibold">● Active</span>}
-                      </div>
-                    </button>
-                    
-                    <button
-                      onClick={() => setActiveFilter('no_match')}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded border-2 transition-all hover:scale-[1.01] ${
-                        activeFilter === 'no_match' 
-                          ? 'bg-yellow-100 border-yellow-500 ring-1 ring-yellow-300' 
-                          : 'bg-white border-yellow-200 hover:border-yellow-300'
-                      }`}
-                    >
-                      <span className="text-xs font-medium text-gray-700">Not Matched</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xl font-bold text-yellow-600">{notMatched}</span>
-                        {activeFilter === 'no_match' && <span className="text-[10px] text-yellow-600 font-semibold">● Active</span>}
-                      </div>
-                    </button>
-                    
-                    <button
-                      onClick={() => setActiveFilter('multiple_matches')}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded border-2 transition-all hover:scale-[1.01] ${
-                        activeFilter === 'multiple_matches' 
-                          ? 'bg-purple-100 border-purple-500 ring-1 ring-purple-300' 
-                          : 'bg-white border-purple-200 hover:border-purple-300'
-                      }`}
-                    >
-                      <span className="text-xs font-medium text-gray-700">2+ Matches</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xl font-bold text-purple-600">{multipleMatches}</span>
-                        {activeFilter === 'multiple_matches' && <span className="text-[10px] text-purple-600 font-semibold">● Active</span>}
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="mt-2.5 bg-white rounded-lg shadow-sm px-3 py-2 border border-gray-200">
-                <div className="flex justify-between text-xs text-gray-600 mb-1.5">
-                  <span className="font-medium">Processing Progress</span>
-                  <span className="font-semibold">{matched} / {totalProducts} Saved ({Math.round((matched / totalProducts) * 100)}%)</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-0.5"
-                    style={{ width: `${(matched / totalProducts) * 100}%` }}
-                  >
-                    {matched > 0 && (
-                      <span className="text-[9px] font-bold text-white">✓</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+        {productsDetected && detections.length > 0 && (
+          <ImageStatisticsPanel 
+            detections={detections}
+            activeFilter={activeFilter}
+            setActiveFilter={setActiveFilter}
+          />
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left: Image with Bounding Boxes */}

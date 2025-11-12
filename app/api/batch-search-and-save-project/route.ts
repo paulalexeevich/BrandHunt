@@ -303,28 +303,28 @@ export async function POST(request: NextRequest) {
 
             const { croppedBase64, width, height } = await cropImageToBoundingBox(imageBase64, boundingBox);
 
-            // Run AI Filter comparison
-            const comparisonResults = await compareProductImages(
-              croppedBase64,
-              {
-                brand: detection.brand_name || 'Unknown',
-                productName: detection.product_name || 'Unknown',
-                size: detection.size || 'Unknown',
-                flavor: detection.flavor || 'Unknown',
-                category: detection.category || 'Unknown'
-              },
-              preFilteredResults.map(m => ({
-                id: String(m.id || Math.random()),
-                gtin: String(m.product_gtin || m.key || ''),
-                productName: String(m.product_name || m.title || ''),
-                brandName: String(m.brand_name || m.companyBrand || ''),
-                size: String(m.measures || ''),
-                category: String(m.category || ''),
-                ingredients: String(m.ingredients || ''),
-                imageUrl: String(m.front_image_url || ''),
-              })),
-              image?.project_id || null
-            );
+            // Run AI Filter comparison for each result
+            const comparisonPromises = preFilteredResults.map(async (fgResult, index) => {
+              if (!fgResult.front_image_url) {
+                return { result: fgResult, matchStatus: 'not_match' as const, details: { matchStatus: 'not_match' as const, confidence: 0, visualSimilarity: 0, reason: 'No image URL' } };
+              }
+
+              try {
+                const comparisonDetails = await compareProductImages(
+                  croppedBase64,
+                  fgResult.front_image_url as string,
+                  true, // Get detailed results with matchStatus
+                  image?.project_id || null
+                );
+                
+                return { result: fgResult, matchStatus: comparisonDetails.matchStatus, details: comparisonDetails };
+              } catch (error) {
+                console.error(`⚠️ Comparison error for ${fgResult.product_name}:`, error);
+                return { result: fgResult, matchStatus: 'not_match' as const, details: { matchStatus: 'not_match' as const, confidence: 0, visualSimilarity: 0, reason: 'Error' } };
+              }
+            });
+
+            const comparisonResults = await Promise.all(comparisonPromises);
 
             // Determine best match
             const identicalMatches = comparisonResults.filter(r => r.matchStatus === 'identical');
@@ -334,7 +334,7 @@ export async function POST(request: NextRequest) {
             let needsManualReview = false;
 
             if (identicalMatches.length === 1) {
-              bestMatch = preFilteredResults.find(r => (r.product_gtin || r.key) === identicalMatches[0].gtin);
+              bestMatch = identicalMatches[0].result;
             } else if (identicalMatches.length > 1 || almostSameMatches.length > 1) {
               needsManualReview = true;
             }
