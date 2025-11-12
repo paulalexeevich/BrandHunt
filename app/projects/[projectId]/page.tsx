@@ -536,26 +536,19 @@ export default function ProjectViewPage() {
   };
 
   const handleBatchContextual = async () => {
-    if (!confirm('Run contextual analysis on all products with low brand confidence (≤90%) or Unknown brand?')) {
+    if (!confirm('Run contextual analysis to improve Unknown/low-confidence brands?\n\nThis will:\n- Process products with brand="Unknown" OR confidence <91%\n- Use shelf neighbors to infer correct brand/size\n- ALWAYS overwrite brand and size fields with contextual results')) {
       return;
     }
-
-    // Get the first image's ID for now (TODO: process all images)
-    if (images.length === 0) {
-      alert('No images in project');
-      return;
-    }
-
-    const imageId = images[0].id; // Using first image for testing
 
     setBatchContextual(true);
-    setBatchProgress(`🔬 Starting contextual analysis for image...`);
+    setBatchProgress(`🔬 Starting automated contextual analysis...\n📊 Finding products that need improvement...`);
 
     try {
-      const response = await fetch('/api/batch-contextual-analysis', {
+      // Call the automated batch contextual analysis endpoint for entire project
+      const response = await fetch('/api/batch-contextual-project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageId }),
+        body: JSON.stringify({ projectId }),
         credentials: 'include'
       });
 
@@ -568,15 +561,15 @@ export default function ProjectViewPage() {
       
       setBatchProgress(
         `✅ Contextual Analysis Complete!\n\n` +
-        `Processed: ${result.processed}\n` +
-        `Corrected: ${result.corrected}\n` +
-        `No improvement: ${result.noImprovement}\n` +
-        `Skipped (no neighbors): ${result.skipped}\n` +
-        `Errors: ${result.errors}`
+        `Images processed: ${result.imagesProcessed}\n` +
+        `Products analyzed: ${result.totalProcessed}\n` +
+        `Brands corrected: ${result.totalCorrected}\n` +
+        `Skipped (no neighbors): ${result.totalSkipped}\n` +
+        `Errors: ${result.totalErrors}`
       );
 
       // Auto-hide success message after 5s
-      if (result.errors === 0) {
+      if (result.totalErrors === 0) {
         setTimeout(() => setBatchProgress(''), 5000);
       }
 
@@ -1084,7 +1077,7 @@ export default function ProjectViewPage() {
                 <ul className="text-xs text-gray-700 space-y-1">
                   <li><strong>Batch Detect:</strong> Uses YOLO API for ultra-fast detection (~0.6s per image, 10 images in parallel)</li>
                   <li><strong>Batch Extract:</strong> Detection-level parallelism - processes 300 detections simultaneously (TESTING MAX SPEED!)</li>
-                  <li><strong>Contextual Analysis:</strong> Uses shelf neighbors to improve brand/size for products with ≤90% confidence or Unknown brand</li>
+                  <li><strong>Contextual Analysis:</strong> Automated correction for Unknown/low-confidence (&lt;91%) brands using shelf neighbors - ALWAYS overwrites brand/size</li>
                   <li><strong>Gemini Rate Limit:</strong> 2000 requests/min - testing 300 concurrency (~3000 RPM, may hit limits)</li>
                   <li><strong>Performance:</strong> Target ~30-45 seconds for 1382 detections (if rate limit allows)</li>
                 </ul>
