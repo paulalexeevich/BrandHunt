@@ -1423,313 +1423,34 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           </div>
         )}
 
-        {/* BLOCK 1 (continued): Extract Information - Only show after detection */}
-        {showProcessingBlocks && productsDetected && (() => {
-          const needsInfo = detections.filter(d => !d.brand_name).length;
-          const needsPrice = detections.filter(d => d.brand_name && (!d.price || d.price === 'Unknown')).length;
-          const hasExtractionWork = needsInfo > 0 || needsPrice > 0;
-
-          return hasExtractionWork ? (
-            <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-lg shadow p-4 mb-4 border-2 border-orange-200">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-base font-bold text-gray-900">
-                    📋 Block 1: Extract Information
-                  </h2>
-                  <p className="text-xs text-gray-600">
-                    Extract product details (brand, name, size, price) from detected products
-                  </p>
-                </div>
-                
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={handleExtractInfoAll}
-                    disabled={processingStep1 || needsInfo === 0}
-                    className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 text-sm"
-                    title={needsInfo === 0 ? 'All products have info extracted' : `Extract info for ${needsInfo} products`}
-                  >
-                    {processingStep1 ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Extracting...
-                      </>
-                    ) : (
-                      `📋 Extract Info (${needsInfo})`
-                    )}
-                  </button>
-                  
-                  <button
-                    onClick={handleExtractPriceAll}
-                    disabled={processingStep2 || needsPrice === 0}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold disabled:opacity-50 flex items-center gap-2 text-sm"
-                    title={needsPrice === 0 ? 'All products have prices' : `Extract price for ${needsPrice} products`}
-                  >
-                    {processingStep2 ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Extracting...
-                      </>
-                    ) : (
-                      `💰 Extract Price (${needsPrice})`
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null;
-        })()}
-
-        {/* BLOCK 2: Product Matching with FoodGraph - Dual Pipeline */}
-        {showProcessingBlocks && productsDetected && (() => {
-          const needsSearch = detections.filter(d => d.brand_name && !d.fully_analyzed).length;
-          const isProcessing = processingPipelineAI || processingPipelineVisual;
-          
-          return needsSearch > 0 ? (
-            <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-lg shadow p-4 mb-4 border-2 border-indigo-300">
-              {/* Collapsible Header */}
-              <button
-                onClick={() => setShowBlock2(!showBlock2)}
-                className="w-full flex items-center justify-between mb-3 hover:bg-white/50 rounded-lg p-2 transition-colors group"
-              >
-                <div className="flex items-center gap-2">
-                  <div className={`transform transition-transform ${showBlock2 ? 'rotate-180' : ''}`}>
-                    <ChevronDown className="w-5 h-5 text-indigo-600" />
-                  </div>
-                  <Settings className={`w-5 h-5 text-indigo-600 ${isProcessing ? 'animate-spin' : 'group-hover:rotate-90 transition-transform'}`} />
-                  <div className="text-left">
-                    <h2 className="text-base font-bold text-gray-900">
-                      🔍 Block 2: Product Matching with FoodGraph
-                    </h2>
-                    <p className="text-xs text-gray-600">
-                      Search, pre-filter, AI filter, and save product matches from FoodGraph database
-                    </p>
-                  </div>
-                </div>
-                <div className="px-3 py-1 bg-indigo-600 text-white rounded-full text-xs font-semibold">
-                  {needsSearch} ready
-                </div>
-              </button>
-              
-              {/* Collapsible Content */}
-              {showBlock2 && (
-                <>
-              {/* Pipeline 1: With AI Filter */}
-              <div className="bg-white rounded-lg p-3 mb-3 border-2 border-blue-300">
-                <h3 className="text-sm font-semibold text-blue-900 mb-2">
-                  🤖 Pipeline 1: With AI Filter (Standard)
-                </h3>
-                <p className="text-[10px] text-gray-600 mb-2">
-                  Search → Pre-filter → <strong className="text-blue-700">AI Filter</strong> → Visual Match (2+) → Save
-                </p>
-                <div className="grid grid-cols-5 gap-1.5">
-                  <button
-                    onClick={() => handlePipelineAI(3)}
-                    disabled={isProcessing || needsSearch === 0}
-                    className="px-2 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
-                  >
-                    {processingPipelineAI && activePipeline === 'ai' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡ 3'}
-                  </button>
-                  <button
-                    onClick={() => handlePipelineAI(10)}
-                    disabled={isProcessing || needsSearch === 0}
-                    className="px-2 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
-                  >
-                    {processingPipelineAI && activePipeline === 'ai' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡ 10'}
-                  </button>
-                  <button
-                    onClick={() => handlePipelineAI(20)}
-                    disabled={isProcessing || needsSearch === 0}
-                    className="px-2 py-1.5 bg-fuchsia-600 text-white rounded hover:bg-fuchsia-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
-                  >
-                    {processingPipelineAI && activePipeline === 'ai' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡⚡ 20'}
-                  </button>
-                  <button
-                    onClick={() => handlePipelineAI(50)}
-                    disabled={isProcessing || needsSearch === 0}
-                    className="px-2 py-1.5 bg-pink-600 text-white rounded hover:bg-pink-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
-                  >
-                    {processingPipelineAI && activePipeline === 'ai' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '✨ 50'}
-                  </button>
-                  <button
-                    onClick={() => handlePipelineAI(999999)}
-                    disabled={isProcessing || needsSearch === 0}
-                    className="px-2 py-1.5 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded hover:from-orange-600 hover:to-red-700 transition-all font-bold disabled:opacity-50 text-[10px]"
-                  >
-                    {processingPipelineAI && activePipeline === 'ai' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🔥 ALL'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Pipeline 2: Visual-Only */}
-              <div className="bg-white rounded-lg p-3 mb-3 border-2 border-green-300">
-                <h3 className="text-sm font-semibold text-green-900 mb-2">
-                  🎯 Pipeline 2: Visual-Only (No AI Filter)
-                </h3>
-                <p className="text-[10px] text-gray-600 mb-2">
-                  Search → Pre-filter → <strong className="text-green-700">Visual Match Directly</strong> → Save
-                </p>
-                <div className="grid grid-cols-5 gap-1.5">
-                  <button
-                    onClick={() => handlePipelineVisual(3)}
-                    disabled={isProcessing || needsSearch === 0}
-                    className="px-2 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
-                  >
-                    {processingPipelineVisual && activePipeline === 'visual' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡ 3'}
-                  </button>
-                  <button
-                    onClick={() => handlePipelineVisual(10)}
-                    disabled={isProcessing || needsSearch === 0}
-                    className="px-2 py-1.5 bg-teal-600 text-white rounded hover:bg-teal-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
-                  >
-                    {processingPipelineVisual && activePipeline === 'visual' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡ 10'}
-                  </button>
-                  <button
-                    onClick={() => handlePipelineVisual(20)}
-                    disabled={isProcessing || needsSearch === 0}
-                    className="px-2 py-1.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
-                  >
-                    {processingPipelineVisual && activePipeline === 'visual' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡⚡ 20'}
-                  </button>
-                  <button
-                    onClick={() => handlePipelineVisual(50)}
-                    disabled={isProcessing || needsSearch === 0}
-                    className="px-2 py-1.5 bg-lime-600 text-white rounded hover:bg-lime-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
-                  >
-                    {processingPipelineVisual && activePipeline === 'visual' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '✨ 50'}
-                  </button>
-                  <button
-                    onClick={() => handlePipelineVisual(999999)}
-                    disabled={isProcessing || needsSearch === 0}
-                    className="px-2 py-1.5 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded hover:from-green-600 hover:to-teal-700 transition-all font-bold disabled:opacity-50 text-[10px]"
-                  >
-                    {processingPipelineVisual && activePipeline === 'visual' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🔥 ALL'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Processing Status */}
-              {isProcessing && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                    <span className="font-semibold text-blue-900 text-xs">
-                      {activePipeline === 'ai' ? '🤖 AI Filter Pipeline Running...' : '🎯 Visual-Only Pipeline Running...'}
-                    </span>
-                  </div>
-                  {pipelineProgress && (
-                    <p className="text-[10px] text-blue-800 font-mono">
-                      {pipelineProgress.success}/{pipelineProgress.total} processed | {pipelineProgress.noMatch} no match | {pipelineProgress.errors} errors
-                    </p>
-                  )}
-                </div>
-              )}
-              </>
-              )}
-            </div>
-          ) : null;
-        })()}
+        {/* Processing Blocks - Extracted to component */}
+        <ProcessingBlocksPanel
+          showProcessingBlocks={showProcessingBlocks}
+          productsDetected={productsDetected}
+          detections={detections}
+          showBlock2={showBlock2}
+          setShowBlock2={setShowBlock2}
+          processingStep1={processingStep1}
+          processingStep2={processingStep2}
+          processingStep3={processingStep3}
+          processingPipelineAI={processingPipelineAI}
+          processingPipelineVisual={processingPipelineVisual}
+          activePipeline={activePipeline}
+          step1Progress={step1Progress}
+          step2Progress={step2Progress}
+          step3Progress={step3Progress}
+          pipelineProgress={pipelineProgress}
+          step3Details={step3Details}
+          pipelineDetails={pipelineDetails}
+          handleExtractInfoAll={handleExtractInfoAll}
+          handleExtractPriceAll={handleExtractPriceAll}
+          handlePipelineAI={handlePipelineAI}
+          handlePipelineVisual={handlePipelineVisual}
+        />
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-red-700">
             {error}
-          </div>
-        )}
-
-        {/* Batch Processing Progress - Split by Blocks */}
-        {showProcessingBlocks && (processingStep1 || processingStep2 || step1Progress || step2Progress) && (
-          <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-lg p-4 mb-6">
-            <h3 className="font-bold text-orange-900 mb-3">📊 Block 1 Progress: Extraction</h3>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className={`bg-white rounded-lg p-3 border-2 ${step1Progress ? 'border-green-500' : processingStep1 ? 'border-yellow-500' : 'border-gray-300'}`}>
-                <div className="text-xs font-semibold text-gray-600 mb-1">📋 Extract Info</div>
-                <div className={`text-lg font-bold ${step1Progress ? 'text-green-600' : processingStep1 ? 'text-yellow-600' : 'text-gray-400'}`}>
-                  {step1Progress ? `${step1Progress.success}/${step1Progress.total}` : processingStep1 ? 'Running...' : '—'}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {step1Progress ? `✓ Done (${step1Progress.errors} errors)` : processingStep1 ? 'In Progress...' : 'Not Started'}
-                </div>
-              </div>
-              <div className={`bg-white rounded-lg p-3 border-2 ${step2Progress ? 'border-green-500' : processingStep2 ? 'border-green-500' : 'border-gray-300'}`}>
-                <div className="text-xs font-semibold text-gray-600 mb-1">💰 Extract Price</div>
-                <div className={`text-lg font-bold ${step2Progress ? 'text-green-600' : processingStep2 ? 'text-green-600' : 'text-gray-400'}`}>
-                  {step2Progress ? `${step2Progress.success}/${step2Progress.total}` : processingStep2 ? 'Running...' : '—'}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {step2Progress ? `✓ Done (${step2Progress.errors} errors)` : processingStep2 ? 'In Progress...' : 'Not Started'}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Pipeline Progress Tracking */}
-        {showProcessingBlocks && ((processingPipelineAI || processingPipelineVisual || pipelineProgress) || (processingStep3 || step3Progress)) && (
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-lg p-4 mb-6">
-            <h3 className="font-bold text-blue-900 mb-3">
-              📊 Block 2 Progress: {activePipeline === 'ai' ? '🤖 AI Filter Pipeline' : activePipeline === 'visual' ? '🎯 Visual-Only Pipeline' : 'FoodGraph Matching'}
-            </h3>
-            <div className="grid grid-cols-1 gap-3 text-sm">
-              <div className={`bg-white rounded-lg p-3 border-2 ${
-                pipelineProgress ? 'border-green-500' : 
-                step3Progress ? 'border-green-500' : 
-                (processingPipelineAI || processingPipelineVisual || processingStep3) ? 'border-blue-500' : 
-                'border-gray-300'
-              }`}>
-                <div className="text-xs font-semibold text-gray-600 mb-1">
-                  {activePipeline === 'ai' ? '🤖 AI Filter Pipeline' : activePipeline === 'visual' ? '🎯 Visual-Only Pipeline' : '🔍 Search & Save'}
-                </div>
-                <div className={`text-lg font-bold ${
-                  pipelineProgress ? 'text-green-600' : 
-                  step3Progress ? 'text-green-600' : 
-                  (processingPipelineAI || processingPipelineVisual || processingStep3) ? 'text-blue-600' : 
-                  'text-gray-400'
-                }`}>
-                  {pipelineProgress ? `${pipelineProgress.success}/${pipelineProgress.total}` : 
-                   step3Progress ? `${step3Progress.success}/${step3Progress.total}` : 
-                   (processingPipelineAI || processingPipelineVisual || processingStep3) ? 'Running...' : '—'}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {pipelineProgress ? `✓ Saved ${pipelineProgress.success}, No Match ${pipelineProgress.noMatch}, Errors ${pipelineProgress.errors}` : 
-                   step3Progress ? `✓ Saved ${step3Progress.success}, No Match ${step3Progress.noMatch}` : 
-                   (processingPipelineAI || processingPipelineVisual || processingStep3) ? 'In Progress...' : 
-                   'Not Started'}
-                </div>
-              </div>
-            </div>
-            
-            {/* Detailed Per-Product Progress */}
-            {((processingPipelineAI || processingPipelineVisual) && pipelineDetails.length > 0) || (processingStep3 && step3Details.length > 0) ? (
-              <div className="mt-4 bg-white rounded-lg p-4 border border-blue-200">
-                <h4 className="font-semibold text-sm text-gray-700 mb-2">📦 Product Progress</h4>
-                <div className="space-y-1 max-h-48 overflow-y-auto">
-                  {((processingPipelineAI || processingPipelineVisual) ? pipelineDetails : step3Details).map((detail, idx) => (
-                    <div key={`progress-${detail.detectionIndex}-${idx}`} className="flex items-center gap-2 text-xs py-1 px-2 bg-gray-50 rounded">
-                      <span className="font-mono text-gray-500">#{detail.detectionIndex}</span>
-                      <span className="flex-1 truncate text-gray-700">{detail.product}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                        detail.stage === 'done' ? 'bg-green-100 text-green-700' :
-                        detail.stage === 'searching' ? 'bg-blue-100 text-blue-700' :
-                        detail.stage === 'prefiltering' ? 'bg-orange-100 text-orange-700' :
-                        detail.stage === 'filtering' ? 'bg-purple-100 text-purple-700' :
-                        detail.stage === 'visual-matching' ? 'bg-cyan-100 text-cyan-700' :
-                        detail.stage === 'saving' ? 'bg-yellow-100 text-yellow-700' :
-                        detail.stage === 'error' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {detail.stage === 'searching' ? '🔍' :
-                         detail.stage === 'prefiltering' ? '⚡' : 
-                         detail.stage === 'filtering' ? '🤖' :
-                         detail.stage === 'visual-matching' ? '🎯' : 
-                         detail.stage === 'saving' ? '💾' : 
-                         detail.stage === 'done' ? '✓' : 
-                         detail.stage === 'error' ? '✗' : '⏳'}
-                        {detail.message}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </div>
         )}
 
