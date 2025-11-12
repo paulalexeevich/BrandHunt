@@ -2408,23 +2408,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     )}
                   </button>
                 )}
-
-                    {detection.brand_name && (!detection.price || detection.price === 'Unknown') && (
-                      <button
-                        onClick={() => handleExtractPrice(detection.id)}
-                        disabled={extractingPrice}
-                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
-                      >
-                        {extractingPrice ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Extracting Price...
-                          </>
-                        ) : (
-                          '💰 Extract Price'
-                        )}
-                      </button>
-                    )}
                     
                     {detection.brand_name && foodgraphResults.length === 0 && !detection.fully_analyzed && (
                     <button
@@ -3362,6 +3345,26 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           )}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Extract Price - Moved below Contextual Analysis */}
+                  {detection.brand_name && (!detection.price || detection.price === 'Unknown') && (
+                    <div className="mt-4">
+                      <button
+                        onClick={() => handleExtractPrice(detection.id)}
+                        disabled={extractingPrice}
+                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
+                      >
+                        {extractingPrice ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Extracting Price...
+                          </>
+                        ) : (
+                          '💰 Extract Price'
+                        )}
+                      </button>
                     </div>
                   )}
 
