@@ -1535,6 +1535,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 📊 Product Statistics
               </h3>
               
+              {/* Two-block layout: Processing Status & Match Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Block 1: Processing Status */}
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-sm p-2.5 border border-indigo-200">
