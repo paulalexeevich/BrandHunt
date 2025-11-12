@@ -113,6 +113,7 @@ export default function ProjectViewPage() {
   // Batch processing state
   const [batchDetecting, setBatchDetecting] = useState(false);
   const [batchExtracting, setBatchExtracting] = useState(false);
+  const [batchContextual, setBatchContextual] = useState(false);
   const [productStats, setProductStats] = useState<ProductStatistics | null>(null);
   const [batchProgress, setBatchProgress] = useState<string>('');
   
@@ -534,6 +535,63 @@ export default function ProjectViewPage() {
     }
   };
 
+  const handleBatchContextual = async () => {
+    if (!confirm('Run contextual analysis on all products with low brand confidence (≤90%) or Unknown brand?')) {
+      return;
+    }
+
+    // Get the first image's ID for now (TODO: process all images)
+    if (images.length === 0) {
+      alert('No images in project');
+      return;
+    }
+
+    const imageId = images[0].id; // Using first image for testing
+
+    setBatchContextual(true);
+    setBatchProgress(`🔬 Starting contextual analysis for image...`);
+
+    try {
+      const response = await fetch('/api/batch-contextual-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.details || result.error || 'Batch contextual analysis failed');
+      }
+
+      const result = await response.json();
+      
+      setBatchProgress(
+        `✅ Contextual Analysis Complete!\n\n` +
+        `Processed: ${result.processed}\n` +
+        `Corrected: ${result.corrected}\n` +
+        `No improvement: ${result.noImprovement}\n` +
+        `Skipped (no neighbors): ${result.skipped}\n` +
+        `Errors: ${result.errors}`
+      );
+
+      // Auto-hide success message after 5s
+      if (result.errors === 0) {
+        setTimeout(() => setBatchProgress(''), 5000);
+      }
+
+      // Reload images to update UI
+      await fetchImages(page);
+
+    } catch (error) {
+      console.error('Batch contextual analysis error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      setBatchProgress(`❌ Batch Contextual Analysis Failed:\n${errorMsg}\n\nCheck browser console (F12) for details.`);
+    } finally {
+      setBatchContextual(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
@@ -944,10 +1002,10 @@ export default function ProjectViewPage() {
               <p className="text-gray-600 mb-4">
                 Process multiple images in parallel for faster analysis
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                 <button
                   onClick={handleBatchDetect}
-                  disabled={batchDetecting || batchExtracting}
+                  disabled={batchDetecting || batchExtracting || batchContextual}
                   className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {batchDetecting ? (
@@ -964,7 +1022,7 @@ export default function ProjectViewPage() {
                 </button>
                 <button
                   onClick={handleBatchExtract}
-                  disabled={batchDetecting || batchExtracting}
+                  disabled={batchDetecting || batchExtracting || batchContextual}
                   className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {batchExtracting ? (
@@ -976,6 +1034,23 @@ export default function ProjectViewPage() {
                     <>
                       <Package className="w-5 h-5" />
                       <span className="font-semibold">Batch Extract Info</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleBatchContextual}
+                  disabled={batchDetecting || batchExtracting || batchContextual}
+                  className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg hover:from-orange-700 hover:to-amber-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {batchContextual ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span className="font-semibold">Analyzing Context...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xl">🔬</span>
+                      <span className="font-semibold">Contextual Analysis</span>
                     </>
                   )}
                 </button>
@@ -1009,6 +1084,7 @@ export default function ProjectViewPage() {
                 <ul className="text-xs text-gray-700 space-y-1">
                   <li><strong>Batch Detect:</strong> Uses YOLO API for ultra-fast detection (~0.6s per image, 10 images in parallel)</li>
                   <li><strong>Batch Extract:</strong> Detection-level parallelism - processes 300 detections simultaneously (TESTING MAX SPEED!)</li>
+                  <li><strong>Contextual Analysis:</strong> Uses shelf neighbors to improve brand/size for products with ≤90% confidence or Unknown brand</li>
                   <li><strong>Gemini Rate Limit:</strong> 2000 requests/min - testing 300 concurrency (~3000 RPM, may hit limits)</li>
                   <li><strong>Performance:</strong> Target ~30-45 seconds for 1382 detections (if rate limit allows)</li>
                 </ul>
