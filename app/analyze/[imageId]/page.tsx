@@ -122,6 +122,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [step2Progress, setStep2Progress] = useState<{ success: number; total: number; errors: number } | null>(null);
   const [step3Progress, setStep3Progress] = useState<{ success: number; total: number; noMatch: number; errors: number } | null>(null);
   const [step3Details, setStep3Details] = useState<Array<{ detectionIndex: number; product: string; stage: string; message: string }>>([]);
+  
+  // Dual pipeline state
+  const [processingPipelineAI, setProcessingPipelineAI] = useState(false);
+  const [processingPipelineVisual, setProcessingPipelineVisual] = useState(false);
+  const [pipelineProgress, setPipelineProgress] = useState<{ success: number; total: number; noMatch: number; errors: number } | null>(null);
+  const [pipelineDetails, setPipelineDetails] = useState<Array<{ detectionIndex: number; product: string; stage: string; message: string }>>([]);
+  const [activePipeline, setActivePipeline] = useState<'ai' | 'visual' | null>(null);
   const [detectionMethod, setDetectionMethod] = useState<'gemini' | 'yolo'>('yolo');
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageDimensions, setImageDimensions] = useState<{ 
@@ -1123,6 +1130,228 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
   };
 
+  // Handler for Pipeline 1: With AI Filter
+  const handlePipelineAI = async (concurrency?: number) => {
+    setProcessingPipelineAI(true);
+    setActivePipeline('ai');
+    setError(null);
+    setPipelineProgress(null);
+    setPipelineDetails([]);
+
+    try {
+      const concurrencyLabel = concurrency === 999999 ? 'ALL' : concurrency || 3;
+      console.log(`🤖 Starting Pipeline 1 (AI Filter): Concurrency=${concurrencyLabel}`);
+      
+      const response = await fetch('/api/batch-search-and-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          imageId: resolvedParams.imageId,
+          concurrency: concurrency
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to start AI Filter pipeline');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'progress') {
+              setPipelineDetails(prev => {
+                const existing = prev.findIndex(p => p.detectionIndex === data.detectionIndex);
+                const newItem = {
+                  detectionIndex: data.detectionIndex,
+                  product: data.currentProduct || '',
+                  stage: data.stage || '',
+                  message: data.message || ''
+                };
+                
+                if (existing >= 0) {
+                  const updated = [...prev];
+                  updated[existing] = newItem;
+                  return updated;
+                } else {
+                  return [...prev, newItem];
+                }
+              });
+
+              if (data.processed !== undefined && data.total !== undefined) {
+                setPipelineProgress({
+                  success: data.success || 0,
+                  total: data.total,
+                  noMatch: data.noMatch || 0,
+                  errors: data.errors || 0
+                });
+              }
+
+              if (data.stage === 'done' || data.stage === 'error') {
+                fetch(`/api/results/${resolvedParams.imageId}`)
+                  .then(res => res.json())
+                  .then(refreshedData => {
+                    if (refreshedData.detections) {
+                      setDetections(refreshedData.detections);
+                      setLoadedDetectionIds(new Set());
+                    }
+                  })
+                  .catch(err => console.error('Failed to refresh detections:', err));
+              }
+            } else if (data.type === 'complete') {
+              setPipelineProgress({
+                success: data.success || 0,
+                total: data.processed || data.total || 0,
+                noMatch: data.noMatch || 0,
+                errors: data.errors || 0
+              });
+
+              await fetchImage();
+
+              alert(`✅ AI Filter Pipeline Complete!\n\n🔍 Processed: ${data.processed || data.total || 0} products\n✓ Saved: ${data.success || 0}\n⏸️ No Match: ${data.noMatch || 0}\n❌ Errors: ${data.errors || 0}`);
+            }
+          }
+        }
+      }
+      
+    } catch (err) {
+      console.error('❌ AI Filter pipeline failed:', err);
+      setError(err instanceof Error ? err.message : 'AI Filter pipeline failed');
+      alert(`AI Filter pipeline failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setProcessingPipelineAI(false);
+      setActivePipeline(null);
+    }
+  };
+
+  // Handler for Pipeline 2: Visual-Only
+  const handlePipelineVisual = async (concurrency?: number) => {
+    setProcessingPipelineVisual(true);
+    setActivePipeline('visual');
+    setError(null);
+    setPipelineProgress(null);
+    setPipelineDetails([]);
+
+    try {
+      const concurrencyLabel = concurrency === 999999 ? 'ALL' : concurrency || 3;
+      console.log(`🎯 Starting Pipeline 2 (Visual-Only): Concurrency=${concurrencyLabel}`);
+      
+      const response = await fetch('/api/batch-search-visual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          imageId: resolvedParams.imageId,
+          concurrency: concurrency
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to start Visual-Only pipeline');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'progress') {
+              setPipelineDetails(prev => {
+                const existing = prev.findIndex(p => p.detectionIndex === data.detectionIndex);
+                const newItem = {
+                  detectionIndex: data.detectionIndex,
+                  product: data.currentProduct || '',
+                  stage: data.stage || '',
+                  message: data.message || ''
+                };
+                
+                if (existing >= 0) {
+                  const updated = [...prev];
+                  updated[existing] = newItem;
+                  return updated;
+                } else {
+                  return [...prev, newItem];
+                }
+              });
+
+              if (data.processed !== undefined && data.total !== undefined) {
+                setPipelineProgress({
+                  success: data.success || 0,
+                  total: data.total,
+                  noMatch: data.noMatch || 0,
+                  errors: data.errors || 0
+                });
+              }
+
+              if (data.stage === 'done' || data.stage === 'error') {
+                fetch(`/api/results/${resolvedParams.imageId}`)
+                  .then(res => res.json())
+                  .then(refreshedData => {
+                    if (refreshedData.detections) {
+                      setDetections(refreshedData.detections);
+                      setLoadedDetectionIds(new Set());
+                    }
+                  })
+                  .catch(err => console.error('Failed to refresh detections:', err));
+              }
+            } else if (data.type === 'complete') {
+              setPipelineProgress({
+                success: data.success || 0,
+                total: data.processed || data.total || 0,
+                noMatch: data.noMatch || 0,
+                errors: data.errors || 0
+              });
+
+              await fetchImage();
+
+              alert(`✅ Visual-Only Pipeline Complete!\n\n🔍 Processed: ${data.processed || data.total || 0} products\n✓ Saved: ${data.success || 0}\n⏸️ No Match: ${data.noMatch || 0}\n❌ Errors: ${data.errors || 0}`);
+            }
+          }
+        }
+      }
+      
+    } catch (err) {
+      console.error('❌ Visual-Only pipeline failed:', err);
+      setError(err instanceof Error ? err.message : 'Visual-Only pipeline failed');
+      alert(`Visual-Only pipeline failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setProcessingPipelineVisual(false);
+      setActivePipeline(null);
+    }
+  };
+
   const handleDeleteImage = async () => {
     setDeleting(true);
     setError(null);
@@ -1322,68 +1551,135 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           ) : null;
         })()}
 
-        {/* BLOCK 2: Product Matching with FoodGraph */}
+        {/* BLOCK 2: Product Matching with FoodGraph - Dual Pipeline */}
         {productsDetected && (() => {
           const needsSearch = detections.filter(d => d.brand_name && !d.fully_analyzed).length;
+          const isProcessing = processingPipelineAI || processingPipelineVisual;
           
           return needsSearch > 0 ? (
-            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg shadow p-4 mb-4 border-2 border-blue-300">
+            <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-lg shadow p-4 mb-4 border-2 border-indigo-300">
               <div className="mb-3">
                 <h2 className="text-base font-bold text-gray-900">
                   🔍 Block 2: Product Matching with FoodGraph
                 </h2>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-gray-600 mb-2">
                   Search, pre-filter, AI filter, and save product matches from FoodGraph database
+                </p>
+                <p className="text-xs font-semibold text-gray-700">
+                  {needsSearch} products ready to process
                 </p>
               </div>
               
-              <div>
-                <p className="text-xs font-semibold text-gray-700 mb-2">
-                  🔍 Search & Save ({needsSearch} products ready)
+              {/* Pipeline 1: With AI Filter */}
+              <div className="bg-white rounded-lg p-3 mb-3 border-2 border-blue-300">
+                <h3 className="text-sm font-semibold text-blue-900 mb-2">
+                  🤖 Pipeline 1: With AI Filter (Standard)
+                </h3>
+                <p className="text-[10px] text-gray-600 mb-2">
+                  Search → Pre-filter → <strong className="text-blue-700">AI Filter</strong> → Visual Match (2+) → Save
                 </p>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-5 gap-1.5">
                   <button
-                    onClick={() => handleSearchAndSaveAll(3)}
-                    disabled={processingStep3 || needsSearch === 0}
-                    className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-semibold disabled:opacity-50 text-xs"
-                    title="Process 3 products at a time (safe)"
+                    onClick={() => handlePipelineAI(3)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="px-2 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
                   >
-                    {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡ 3 at once'}
+                    {processingPipelineAI && activePipeline === 'ai' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡ 3'}
                   </button>
                   <button
-                    onClick={() => handleSearchAndSaveAll(10)}
-                    disabled={processingStep3 || needsSearch === 0}
-                    className="px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-all font-semibold disabled:opacity-50 text-xs"
-                    title="Process 10 products at a time"
+                    onClick={() => handlePipelineAI(10)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="px-2 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
                   >
-                    {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡ 10 at once'}
+                    {processingPipelineAI && activePipeline === 'ai' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡ 10'}
                   </button>
                   <button
-                    onClick={() => handleSearchAndSaveAll(20)}
-                    disabled={processingStep3 || needsSearch === 0}
-                    className="px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all font-semibold disabled:opacity-50 text-xs"
-                    title="Process 20 products at a time"
+                    onClick={() => handlePipelineAI(20)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="px-2 py-1.5 bg-fuchsia-600 text-white rounded hover:bg-fuchsia-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
                   >
-                    {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡⚡ 20 at once'}
+                    {processingPipelineAI && activePipeline === 'ai' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡⚡ 20'}
                   </button>
                   <button
-                    onClick={() => handleSearchAndSaveAll(50)}
-                    disabled={processingStep3 || needsSearch === 0}
-                    className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-all font-semibold disabled:opacity-50 text-xs"
-                    title="Process 50 products at a time"
+                    onClick={() => handlePipelineAI(50)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="px-2 py-1.5 bg-pink-600 text-white rounded hover:bg-pink-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
                   >
-                    {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🚀 50 at once'}
+                    {processingPipelineAI && activePipeline === 'ai' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '✨ 50'}
                   </button>
                   <button
-                    onClick={() => handleSearchAndSaveAll(999999)}
-                    disabled={processingStep3 || needsSearch === 0}
-                    className="px-3 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg hover:from-red-600 hover:to-orange-600 transition-all font-bold disabled:opacity-50 text-xs"
-                    title="Process ALL products simultaneously"
+                    onClick={() => handlePipelineAI(999999)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="px-2 py-1.5 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded hover:from-orange-600 hover:to-red-700 transition-all font-bold disabled:opacity-50 text-[10px]"
                   >
-                    {processingStep3 ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🔥 ALL 🔥'}
+                    {processingPipelineAI && activePipeline === 'ai' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🔥 ALL'}
                   </button>
                 </div>
               </div>
+
+              {/* Pipeline 2: Visual-Only */}
+              <div className="bg-white rounded-lg p-3 mb-3 border-2 border-green-300">
+                <h3 className="text-sm font-semibold text-green-900 mb-2">
+                  🎯 Pipeline 2: Visual-Only (No AI Filter)
+                </h3>
+                <p className="text-[10px] text-gray-600 mb-2">
+                  Search → Pre-filter → <strong className="text-green-700">Visual Match Directly</strong> → Save
+                </p>
+                <div className="grid grid-cols-5 gap-1.5">
+                  <button
+                    onClick={() => handlePipelineVisual(3)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="px-2 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
+                  >
+                    {processingPipelineVisual && activePipeline === 'visual' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡ 3'}
+                  </button>
+                  <button
+                    onClick={() => handlePipelineVisual(10)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="px-2 py-1.5 bg-teal-600 text-white rounded hover:bg-teal-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
+                  >
+                    {processingPipelineVisual && activePipeline === 'visual' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡ 10'}
+                  </button>
+                  <button
+                    onClick={() => handlePipelineVisual(20)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="px-2 py-1.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
+                  >
+                    {processingPipelineVisual && activePipeline === 'visual' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '⚡⚡⚡ 20'}
+                  </button>
+                  <button
+                    onClick={() => handlePipelineVisual(50)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="px-2 py-1.5 bg-lime-600 text-white rounded hover:bg-lime-700 transition-all font-semibold disabled:opacity-50 text-[10px]"
+                  >
+                    {processingPipelineVisual && activePipeline === 'visual' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '✨ 50'}
+                  </button>
+                  <button
+                    onClick={() => handlePipelineVisual(999999)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="px-2 py-1.5 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded hover:from-green-600 hover:to-teal-700 transition-all font-bold disabled:opacity-50 text-[10px]"
+                  >
+                    {processingPipelineVisual && activePipeline === 'visual' ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : '🔥 ALL'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Processing Status */}
+              {isProcessing && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                    <span className="font-semibold text-blue-900 text-xs">
+                      {activePipeline === 'ai' ? '🤖 AI Filter Pipeline Running...' : '🎯 Visual-Only Pipeline Running...'}
+                    </span>
+                  </div>
+                  {pipelineProgress && (
+                    <p className="text-[10px] text-blue-800 font-mono">
+                      {pipelineProgress.success}/{pipelineProgress.total} processed | {pipelineProgress.noMatch} no match | {pipelineProgress.errors} errors
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           ) : null;
         })()}
@@ -1421,40 +1717,64 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           </div>
         )}
 
-        {(processingStep3 || step3Progress) && (
+        {/* Pipeline Progress Tracking */}
+        {((processingPipelineAI || processingPipelineVisual || pipelineProgress) || (processingStep3 || step3Progress)) && (
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-lg p-4 mb-6">
-            <h3 className="font-bold text-blue-900 mb-3">📊 Block 2 Progress: FoodGraph Matching</h3>
+            <h3 className="font-bold text-blue-900 mb-3">
+              📊 Block 2 Progress: {activePipeline === 'ai' ? '🤖 AI Filter Pipeline' : activePipeline === 'visual' ? '🎯 Visual-Only Pipeline' : 'FoodGraph Matching'}
+            </h3>
             <div className="grid grid-cols-1 gap-3 text-sm">
-              <div className={`bg-white rounded-lg p-3 border-2 ${step3Progress ? 'border-green-500' : processingStep3 ? 'border-blue-500' : 'border-gray-300'}`}>
-                <div className="text-xs font-semibold text-gray-600 mb-1">🔍 Search & Save</div>
-                <div className={`text-lg font-bold ${step3Progress ? 'text-green-600' : processingStep3 ? 'text-blue-600' : 'text-gray-400'}`}>
-                  {step3Progress ? `${step3Progress.success}/${step3Progress.total}` : processingStep3 ? 'Running...' : '—'}
+              <div className={`bg-white rounded-lg p-3 border-2 ${
+                pipelineProgress ? 'border-green-500' : 
+                step3Progress ? 'border-green-500' : 
+                (processingPipelineAI || processingPipelineVisual || processingStep3) ? 'border-blue-500' : 
+                'border-gray-300'
+              }`}>
+                <div className="text-xs font-semibold text-gray-600 mb-1">
+                  {activePipeline === 'ai' ? '🤖 AI Filter Pipeline' : activePipeline === 'visual' ? '🎯 Visual-Only Pipeline' : '🔍 Search & Save'}
+                </div>
+                <div className={`text-lg font-bold ${
+                  pipelineProgress ? 'text-green-600' : 
+                  step3Progress ? 'text-green-600' : 
+                  (processingPipelineAI || processingPipelineVisual || processingStep3) ? 'text-blue-600' : 
+                  'text-gray-400'
+                }`}>
+                  {pipelineProgress ? `${pipelineProgress.success}/${pipelineProgress.total}` : 
+                   step3Progress ? `${step3Progress.success}/${step3Progress.total}` : 
+                   (processingPipelineAI || processingPipelineVisual || processingStep3) ? 'Running...' : '—'}
                 </div>
                 <div className="text-xs text-gray-500">
-                  {step3Progress ? `✓ Saved ${step3Progress.success}, No Match ${step3Progress.noMatch}` : processingStep3 ? 'In Progress...' : 'Not Started'}
+                  {pipelineProgress ? `✓ Saved ${pipelineProgress.success}, No Match ${pipelineProgress.noMatch}, Errors ${pipelineProgress.errors}` : 
+                   step3Progress ? `✓ Saved ${step3Progress.success}, No Match ${step3Progress.noMatch}` : 
+                   (processingPipelineAI || processingPipelineVisual || processingStep3) ? 'In Progress...' : 
+                   'Not Started'}
                 </div>
               </div>
             </div>
             
-            {/* Detailed Per-Product Progress for Step 3 */}
-            {processingStep3 && step3Details.length > 0 && (
+            {/* Detailed Per-Product Progress */}
+            {((processingPipelineAI || processingPipelineVisual) && pipelineDetails.length > 0) || (processingStep3 && step3Details.length > 0) ? (
               <div className="mt-4 bg-white rounded-lg p-4 border border-blue-200">
-                <h4 className="font-semibold text-sm text-gray-700 mb-2">📦 Product Progress (3 at a time)</h4>
+                <h4 className="font-semibold text-sm text-gray-700 mb-2">📦 Product Progress</h4>
                 <div className="space-y-1 max-h-48 overflow-y-auto">
-                  {step3Details.map((detail, idx) => (
-                    <div key={`step3-${detail.detectionIndex}-${idx}`} className="flex items-center gap-2 text-xs py-1 px-2 bg-gray-50 rounded">
+                  {((processingPipelineAI || processingPipelineVisual) ? pipelineDetails : step3Details).map((detail, idx) => (
+                    <div key={`progress-${detail.detectionIndex}-${idx}`} className="flex items-center gap-2 text-xs py-1 px-2 bg-gray-50 rounded">
                       <span className="font-mono text-gray-500">#{detail.detectionIndex}</span>
                       <span className="flex-1 truncate text-gray-700">{detail.product}</span>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                         detail.stage === 'done' ? 'bg-green-100 text-green-700' :
                         detail.stage === 'searching' ? 'bg-blue-100 text-blue-700' :
+                        detail.stage === 'prefiltering' ? 'bg-orange-100 text-orange-700' :
                         detail.stage === 'filtering' ? 'bg-purple-100 text-purple-700' :
+                        detail.stage === 'visual-matching' ? 'bg-cyan-100 text-cyan-700' :
                         detail.stage === 'saving' ? 'bg-yellow-100 text-yellow-700' :
                         detail.stage === 'error' ? 'bg-red-100 text-red-700' :
                         'bg-gray-100 text-gray-700'
                       }`}>
-                        {detail.stage === 'searching' ? '🔍' : 
-                         detail.stage === 'filtering' ? '🤖' : 
+                        {detail.stage === 'searching' ? '🔍' :
+                         detail.stage === 'prefiltering' ? '⚡' : 
+                         detail.stage === 'filtering' ? '🤖' :
+                         detail.stage === 'visual-matching' ? '🎯' : 
                          detail.stage === 'saving' ? '💾' : 
                          detail.stage === 'done' ? '✓' : 
                          detail.stage === 'error' ? '✗' : '⏳'}
@@ -1464,7 +1784,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   ))}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
