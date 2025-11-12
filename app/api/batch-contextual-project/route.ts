@@ -354,55 +354,71 @@ export async function POST(request: NextRequest) {
             
             // Start all detections in batch in parallel
             const batchPromises = batch.map(async (detection) => {
+              console.log(`🔍 [#${detection.detection_index}] Starting detection ${detection.id}`);
+              
               const image = imageMap.get(detection.image_id);
               if (!image) {
-                console.error(`❌ Image not found for detection ${detection.id}`);
+                console.error(`❌ [#${detection.detection_index}] Image not found for detection ${detection.id}`);
                 return { success: false, skipped: false, error: 'Image not found' };
               }
+              console.log(`   ✓ Image found`);
 
               try {
                 // Get all detections for this image (for neighbors)
                 const imageDetections = detectionsByImage.get(detection.image_id) || [];
+                console.log(`   ✓ Found ${imageDetections.length} detections for image`);
                 
                 // Find neighbors
                 const { left, right } = findNeighbors(detection, imageDetections);
+                console.log(`   ✓ Found ${left.length} left, ${right.length} right neighbors`);
                 
                 if (left.length === 0 && right.length === 0) {
+                  console.log(`   ⚠️ No neighbors, skipping`);
                   return { success: false, skipped: true };
                 }
 
                 // Get image data from cache
                 const imageBase64 = imageDataCache.get(detection.image_id);
                 if (!imageBase64) {
-                  console.error(`❌ Image data not in cache for detection ${detection.id}`);
+                  console.error(`❌ [#${detection.detection_index}] Image data not in cache for detection ${detection.id}`);
                   return { success: false, skipped: false, error: 'Image data not loaded' };
                 }
+                console.log(`   ✓ Image data retrieved from cache (${Math.round(imageBase64.length / 1024)}KB)`);
                 
                 // Calculate expanded box
                 const expandedBox = calculateExpandedBox(detection.bounding_box, left, right);
+                console.log(`   ✓ Expanded box calculated: ${JSON.stringify(expandedBox)}`);
                 
                 // Extract expanded crop
                 let expandedCropBase64;
                 try {
+                  console.log(`   🖼️  Extracting crop...`);
                   expandedCropBase64 = await extractExpandedCrop(imageBase64, expandedBox);
+                  console.log(`   ✓ Crop extracted (${Math.round(expandedCropBase64.length / 1024)}KB)`);
                 } catch (cropError) {
-                  console.error(`❌ Crop extraction failed for detection ${detection.id}:`, cropError instanceof Error ? cropError.message : cropError);
+                  console.error(`❌ [#${detection.detection_index}] Crop extraction failed:`, cropError instanceof Error ? cropError.message : cropError);
+                  console.error(`   Detection box:`, detection.bounding_box);
+                  console.error(`   Expanded box:`, expandedBox);
                   return { success: false, skipped: false, error: 'Crop extraction failed' };
                 }
                 
                 // Run contextual analysis
                 let analysis;
                 try {
+                  console.log(`   🤖 Calling Gemini API...`);
                   analysis = await analyzeWithContext(expandedCropBase64, detection, left, right);
+                  console.log(`   ✓ Gemini response received`);
                 } catch (geminiError) {
-                  console.error(`❌ Gemini API failed for detection ${detection.id}:`, geminiError instanceof Error ? geminiError.message : geminiError);
+                  console.error(`❌ [#${detection.detection_index}] Gemini API failed:`, geminiError instanceof Error ? geminiError.message : geminiError);
                   return { success: false, skipped: false, error: 'Gemini API failed' };
                 }
                 
                 if (analysis.parse_error) {
-                  console.error(`❌ Parse error for detection ${detection.id}:`, analysis.raw_response?.substring(0, 200));
+                  console.error(`❌ [#${detection.detection_index}] Parse error:`, analysis.raw_response?.substring(0, 200));
                   return { success: false, skipped: false, error: 'Parse error' };
                 }
+                console.log(`   ✓ Analysis parsed: ${analysis.inferred_brand} (${Math.round((analysis.brand_confidence || 0) * 100)}%)`);
+
 
                 // ALWAYS overwrite brand and size
                 const updateData: any = {
@@ -426,15 +442,19 @@ export async function POST(request: NextRequest) {
                   size_confidence: analysis.size_confidence,
                 };
 
+                console.log(`   💾 Saving to database...`);
                 const { error: updateError } = await supabase
                   .from('branghunt_detections')
                   .update(updateData)
                   .eq('id', detection.id);
 
                 if (updateError) {
+                  console.error(`❌ [#${detection.detection_index}] Database update failed:`, updateError.message);
+                  console.error(`   Update data keys:`, Object.keys(updateData));
                   throw new Error(`Database update failed: ${updateError.message}`);
                 }
 
+                console.log(`   ✅ SUCCESS: Detection #${detection.detection_index} completed\n`);
                 return { success: true, skipped: false };
 
               } catch (error) {
