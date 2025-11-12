@@ -212,7 +212,7 @@ Return your analysis in JSON format:
 
 export async function POST(request: NextRequest) {
   try {
-    const { projectId, concurrency = 50 } = await request.json();
+    const { projectId, concurrency = 10 } = await request.json();
 
     if (!projectId) {
       const encoder = new TextEncoder();
@@ -324,6 +324,19 @@ export async function POST(request: NextRequest) {
             detectionsByImage.get(det.image_id)!.push(det);
           });
 
+          // PRE-LOAD all image data to avoid loading same image multiple times
+          console.log('📸 Pre-loading image data for all images...');
+          const imageDataCache = new Map<string, string>();
+          for (const image of images) {
+            try {
+              const imageBase64 = await getImageBase64ForProcessing(image);
+              imageDataCache.set(image.id, imageBase64);
+            } catch (error) {
+              console.error(`❌ Failed to load image ${image.id}:`, error);
+            }
+          }
+          console.log(`✅ Loaded ${imageDataCache.size}/${images.length} images into cache`);
+
           let processedCount = 0;
           let correctedCount = 0;
           let skippedCount = 0;
@@ -341,7 +354,8 @@ export async function POST(request: NextRequest) {
             const batchPromises = batch.map(async (detection) => {
               const image = imageMap.get(detection.image_id);
               if (!image) {
-                return { success: false, skipped: false };
+                console.error(`❌ Image not found for detection ${detection.id}`);
+                return { success: false, skipped: false, error: 'Image not found' };
               }
 
               try {
@@ -355,8 +369,12 @@ export async function POST(request: NextRequest) {
                   return { success: false, skipped: true };
                 }
 
-                // Get image data
-                const imageBase64 = await getImageBase64ForProcessing(image);
+                // Get image data from cache
+                const imageBase64 = imageDataCache.get(detection.image_id);
+                if (!imageBase64) {
+                  console.error(`❌ Image data not in cache for detection ${detection.id}`);
+                  return { success: false, skipped: false, error: 'Image data not loaded' };
+                }
                 
                 // Calculate expanded box
                 const expandedBox = calculateExpandedBox(detection.bounding_box, left, right);
@@ -368,7 +386,8 @@ export async function POST(request: NextRequest) {
                 const analysis = await analyzeWithContext(expandedCropBase64, detection, left, right);
                 
                 if (analysis.parse_error) {
-                  return { success: false, skipped: false };
+                  console.error(`❌ Parse error for detection ${detection.id}:`, analysis.raw_response?.substring(0, 200));
+                  return { success: false, skipped: false, error: 'Parse error' };
                 }
 
                 // ALWAYS overwrite brand and size
@@ -405,8 +424,8 @@ export async function POST(request: NextRequest) {
                 return { success: true, skipped: false };
 
               } catch (error) {
-                console.error(`❌ Detection error:`, error);
-                return { success: false, skipped: false };
+                console.error(`❌ Detection ${detection.id} (#${detection.detection_index}) error:`, error instanceof Error ? error.message : error);
+                return { success: false, skipped: false, error: error instanceof Error ? error.message : 'Unknown error' };
               }
             });
 
