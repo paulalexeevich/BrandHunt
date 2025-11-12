@@ -125,6 +125,11 @@ export default function ProjectViewPage() {
   const [productStats, setProductStats] = useState<ProductStatistics | null>(null);
   const [batchProgress, setBatchProgress] = useState<string>('');
   
+  // Batch matching pipelines state
+  const [batchMatchingAI, setBatchMatchingAI] = useState(false);
+  const [batchMatchingVisual, setBatchMatchingVisual] = useState(false);
+  const [matchingProgress, setMatchingProgress] = useState<string>('');
+  
   const supabase = createClient();
 
   useEffect(() => {
@@ -669,6 +674,220 @@ export default function ProjectViewPage() {
     }
   };
 
+  // Handler for Pipeline 1: With AI Filter (uses existing batch-search-and-save endpoint)
+  const handleBatchSearchAndSave = async (concurrency: number) => {
+    const imageIds = images.map(img => img.id);
+    
+    if (imageIds.length === 0) {
+      alert('No images available to process');
+      return;
+    }
+
+    if (!confirm(`🤖 Pipeline 1: With AI Filter\n\nProcess ${imageIds.length} image(s) with:\n- Search FoodGraph\n- Pre-filter by brand/size\n- AI Filter comparison\n- Visual match (if 2+ candidates)\n- Auto-save results\n\nConcurrency: ${concurrency === 999999 ? 'ALL' : concurrency} products at once\n\nContinue?`)) {
+      return;
+    }
+
+    setBatchMatchingAI(true);
+    setMatchingProgress('🤖 Starting AI Filter pipeline...');
+
+    let totalProcessed = 0;
+    let totalSuccess = 0;
+    let totalNoMatch = 0;
+    let totalErrors = 0;
+
+    try {
+      // Process each image sequentially
+      for (let i = 0; i < imageIds.length; i++) {
+        const imageId = imageIds[i];
+        setMatchingProgress(`🤖 Processing image ${i + 1}/${imageIds.length} (AI Filter pipeline)...`);
+
+        const response = await fetch('/api/batch-search-and-save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId, concurrency }),
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to process image ${i + 1}`);
+        }
+
+        // Handle SSE stream
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error('Failed to get response stream');
+        }
+
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === 'progress') {
+                setMatchingProgress(
+                  `🤖 Image ${i + 1}/${imageIds.length} | Product ${data.processed || 0}/${data.total || 0}\n` +
+                  `Stage: ${data.stage || 'processing'}\n` +
+                  `${data.message || ''}`
+                );
+              } else if (data.type === 'complete') {
+                totalProcessed += data.processed || 0;
+                totalSuccess += data.success || 0;
+                totalNoMatch += data.noMatch || 0;
+                totalErrors += data.errors || 0;
+              }
+            } catch (parseError) {
+              console.error('Parse error:', parseError);
+            }
+          }
+        }
+      }
+
+      // Final summary
+      setMatchingProgress(
+        `✅ AI Filter Pipeline Complete!\n\n` +
+        `Total processed: ${totalProcessed}\n` +
+        `✅ Success: ${totalSuccess}\n` +
+        `⏸️  No match: ${totalNoMatch}\n` +
+        `❌ Errors: ${totalErrors}`
+      );
+
+      // Refresh project data
+      await fetchProjectData();
+
+      // Auto-hide after 10s if no errors
+      if (totalErrors === 0) {
+        setTimeout(() => setMatchingProgress(''), 10000);
+      }
+    } catch (error) {
+      console.error('Batch matching error:', error);
+      setMatchingProgress(
+        `❌ AI Filter Pipeline Failed:\n${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    } finally {
+      setBatchMatchingAI(false);
+    }
+  };
+
+  // Handler for Pipeline 2: Visual-Only (uses new batch-search-visual endpoint)
+  const handleBatchSearchVisual = async (concurrency: number) => {
+    const imageIds = images.map(img => img.id);
+    
+    if (imageIds.length === 0) {
+      alert('No images available to process');
+      return;
+    }
+
+    if (!confirm(`🎯 Pipeline 2: Visual-Only\n\nProcess ${imageIds.length} image(s) with:\n- Search FoodGraph\n- Pre-filter by brand/size\n- Visual match directly (NO AI Filter)\n- Auto-save results\n\nConcurrency: ${concurrency === 999999 ? 'ALL' : concurrency} products at once\n\nThis pipeline skips AI filtering and goes straight to visual matching, which may be faster but less precise.\n\nContinue?`)) {
+      return;
+    }
+
+    setBatchMatchingVisual(true);
+    setMatchingProgress('🎯 Starting Visual-Only pipeline...');
+
+    let totalProcessed = 0;
+    let totalSuccess = 0;
+    let totalNoMatch = 0;
+    let totalErrors = 0;
+
+    try {
+      // Process each image sequentially
+      for (let i = 0; i < imageIds.length; i++) {
+        const imageId = imageIds[i];
+        setMatchingProgress(`🎯 Processing image ${i + 1}/${imageIds.length} (Visual-Only pipeline)...`);
+
+        const response = await fetch('/api/batch-search-visual', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId, concurrency }),
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to process image ${i + 1}`);
+        }
+
+        // Handle SSE stream
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error('Failed to get response stream');
+        }
+
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === 'progress') {
+                setMatchingProgress(
+                  `🎯 Image ${i + 1}/${imageIds.length} | Product ${data.processed || 0}/${data.total || 0}\n` +
+                  `Stage: ${data.stage || 'processing'}\n` +
+                  `${data.message || ''}`
+                );
+              } else if (data.type === 'complete') {
+                totalProcessed += data.processed || 0;
+                totalSuccess += data.success || 0;
+                totalNoMatch += data.noMatch || 0;
+                totalErrors += data.errors || 0;
+              }
+            } catch (parseError) {
+              console.error('Parse error:', parseError);
+            }
+          }
+        }
+      }
+
+      // Final summary
+      setMatchingProgress(
+        `✅ Visual-Only Pipeline Complete!\n\n` +
+        `Total processed: ${totalProcessed}\n` +
+        `✅ Success: ${totalSuccess}\n` +
+        `⏸️  No match: ${totalNoMatch}\n` +
+        `❌ Errors: ${totalErrors}`
+      );
+
+      // Refresh project data
+      await fetchProjectData();
+
+      // Auto-hide after 10s if no errors
+      if (totalErrors === 0) {
+        setTimeout(() => setMatchingProgress(''), 10000);
+      }
+    } catch (error) {
+      console.error('Batch visual matching error:', error);
+      setMatchingProgress(
+        `❌ Visual-Only Pipeline Failed:\n${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    } finally {
+      setBatchMatchingVisual(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
@@ -1173,6 +1392,160 @@ export default function ProjectViewPage() {
             </div>
           )}
         </div>
+        
+        {/* Product Matching Pipelines */}
+            <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-xl shadow-lg p-6 mb-8 border border-indigo-200">
+              <h2 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                🔍 Block 2: Product Matching with FoodGraph
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Search, pre-filter, AI filter, and save product matches from FoodGraph database
+              </p>
+              
+              {/* Pipeline 1: With AI Filter (Current) */}
+              <div className="bg-white rounded-lg p-4 mb-4 border-2 border-blue-300">
+                <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                  🤖 Pipeline 1: With AI Filter (Standard)
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Search → Pre-filter → <strong className="text-blue-700">AI Filter</strong> → Visual Match (2+ candidates) → Save
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  <button
+                    onClick={() => handleBatchSearchAndSave(3)}
+                    disabled={batchMatchingAI || batchMatchingVisual}
+                    className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                  >
+                    ⚡ 3 at once
+                  </button>
+                  <button
+                    onClick={() => handleBatchSearchAndSave(10)}
+                    disabled={batchMatchingAI || batchMatchingVisual}
+                    className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                  >
+                    ⚡⚡ 10 at once
+                  </button>
+                  <button
+                    onClick={() => handleBatchSearchAndSave(20)}
+                    disabled={batchMatchingAI || batchMatchingVisual}
+                    className="px-4 py-3 bg-fuchsia-600 text-white rounded-lg hover:bg-fuchsia-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                  >
+                    ⚡⚡⚡ 20 at once
+                  </button>
+                  <button
+                    onClick={() => handleBatchSearchAndSave(50)}
+                    disabled={batchMatchingAI || batchMatchingVisual}
+                    className="px-4 py-3 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                  >
+                    ✨ 50 at once
+                  </button>
+                  <button
+                    onClick={() => handleBatchSearchAndSave(999999)}
+                    disabled={batchMatchingAI || batchMatchingVisual}
+                    className="px-4 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:from-orange-600 hover:to-red-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                  >
+                    🔥 ALL 🔥
+                  </button>
+                </div>
+              </div>
+
+              {/* Pipeline 2: Visual Only (New) */}
+              <div className="bg-white rounded-lg p-4 mb-4 border-2 border-green-300">
+                <h3 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
+                  🎯 Pipeline 2: Visual-Only (No AI Filter)
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Search → Pre-filter → <strong className="text-green-700">Visual Match Directly</strong> → Save
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  <button
+                    onClick={() => handleBatchSearchVisual(3)}
+                    disabled={batchMatchingAI || batchMatchingVisual}
+                    className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                  >
+                    ⚡ 3 at once
+                  </button>
+                  <button
+                    onClick={() => handleBatchSearchVisual(10)}
+                    disabled={batchMatchingAI || batchMatchingVisual}
+                    className="px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                  >
+                    ⚡⚡ 10 at once
+                  </button>
+                  <button
+                    onClick={() => handleBatchSearchVisual(20)}
+                    disabled={batchMatchingAI || batchMatchingVisual}
+                    className="px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                  >
+                    ⚡⚡⚡ 20 at once
+                  </button>
+                  <button
+                    onClick={() => handleBatchSearchVisual(50)}
+                    disabled={batchMatchingAI || batchMatchingVisual}
+                    className="px-4 py-3 bg-lime-600 text-white rounded-lg hover:bg-lime-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                  >
+                    ✨ 50 at once
+                  </button>
+                  <button
+                    onClick={() => handleBatchSearchVisual(999999)}
+                    disabled={batchMatchingAI || batchMatchingVisual}
+                    className="px-4 py-3 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                  >
+                    🔥 ALL 🔥
+                  </button>
+                </div>
+              </div>
+
+              {/* Processing Status */}
+              {(batchMatchingAI || batchMatchingVisual) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                    <span className="font-semibold text-blue-900">
+                      {batchMatchingAI ? '🤖 AI Filter Pipeline Running...' : '🎯 Visual-Only Pipeline Running...'}
+                    </span>
+                  </div>
+                  {matchingProgress && (
+                    <p className="text-sm text-blue-800 whitespace-pre-line font-mono">
+                      {matchingProgress}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Results Message */}
+              {matchingProgress && !batchMatchingAI && !batchMatchingVisual && (
+                <div className={`p-4 rounded-lg ${
+                  matchingProgress.includes('✅') ? 'bg-green-50 border border-green-200' :
+                  matchingProgress.includes('❌') ? 'bg-red-50 border border-red-200' :
+                  'bg-yellow-50 border border-yellow-200'
+                }`}>
+                  <p className={`text-sm font-medium whitespace-pre-line ${
+                    matchingProgress.includes('✅') ? 'text-green-900' :
+                    matchingProgress.includes('❌') ? 'text-red-900' :
+                    'text-yellow-900'
+                  }`}>
+                    {matchingProgress}
+                  </p>
+                  {(matchingProgress.includes('❌') || matchingProgress.includes('⏸️')) && (
+                    <button
+                      onClick={() => setMatchingProgress('')}
+                      className="mt-3 px-3 py-1 bg-white border border-gray-300 rounded text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Dismiss
+                    </button>
+                  )}
+                  {matchingProgress.includes('✅') && (
+                    <button
+                      onClick={() => setMatchingProgress('')}
+                      className="mt-3 px-3 py-1 bg-white border border-gray-300 rounded text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Dismiss
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
         {/* Images Grid */}
             <div className="bg-white rounded-xl shadow-lg p-6">
