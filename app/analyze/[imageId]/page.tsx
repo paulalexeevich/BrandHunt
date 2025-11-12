@@ -2192,21 +2192,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               
               return (
                 <div className="space-y-4">
-                  {/* Product Header */}
-                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border-2 border-indigo-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-xl font-bold text-indigo-900">
-                        Product #{detectionIndex + 1}
-                      </h3>
-                      {detection.fully_analyzed && (
-                        <span className="px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded-full flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" />
-                          Saved
-                        </span>
-                          )}
-                        </div>
-                </div>
-                
                   {/* Extracted Product Information */}
                   {detection.brand_name ? (
                     <div className="bg-white border-2 border-gray-200 rounded-lg p-4 shadow-sm">
