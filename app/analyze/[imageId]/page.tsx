@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, CheckCircle, Package, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle, Package, Trash2, ChevronDown, Settings } from 'lucide-react';
 import { getImageUrl } from '@/lib/image-utils';
 
 interface BoundingBox {
@@ -144,6 +144,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [contextPromptVersion, setContextPromptVersion] = useState('v1');
   const [showContextAnalysis, setShowContextAnalysis] = useState(false);
   const [contextSaveResults, setContextSaveResults] = useState(true);
+  const [showBlock2, setShowBlock2] = useState(false);
 
   useEffect(() => {
     fetchImage();
@@ -1558,18 +1559,33 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           
           return needsSearch > 0 ? (
             <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-lg shadow p-4 mb-4 border-2 border-indigo-300">
-              <div className="mb-3">
-                <h2 className="text-base font-bold text-gray-900">
-                  🔍 Block 2: Product Matching with FoodGraph
-                </h2>
-                <p className="text-xs text-gray-600 mb-2">
-                  Search, pre-filter, AI filter, and save product matches from FoodGraph database
-                </p>
-                <p className="text-xs font-semibold text-gray-700">
-                  {needsSearch} products ready to process
-                </p>
-              </div>
+              {/* Collapsible Header */}
+              <button
+                onClick={() => setShowBlock2(!showBlock2)}
+                className="w-full flex items-center justify-between mb-3 hover:bg-white/50 rounded-lg p-2 transition-colors group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`transform transition-transform ${showBlock2 ? 'rotate-180' : ''}`}>
+                    <ChevronDown className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <Settings className={`w-5 h-5 text-indigo-600 ${isProcessing ? 'animate-spin' : 'group-hover:rotate-90 transition-transform'}`} />
+                  <div className="text-left">
+                    <h2 className="text-base font-bold text-gray-900">
+                      🔍 Block 2: Product Matching with FoodGraph
+                    </h2>
+                    <p className="text-xs text-gray-600">
+                      Search, pre-filter, AI filter, and save product matches from FoodGraph database
+                    </p>
+                  </div>
+                </div>
+                <div className="px-3 py-1 bg-indigo-600 text-white rounded-full text-xs font-semibold">
+                  {needsSearch} ready
+                </div>
+              </button>
               
+              {/* Collapsible Content */}
+              {showBlock2 && (
+                <>
               {/* Pipeline 1: With AI Filter */}
               <div className="bg-white rounded-lg p-3 mb-3 border-2 border-blue-300">
                 <h3 className="text-sm font-semibold text-blue-900 mb-2">
@@ -1679,6 +1695,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </p>
                   )}
                 </div>
+              )}
+              </>
               )}
             </div>
           ) : null;
