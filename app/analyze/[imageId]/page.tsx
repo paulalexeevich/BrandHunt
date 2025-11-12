@@ -2715,10 +2715,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       
                       {/* Stage Filter Buttons - Always visible */}
                       {(() => {
+                        // UNIVERSAL FILTERING LOGIC for both pipelines
                         // Calculate current stage counts for filtering logic
                         const searchCount = foodgraphResults.filter(r => r.processing_stage === 'search').length;
                         const preFilterCount = foodgraphResults.filter(r => r.processing_stage === 'pre_filter').length;
                         const aiFilterCount = foodgraphResults.filter(r => r.processing_stage === 'ai_filter').length;
+                        const visualMatchStageCount = foodgraphResults.filter(r => r.processing_stage === 'visual_match').length;
                         
                         // Count ONLY successful AI matches (identical or almost_same) - excludes not_match
                         const aiMatchesCount = foodgraphResults.filter(r => {
@@ -2727,25 +2729,32 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                  (matchStatus === 'identical' || matchStatus === 'almost_same' || r.is_match === true);
                         }).length;
                         
-                        // Count products for visual matching:
-                        // 1) Already matched via visual_matching, OR
-                        // 2) Has 2+ identical/almost_same results (pending visual match)
-                        const multipleMatchCandidates = foodgraphResults.filter(r => {
+                        // Count products for visual matching (UNIVERSAL for both pipelines):
+                        // Pipeline 1: Products with 2+ identical/almost_same results at ai_filter stage (pending visual match)
+                        // Pipeline 2: Products already at visual_match stage (matched via visual-only pipeline)
+                        const aiFilterCandidates = foodgraphResults.filter(r => {
                           const matchStatus = (r as any).match_status;
                           return r.processing_stage === 'ai_filter' && 
                                  (matchStatus === 'identical' || matchStatus === 'almost_same');
                         }).length;
                         
-                        const visualMatchCount = (detection.selection_method === 'visual_matching' || multipleMatchCandidates >= 2) 
-                          ? aiMatchesCount 
+                        // Visual match count includes:
+                        // 1) Products at visual_match stage (Pipeline 2 results)
+                        // 2) Products with 2+ AI filter candidates (Pipeline 1 pending)
+                        // 3) Products with selection_method='visual_matching' (Pipeline 1 completed)
+                        const hasVisualMatchData = visualMatchStageCount > 0 || 
+                                                   aiFilterCandidates >= 2 || 
+                                                   detection.selection_method === 'visual_matching';
+                        const visualMatchCount = hasVisualMatchData 
+                          ? (visualMatchStageCount > 0 ? visualMatchStageCount : aiMatchesCount)
                           : 0;
                         
-                        // Use cumulative counts for button labels
+                        // Use cumulative counts for button labels (UNIVERSAL)
                         const stageStats = {
-                          search: searchCount + preFilterCount + aiFilterCount,  // All returned by FoodGraph (TOP 100)
-                          pre_filter: preFilterCount + aiFilterCount,  // All that passed pre-filter (≥85%)
-                          ai_filter: aiMatchesCount,  // Only actual matches (identical or almost same)
-                          visual_match: visualMatchCount  // Products matched via visual analysis
+                          search: searchCount + preFilterCount + aiFilterCount + visualMatchStageCount,  // All returned by FoodGraph (includes all stages)
+                          pre_filter: preFilterCount + aiFilterCount + visualMatchStageCount,  // All that passed pre-filter (≥85%)
+                          ai_filter: aiMatchesCount,  // Only actual AI matches (identical or almost same)
+                          visual_match: visualMatchCount  // Products matched via visual analysis (both pipelines)
                         };
                         
                         return (
@@ -2754,11 +2763,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             <div className="flex flex-wrap gap-2">
                               <button
                                 onClick={() => setStageFilter('search')}
-                                disabled={searchCount + preFilterCount + aiFilterCount === 0}
+                                disabled={searchCount + preFilterCount + aiFilterCount + visualMatchStageCount === 0}
                                 className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
                                   stageFilter === 'search'
                                     ? 'bg-blue-600 text-white ring-2 ring-blue-300 shadow-sm'
-                                    : searchCount + preFilterCount + aiFilterCount > 0
+                                    : searchCount + preFilterCount + aiFilterCount + visualMatchStageCount > 0
                                       ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
                                       : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                                 }`}
@@ -2767,11 +2776,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                               </button>
                               <button
                                 onClick={() => setStageFilter('pre_filter')}
-                                disabled={preFilterCount + aiFilterCount === 0}
+                                disabled={preFilterCount + aiFilterCount + visualMatchStageCount === 0}
                                 className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
                                   stageFilter === 'pre_filter'
                                     ? 'bg-orange-600 text-white ring-2 ring-orange-300 shadow-sm'
-                                    : preFilterCount + aiFilterCount > 0
+                                    : preFilterCount + aiFilterCount + visualMatchStageCount > 0
                                       ? 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
                                       : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                                 }`}
@@ -2811,30 +2820,37 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       
                       <div className="space-y-2 max-h-96 overflow-y-auto">
                         {(() => {
-                          // Apply stage filter with cumulative logic (matching button counts)
+                          // UNIVERSAL FILTER LOGIC - Apply stage filter with cumulative logic (matching button counts)
                           let filteredResults: typeof foodgraphResults;
                           if (stageFilter === 'search') {
                             // Show all results returned by FoodGraph (TOP 100, all stages)
                             filteredResults = foodgraphResults;
                           } else if (stageFilter === 'pre_filter') {
-                            // Show results that passed pre-filter (≥85%) - includes both pre_filter and ai_filter stages
+                            // Show results that passed pre-filter (≥85%) - includes pre_filter, ai_filter, and visual_match stages
                             filteredResults = foodgraphResults.filter(r => 
-                              r.processing_stage === 'pre_filter' || r.processing_stage === 'ai_filter'
+                              r.processing_stage === 'pre_filter' || 
+                              r.processing_stage === 'ai_filter' ||
+                              r.processing_stage === 'visual_match'
                             );
                           } else if (stageFilter === 'ai_filter') {
                             // Show all AI-filtered results (includes identical, almost_same, and not_match)
                             filteredResults = foodgraphResults.filter(r => r.processing_stage === 'ai_filter');
                           } else if (stageFilter === 'visual_match') {
-                            // Show results for products that use/need visual matching:
-                            // 1) Already matched via visual_matching, OR
-                            // 2) Has 2+ candidates (pending visual match)
+                            // UNIVERSAL VISUAL MATCH FILTER - works for both pipelines:
+                            // Pipeline 1: Show ai_filter results when there are 2+ candidates or selection_method='visual_matching'
+                            // Pipeline 2: Show visual_match stage results directly
+                            const hasVisualMatchStage = foodgraphResults.some(r => r.processing_stage === 'visual_match');
                             const candidateCount = foodgraphResults.filter(r => {
                               const matchStatus = (r as any).match_status;
                               return r.processing_stage === 'ai_filter' && 
                                      (matchStatus === 'identical' || matchStatus === 'almost_same');
                             }).length;
                             
-                            if (detection.selection_method === 'visual_matching' || candidateCount >= 2) {
+                            if (hasVisualMatchStage) {
+                              // Pipeline 2: Show visual_match stage results
+                              filteredResults = foodgraphResults.filter(r => r.processing_stage === 'visual_match');
+                            } else if (detection.selection_method === 'visual_matching' || candidateCount >= 2) {
+                              // Pipeline 1: Show ai_filter results with multiple candidates
                               filteredResults = foodgraphResults.filter(r => r.processing_stage === 'ai_filter');
                             } else {
                               filteredResults = [];
