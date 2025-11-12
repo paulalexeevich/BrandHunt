@@ -84,6 +84,12 @@ interface ProjectMember {
   added_by: string;
 }
 
+interface AvailableUser {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
 export default function ProjectViewPage() {
   const params = useParams();
   const router = useRouter();
@@ -106,6 +112,8 @@ export default function ProjectViewPage() {
   const [newMemberUserId, setNewMemberUserId] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<'admin' | 'member' | 'viewer'>('member');
   const [memberLoading, setMemberLoading] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
   
   // Prompt settings modal state
   const [showPromptSettings, setShowPromptSettings] = useState(false);
@@ -247,9 +255,36 @@ export default function ProjectViewPage() {
     }
   };
 
+  const fetchAvailableUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const response = await fetch('/api/users', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // Filter out users who are already members
+        const memberIds = members.map(m => m.user_id);
+        const filteredUsers = data.users.filter((u: AvailableUser) => !memberIds.includes(u.id));
+        setAvailableUsers(filteredUsers);
+      } else {
+        console.error('Failed to fetch users');
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleShowAddMember = () => {
+    setShowAddMember(true);
+    fetchAvailableUsers();
+  };
+
   const handleAddMember = async () => {
     if (!newMemberUserId.trim()) {
-      alert('Please enter a user ID');
+      alert('Please select a user');
       return;
     }
 
@@ -271,6 +306,7 @@ export default function ProjectViewPage() {
       await fetchMembers();
       setNewMemberUserId('');
       setShowAddMember(false);
+      setAvailableUsers([]);
       alert('Member added successfully');
     } catch (err) {
       console.error('Error adding member:', err);
@@ -862,8 +898,9 @@ export default function ProjectViewPage() {
                   Project Members ({members.length})
                 </h2>
                 <button
-                  onClick={() => setShowAddMember(!showAddMember)}
+                  onClick={handleShowAddMember}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  disabled={showAddMember}
                 >
                   <UserPlus className="w-4 h-4" />
                   Add Member
@@ -877,19 +914,33 @@ export default function ProjectViewPage() {
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        User ID
+                        Select User
                       </label>
-                      <input
-                        type="text"
-                        value={newMemberUserId}
-                        onChange={(e) => setNewMemberUserId(e.target.value)}
-                        placeholder="Enter user UUID"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        disabled={memberLoading}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Note: Currently requires the user's UUID. Email lookup coming soon.
-                      </p>
+                      {usersLoading ? (
+                        <div className="flex items-center gap-2 px-3 py-2 text-gray-500">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading users...
+                        </div>
+                      ) : (
+                        <select
+                          value={newMemberUserId}
+                          onChange={(e) => setNewMemberUserId(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          disabled={memberLoading}
+                        >
+                          <option value="">Select a user...</option>
+                          {availableUsers.map((user) => (
+                            <option key={user.id} value={user.id}>
+                              {user.email}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {availableUsers.length === 0 && !usersLoading && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          No available users to add. All users are already members.
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -918,6 +969,7 @@ export default function ProjectViewPage() {
                         onClick={() => {
                           setShowAddMember(false);
                           setNewMemberUserId('');
+                          setAvailableUsers([]);
                         }}
                         disabled={memberLoading}
                         className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
