@@ -674,113 +674,85 @@ export default function ProjectViewPage() {
     }
   };
 
-  // Handler for Pipeline 1: With AI Filter (uses existing batch-search-and-save endpoint)
+  // Handler for Pipeline 1: With AI Filter (uses project-level endpoint for all images)
   const handleBatchSearchAndSave = async (concurrency: number) => {
-    const imageIds = images.map(img => img.id);
-    
-    if (imageIds.length === 0) {
-      alert('No images available to process');
+    if (!projectId) {
+      alert('No project ID available');
       return;
     }
 
-    if (!confirm(`🤖 Pipeline 1: With AI Filter\n\nProcess ${imageIds.length} image(s) with:\n- Search FoodGraph\n- Pre-filter by brand/size\n- AI Filter comparison\n- Visual match (if 2+ candidates)\n- Auto-save results\n\nConcurrency: ${concurrency === 999999 ? 'ALL' : concurrency} products at once\n\nContinue?`)) {
+    if (!confirm(`🤖 Pipeline 1: With AI Filter\n\nProcess ALL products across all images with:\n- Search FoodGraph\n- Pre-filter by brand/size\n- AI Filter comparison\n- Visual match (if 2+ candidates)\n- Auto-save results\n\nConcurrency: ${concurrency === 999999 ? 'ALL' : concurrency} products at once\n\nThis will process all products in parallel for maximum speed!\n\nContinue?`)) {
       return;
     }
 
     setBatchMatchingAI(true);
     setMatchingProgress('🤖 Starting AI Filter pipeline...');
 
-    let totalProcessed = 0;
-    let totalSuccess = 0;
-    let totalNoMatch = 0;
-    let totalErrors = 0;
-
     try {
-      // Process each image sequentially
-      for (let i = 0; i < imageIds.length; i++) {
-        const imageId = imageIds[i];
-        setMatchingProgress(`🤖 Processing image ${i + 1}/${imageIds.length} (AI Filter pipeline)...`);
+      const response = await fetch('/api/batch-search-and-save-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, concurrency }),
+        credentials: 'include'
+      });
 
-        const response = await fetch('/api/batch-search-and-save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageId, concurrency }),
-          credentials: 'include'
-        });
+      if (!response.ok) {
+        throw new Error('Failed to start AI Filter pipeline');
+      }
 
-        if (!response.ok) {
-          throw new Error(`Failed to process image ${i + 1}`);
-        }
+      // Handle SSE stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-        // Handle SSE stream
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
+      if (!reader) {
+        throw new Error('Failed to get response stream');
+      }
 
-        if (!reader) {
-          throw new Error('Failed to get response stream');
-        }
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-        let buffer = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
 
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
 
-            try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.type === 'progress') {
-                const currentImageStats = data.success !== undefined 
-                  ? `Current image: ✅ ${data.success} | ⏸️ ${data.noMatch || 0} | ❌ ${data.errors || 0}`
-                  : '';
-                
-                const overallStats = totalProcessed > 0
-                  ? `Overall total: ${totalProcessed + (data.processed || 0)} processed (✅ ${totalSuccess + (data.success || 0)} | ⏸️ ${totalNoMatch + (data.noMatch || 0)} | ❌ ${totalErrors + (data.errors || 0)})`
-                  : '';
-                
-                setMatchingProgress(
-                  `🤖 Image ${i + 1}/${imageIds.length} | Product ${data.processed || 0}/${data.total || 0}\n` +
-                  `Stage: ${data.stage || 'processing'}\n` +
-                  `${data.message || ''}\n` +
-                  (currentImageStats ? `\n${currentImageStats}` : '') +
-                  (overallStats ? `\n${overallStats}` : '')
-                );
-              } else if (data.type === 'complete') {
-                totalProcessed += data.processed || 0;
-                totalSuccess += data.success || 0;
-                totalNoMatch += data.noMatch || 0;
-                totalErrors += data.errors || 0;
-              }
-            } catch (parseError) {
-              console.error('Parse error:', parseError);
+            if (data.type === 'progress') {
+              const statsLine = data.success !== undefined 
+                ? `✅ ${data.success} | ⏸️ ${data.noMatch || 0} | ❌ ${data.errors || 0}`
+                : '';
+              
+              setMatchingProgress(
+                `🤖 Product ${data.processed || 0}/${data.total || 0}\n` +
+                `Stage: ${data.stage || 'processing'}\n` +
+                `${data.message || ''}\n` +
+                (statsLine ? `\n${statsLine}` : '')
+              );
+            } else if (data.type === 'complete') {
+              setMatchingProgress(
+                `✅ AI Filter Pipeline Complete!\n\n` +
+                `Total processed: ${data.processed || 0}\n` +
+                `✅ Success: ${data.success || 0}\n` +
+                `⏸️  No match: ${data.noMatch || 0}\n` +
+                `❌ Errors: ${data.errors || 0}`
+              );
             }
+          } catch (parseError) {
+            console.error('Parse error:', parseError);
           }
         }
       }
 
-      // Final summary
-      setMatchingProgress(
-        `✅ AI Filter Pipeline Complete!\n\n` +
-        `Total processed: ${totalProcessed}\n` +
-        `✅ Success: ${totalSuccess}\n` +
-        `⏸️  No match: ${totalNoMatch}\n` +
-        `❌ Errors: ${totalErrors}`
-      );
-
       // Refresh project data
       await fetchProjectData();
 
-      // Auto-hide after 10s if no errors
-      if (totalErrors === 0) {
-        setTimeout(() => setMatchingProgress(''), 10000);
-      }
     } catch (error) {
       console.error('Batch matching error:', error);
       setMatchingProgress(
@@ -791,113 +763,85 @@ export default function ProjectViewPage() {
     }
   };
 
-  // Handler for Pipeline 2: Visual-Only (uses new batch-search-visual endpoint)
+  // Handler for Pipeline 2: Visual-Only (uses project-level endpoint for all images)
   const handleBatchSearchVisual = async (concurrency: number) => {
-    const imageIds = images.map(img => img.id);
-    
-    if (imageIds.length === 0) {
-      alert('No images available to process');
+    if (!projectId) {
+      alert('No project ID available');
       return;
     }
 
-    if (!confirm(`🎯 Pipeline 2: Visual-Only\n\nProcess ${imageIds.length} image(s) with:\n- Search FoodGraph\n- Pre-filter by brand/size\n- Visual match directly (NO AI Filter)\n- Auto-save results\n\nConcurrency: ${concurrency === 999999 ? 'ALL' : concurrency} products at once\n\nThis pipeline skips AI filtering and goes straight to visual matching, which may be faster but less precise.\n\nContinue?`)) {
+    if (!confirm(`🎯 Pipeline 2: Visual-Only\n\nProcess ALL products across all images with:\n- Search FoodGraph\n- Pre-filter by brand/size\n- Visual match directly (NO AI Filter)\n- Auto-save results\n\nConcurrency: ${concurrency === 999999 ? 'ALL' : concurrency} products at once\n\nThis pipeline skips AI filtering for maximum speed!\n\nContinue?`)) {
       return;
     }
 
     setBatchMatchingVisual(true);
     setMatchingProgress('🎯 Starting Visual-Only pipeline...');
 
-    let totalProcessed = 0;
-    let totalSuccess = 0;
-    let totalNoMatch = 0;
-    let totalErrors = 0;
-
     try {
-      // Process each image sequentially
-      for (let i = 0; i < imageIds.length; i++) {
-        const imageId = imageIds[i];
-        setMatchingProgress(`🎯 Processing image ${i + 1}/${imageIds.length} (Visual-Only pipeline)...`);
+      const response = await fetch('/api/batch-search-visual-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, concurrency }),
+        credentials: 'include'
+      });
 
-        const response = await fetch('/api/batch-search-visual', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageId, concurrency }),
-          credentials: 'include'
-        });
+      if (!response.ok) {
+        throw new Error('Failed to start Visual-Only pipeline');
+      }
 
-        if (!response.ok) {
-          throw new Error(`Failed to process image ${i + 1}`);
-        }
+      // Handle SSE stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-        // Handle SSE stream
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
+      if (!reader) {
+        throw new Error('Failed to get response stream');
+      }
 
-        if (!reader) {
-          throw new Error('Failed to get response stream');
-        }
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-        let buffer = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
 
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
 
-            try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.type === 'progress') {
-                const currentImageStats = data.success !== undefined 
-                  ? `Current image: ✅ ${data.success} | ⏸️ ${data.noMatch || 0} | ❌ ${data.errors || 0}`
-                  : '';
-                
-                const overallStats = totalProcessed > 0
-                  ? `Overall total: ${totalProcessed + (data.processed || 0)} processed (✅ ${totalSuccess + (data.success || 0)} | ⏸️ ${totalNoMatch + (data.noMatch || 0)} | ❌ ${totalErrors + (data.errors || 0)})`
-                  : '';
-                
-                setMatchingProgress(
-                  `🎯 Image ${i + 1}/${imageIds.length} | Product ${data.processed || 0}/${data.total || 0}\n` +
-                  `Stage: ${data.stage || 'processing'}\n` +
-                  `${data.message || ''}\n` +
-                  (currentImageStats ? `\n${currentImageStats}` : '') +
-                  (overallStats ? `\n${overallStats}` : '')
-                );
-              } else if (data.type === 'complete') {
-                totalProcessed += data.processed || 0;
-                totalSuccess += data.success || 0;
-                totalNoMatch += data.noMatch || 0;
-                totalErrors += data.errors || 0;
-              }
-            } catch (parseError) {
-              console.error('Parse error:', parseError);
+            if (data.type === 'progress') {
+              const statsLine = data.success !== undefined 
+                ? `✅ ${data.success} | ⏸️ ${data.noMatch || 0} | ❌ ${data.errors || 0}`
+                : '';
+              
+              setMatchingProgress(
+                `🎯 Product ${data.processed || 0}/${data.total || 0}\n` +
+                `Stage: ${data.stage || 'processing'}\n` +
+                `${data.message || ''}\n` +
+                (statsLine ? `\n${statsLine}` : '')
+              );
+            } else if (data.type === 'complete') {
+              setMatchingProgress(
+                `✅ Visual-Only Pipeline Complete!\n\n` +
+                `Total processed: ${data.processed || 0}\n` +
+                `✅ Success: ${data.success || 0}\n` +
+                `⏸️  No match: ${data.noMatch || 0}\n` +
+                `❌ Errors: ${data.errors || 0}`
+              );
             }
+          } catch (parseError) {
+            console.error('Parse error:', parseError);
           }
         }
       }
 
-      // Final summary
-      setMatchingProgress(
-        `✅ Visual-Only Pipeline Complete!\n\n` +
-        `Total processed: ${totalProcessed}\n` +
-        `✅ Success: ${totalSuccess}\n` +
-        `⏸️  No match: ${totalNoMatch}\n` +
-        `❌ Errors: ${totalErrors}`
-      );
-
       // Refresh project data
       await fetchProjectData();
 
-      // Auto-hide after 10s if no errors
-      if (totalErrors === 0) {
-        setTimeout(() => setMatchingProgress(''), 10000);
-      }
     } catch (error) {
       console.error('Batch visual matching error:', error);
       setMatchingProgress(
