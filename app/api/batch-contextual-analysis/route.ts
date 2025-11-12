@@ -155,7 +155,7 @@ async function analyzeWithContext(
     throw new Error('Gemini API key is not configured');
   }
   
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   
   // Build context about neighbors
   const leftContext = leftNeighbors.slice(0, 3).map((det, i) => 
