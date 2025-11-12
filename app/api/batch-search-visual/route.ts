@@ -120,6 +120,11 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         const results: SearchAndSaveResult[] = [];
+        
+        // Track cumulative stats
+        let cumulativeSuccess = 0;
+        let cumulativeNoMatch = 0;
+        let cumulativeErrors = 0;
 
         // Helper to send progress updates
         const sendProgress = (update: ProgressUpdate) => {
@@ -189,13 +194,17 @@ export async function POST(request: NextRequest) {
             if (foodgraphResults.length === 0) {
               result.status = 'no_match';
               result.error = 'No FoodGraph results found';
+              cumulativeNoMatch++;
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'error',
                 message: 'No results found',
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
               return result;
             }
@@ -292,13 +301,17 @@ export async function POST(request: NextRequest) {
             if (preFilteredResults.length === 0) {
               result.status = 'no_match';
               result.error = 'No matches after pre-filtering';
+              cumulativeNoMatch++;
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'error',
                 message: 'No matches after pre-filter',
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
               return result;
             }
@@ -331,13 +344,17 @@ export async function POST(request: NextRequest) {
             } else {
               result.status = 'error';
               result.error = 'Invalid bounding box coordinates';
+              cumulativeErrors++;
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'error',
                 message: 'Invalid coordinates',
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
               return result;
             }
@@ -364,13 +381,17 @@ export async function POST(request: NextRequest) {
             if (candidates.length === 0) {
               result.status = 'no_match';
               result.error = 'No candidates with images for visual matching';
+              cumulativeNoMatch++;
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'error',
                 message: 'No candidates with images',
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
               return result;
             }
@@ -477,13 +498,18 @@ export async function POST(request: NextRequest) {
                 imageUrl: (bestMatch.front_image_url || '') as string
               };
 
+              cumulativeSuccess++;
+              
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'done',
                 message: `🎯 Visual match: ${bestMatch.product_name}`,
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
 
               console.log(`  ✅ [#${detection.detection_index}] Complete`);
@@ -504,13 +530,18 @@ export async function POST(request: NextRequest) {
               result.status = 'no_match';
               result.error = `Manual review needed: Visual matching low confidence (${Math.round((visualSelection.confidence || 0) * 100)}%)`;
               
+              cumulativeNoMatch++;
+              
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'done',
                 message: `⏸️ Manual review: Low confidence match`,
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
 
               console.log(`  ⏸️ [#${detection.detection_index}] Manual review needed`);
@@ -521,13 +552,18 @@ export async function POST(request: NextRequest) {
             result.error = error instanceof Error ? error.message : 'Unknown error';
             result.status = 'error';
             
+            cumulativeErrors++;
+            
             sendProgress({
               type: 'progress',
               detectionIndex: detection.detection_index,
               stage: 'error',
               message: `Error: ${result.error}`,
               processed: globalIndex + 1,
-              total: detections.length
+              total: detections.length,
+              success: cumulativeSuccess,
+              noMatch: cumulativeNoMatch,
+              errors: cumulativeErrors
             });
           }
 

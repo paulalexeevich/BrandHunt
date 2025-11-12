@@ -737,10 +737,15 @@ export default function ProjectViewPage() {
               const data = JSON.parse(line.slice(6));
 
               if (data.type === 'progress') {
+                const statsLine = data.success !== undefined 
+                  ? `✅ ${data.success} matched | ⏸️ ${data.noMatch || 0} no match | ❌ ${data.errors || 0} errors`
+                  : '';
+                
                 setMatchingProgress(
                   `🤖 Image ${i + 1}/${imageIds.length} | Product ${data.processed || 0}/${data.total || 0}\n` +
                   `Stage: ${data.stage || 'processing'}\n` +
-                  `${data.message || ''}`
+                  `${data.message || ''}\n` +
+                  (statsLine ? `\n${statsLine}` : '')
                 );
               } else if (data.type === 'complete') {
                 totalProcessed += data.processed || 0;
@@ -844,10 +849,15 @@ export default function ProjectViewPage() {
               const data = JSON.parse(line.slice(6));
 
               if (data.type === 'progress') {
+                const statsLine = data.success !== undefined 
+                  ? `✅ ${data.success} matched | ⏸️ ${data.noMatch || 0} no match | ❌ ${data.errors || 0} errors`
+                  : '';
+                
                 setMatchingProgress(
                   `🎯 Image ${i + 1}/${imageIds.length} | Product ${data.processed || 0}/${data.total || 0}\n` +
                   `Stage: ${data.stage || 'processing'}\n` +
-                  `${data.message || ''}`
+                  `${data.message || ''}\n` +
+                  (statsLine ? `\n${statsLine}` : '')
                 );
               } else if (data.type === 'complete') {
                 totalProcessed += data.processed || 0;

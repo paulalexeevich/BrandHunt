@@ -120,6 +120,11 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         const results: SearchAndSaveResult[] = [];
+        
+        // Track cumulative stats
+        let cumulativeSuccess = 0;
+        let cumulativeNoMatch = 0;
+        let cumulativeErrors = 0;
 
         // Helper to send progress updates
         const sendProgress = (update: ProgressUpdate) => {
@@ -191,13 +196,17 @@ export async function POST(request: NextRequest) {
             if (foodgraphResults.length === 0) {
               result.status = 'no_match';
               result.error = 'No FoodGraph results found';
+              cumulativeNoMatch++;
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'error',
                 message: 'No results found',
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
               return result;
             }
@@ -352,13 +361,17 @@ export async function POST(request: NextRequest) {
             if (preFilteredResults.length === 0) {
               result.status = 'no_match';
               result.error = 'No matches after pre-filtering';
+              cumulativeNoMatch++;
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'error',
                 message: 'No matches after pre-filter',
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
               return result;
             }
@@ -395,6 +408,7 @@ export async function POST(request: NextRequest) {
               console.error(`    ❌ Invalid bounding box data:`, detection.bounding_box || { y0: detection.y0, x0: detection.x0, y1: detection.y1, x1: detection.x1 });
               result.status = 'error';
               result.error = 'Invalid bounding box coordinates';
+              cumulativeErrors++;
               
               sendProgress({
                 type: 'progress',
@@ -402,7 +416,10 @@ export async function POST(request: NextRequest) {
                 stage: 'error',
                 message: 'Invalid coordinates',
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
               
               return result;
@@ -413,6 +430,7 @@ export async function POST(request: NextRequest) {
               console.error(`    ❌ NaN in bounding box:`, boundingBox);
               result.status = 'error';
               result.error = 'Invalid bounding box coordinates';
+              cumulativeErrors++;
               
               sendProgress({
                 type: 'progress',
@@ -420,7 +438,10 @@ export async function POST(request: NextRequest) {
                 stage: 'error',
                 message: 'Invalid coordinates',
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
               
               return result;
@@ -715,6 +736,8 @@ export async function POST(request: NextRequest) {
                 (result as any).selectionMethod = 'auto_select';
               }
 
+              cumulativeSuccess++;
+
               const methodLabel = visualMatchingApplied ? '🎯 Visual match' : consolidationApplied ? '🔄 Consolidated' : '✓ Auto-select';
               sendProgress({
                 type: 'progress',
@@ -722,7 +745,10 @@ export async function POST(request: NextRequest) {
                 stage: 'done',
                 message: `${methodLabel}: ${bestMatch.product_name}`,
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
 
               console.log(`  ✅ [#${detection.detection_index}] Complete`);
@@ -745,13 +771,18 @@ export async function POST(request: NextRequest) {
               result.error = `Manual review needed: ${almostSameMatches.length} similar matches found`;
               result.resultsSearched = comparisonResults.length;
               
+              cumulativeNoMatch++;
+              
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'done',
                 message: `⏸️ Manual review: ${almostSameMatches.length} matches`,
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
 
               console.log(`  ⏸️ [#${detection.detection_index}] Awaiting manual review - ${almostSameMatches.length} results saved for review`);
@@ -774,13 +805,18 @@ export async function POST(request: NextRequest) {
               result.error = 'No matching product found after AI filtering';
               result.resultsSearched = comparisonResults.length;
               
+              cumulativeNoMatch++;
+              
               sendProgress({
                 type: 'progress',
                 detectionIndex: detection.detection_index,
                 stage: 'error',
                 message: 'No match found',
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
 
               console.log(`  ⚠️ [#${detection.detection_index}] No match found - ${comparisonResults.length} results saved with "not_match" status`);
@@ -791,13 +827,18 @@ export async function POST(request: NextRequest) {
             result.error = error instanceof Error ? error.message : 'Unknown error';
             result.status = 'error';
             
+            cumulativeErrors++;
+            
             sendProgress({
               type: 'progress',
               detectionIndex: detection.detection_index,
               stage: 'error',
               message: `Error: ${result.error}`,
               processed: globalIndex + 1,
-              total: detections.length
+              total: detections.length,
+              success: cumulativeSuccess,
+              noMatch: cumulativeNoMatch,
+              errors: cumulativeErrors
             });
           }
 
