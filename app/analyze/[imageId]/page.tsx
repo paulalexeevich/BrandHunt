@@ -1421,22 +1421,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           </div>
         </div>
 
-        {/* Status Bar */}
-        <div className="bg-white rounded-xl shadow-md p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">
-                {!productsDetected ? 'Ready to analyze' : `${detections.length} products detected`}
-              </span>
-              {selectedDetection && (
-                <span className="text-sm font-semibold text-indigo-600">
-                  → Product #{detections.findIndex(d => d.id === selectedDetection) + 1} selected
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* BLOCK 1: Image Upload & Detection */}
         {!productsDetected && (
           <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-xl shadow-lg p-6 mb-6 border-2 border-orange-200">
