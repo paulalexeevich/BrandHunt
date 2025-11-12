@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, CheckCircle, Package, Trash2, ChevronDown, Settings
 import { getImageUrl } from '@/lib/image-utils';
 import { ImageStatisticsPanel } from '@/components/ImageStatisticsPanel';
 import { FoodGraphResultsList } from '@/components/FoodGraphResultsList';
+import { ProcessingBlocksPanel } from '@/components/ProcessingBlocksPanel';
 import type { 
   Detection, 
   FoodGraphResult, 
