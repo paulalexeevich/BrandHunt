@@ -2372,240 +2372,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </div>
                   )}
 
-                  {/* Contextual Analysis - Experimental Feature */}
-                  {detection.brand_name && (
-                    <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-lg p-4 shadow-sm">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">🔬</span>
-                          <div>
-                            <h4 className="font-semibold text-orange-900">Contextual Analysis (Experimental)</h4>
-                            <p className="text-xs text-orange-700">Use neighboring products to infer brand & size</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setShowContextAnalysis(!showContextAnalysis)}
-                          className="px-3 py-1 bg-orange-200 hover:bg-orange-300 text-orange-900 rounded text-sm font-medium transition-colors"
-                        >
-                          {showContextAnalysis ? 'Hide' : 'Show'}
-                        </button>
-                      </div>
-                      
-                      {showContextAnalysis && (
-                        <div className="space-y-3">
-                          <div className="p-3 bg-white rounded border border-orange-200">
-                            <p className="text-xs text-gray-700 mb-2">
-                              <strong>How it works:</strong> Analyzes a larger shelf area including 3+ products on each side. 
-                              Gemini uses visual patterns and neighbor context to predict brand/size when labels are partially hidden.
-                            </p>
-                            <div className="mt-3 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <label className="text-xs font-semibold text-gray-700">Prompt Version:</label>
-                                <select
-                                  value={contextPromptVersion}
-                                  onChange={(e) => setContextPromptVersion(e.target.value)}
-                                  className="px-2 py-1 border border-gray-300 rounded text-xs"
-                                  disabled={analyzingContext}
-                                >
-                                  <option value="v1">V1 - Detailed Context</option>
-                                  <option value="v2">V2 - Strategy-Based</option>
-                                  <option value="v3">V3 - Concise</option>
-                                </select>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  id="contextSaveResults"
-                                  checked={contextSaveResults}
-                                  onChange={(e) => setContextSaveResults(e.target.checked)}
-                                  disabled={analyzingContext}
-                                  className="rounded border-gray-300"
-                                />
-                                <label htmlFor="contextSaveResults" className="text-xs text-gray-700">
-                                  Save results to database
-                                </label>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <button
-                            onClick={() => handleContextualAnalysis(detection.id)}
-                            disabled={analyzingContext}
-                            className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
-                          >
-                            {analyzingContext ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Analyzing Context...
-                              </>
-                            ) : (
-                              '🔍 Analyze with Neighbors'
-                            )}
-                          </button>
-                          
-                          {/* Contextual Analysis Results */}
-                          {contextualAnalysis && (
-                            <div className="space-y-3">
-                              {/* Saved Success Message */}
-                              {contextualAnalysis.saved && (
-                                <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded">
-                                  <div className="flex items-center gap-2">
-                                    <CheckCircle className="w-4 h-4 text-green-600" />
-                                    <p className="text-sm font-semibold text-green-800">
-                                      Results saved to database
-                                    </p>
-                                  </div>
-                                  <p className="text-xs text-green-700 mt-1">
-                                    Contextual analysis results have been stored and can be accessed later.
-                                  </p>
-                                </div>
-                              )}
-                              
-                              {/* Expanded Crop Preview */}
-                              {contextualAnalysis.expanded_crop_preview && (
-                                <div className="p-3 bg-white rounded border border-orange-200">
-                                  <p className="text-xs font-semibold text-gray-700 mb-2">📸 Expanded Crop (includes neighbors):</p>
-                                  <img 
-                                    src={contextualAnalysis.expanded_crop_preview} 
-                                    alt="Expanded crop" 
-                                    className="w-full rounded border border-gray-300"
-                                  />
-                                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                                    <div>
-                                      <span className="font-semibold text-gray-600">Left neighbors:</span> {contextualAnalysis.neighbors.left.length}
-                                    </div>
-                                    <div>
-                                      <span className="font-semibold text-gray-600">Right neighbors:</span> {contextualAnalysis.neighbors.right.length}
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Neighbor Context */}
-                              <div className="p-3 bg-white rounded border border-orange-200">
-                                <p className="text-xs font-semibold text-gray-700 mb-2">📦 Neighbor Products:</p>
-                                <div className="grid grid-cols-2 gap-3 text-xs">
-                                  <div>
-                                    <p className="font-semibold text-gray-600 mb-1">← Left:</p>
-                                    {contextualAnalysis.neighbors.left.length > 0 ? (
-                                      <ul className="space-y-1">
-                                        {contextualAnalysis.neighbors.left.map((n: any, i: number) => (
-                                          <li key={i} className="text-gray-700">
-                                            #{n.index}: {n.brand || 'unknown'} {n.size || ''}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    ) : (
-                                      <p className="text-gray-500 italic">No left neighbors</p>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <p className="font-semibold text-gray-600 mb-1">Right →:</p>
-                                    {contextualAnalysis.neighbors.right.length > 0 ? (
-                                      <ul className="space-y-1">
-                                        {contextualAnalysis.neighbors.right.map((n: any, i: number) => (
-                                          <li key={i} className="text-gray-700">
-                                            #{n.index}: {n.brand || 'unknown'} {n.size || ''}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    ) : (
-                                      <p className="text-gray-500 italic">No right neighbors</p>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              {/* AI Analysis Results */}
-                              <div className="p-3 bg-white rounded border border-orange-200">
-                                <p className="text-xs font-semibold text-gray-700 mb-2">🤖 Gemini Analysis:</p>
-                                {contextualAnalysis.analysis.parse_error ? (
-                                  <div className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-2 rounded">
-                                    {contextualAnalysis.analysis.raw_response}
-                                  </div>
-                                ) : (
-                                  <div className="space-y-2 text-xs">
-                                    {/* Brand Inference */}
-                                    {(contextualAnalysis.analysis.inferred_brand || contextualAnalysis.analysis.brand) && (
-                                      <div className="p-2 bg-blue-50 rounded border border-blue-200">
-                                        <p className="font-semibold text-blue-900">
-                                          Inferred Brand: {contextualAnalysis.analysis.inferred_brand || contextualAnalysis.analysis.brand}
-                                        </p>
-                                        {(contextualAnalysis.analysis.brand_confidence !== undefined) && (
-                                          <p className="text-blue-700">
-                                            Confidence: {Math.round((contextualAnalysis.analysis.brand_confidence || 0) * 100)}%
-                                          </p>
-                                        )}
-                                        <p className="text-blue-800 mt-1">
-                                          {contextualAnalysis.analysis.brand_reasoning || 
-                                           contextualAnalysis.analysis.brand_method || 
-                                           contextualAnalysis.analysis.reasoning || 
-                                           'No reasoning provided'}
-                                        </p>
-                                      </div>
-                                    )}
-                                    
-                                    {/* Size Inference */}
-                                    {(contextualAnalysis.analysis.inferred_size || contextualAnalysis.analysis.size) && (
-                                      <div className="p-2 bg-green-50 rounded border border-green-200">
-                                        <p className="font-semibold text-green-900">
-                                          Inferred Size: {contextualAnalysis.analysis.inferred_size || contextualAnalysis.analysis.size}
-                                        </p>
-                                        {(contextualAnalysis.analysis.size_confidence !== undefined) && (
-                                          <p className="text-green-700">
-                                            Confidence: {Math.round((contextualAnalysis.analysis.size_confidence || 0) * 100)}%
-                                          </p>
-                                        )}
-                                        <p className="text-green-800 mt-1">
-                                          {contextualAnalysis.analysis.size_reasoning || 
-                                           contextualAnalysis.analysis.size_method || 
-                                           'No reasoning provided'}
-                                        </p>
-                                      </div>
-                                    )}
-                                    
-                                    {/* Visual Similarity */}
-                                    {contextualAnalysis.analysis.visual_similarity && (
-                                      <div className="p-2 bg-purple-50 rounded border border-purple-200">
-                                        <p className="font-semibold text-purple-900 mb-1">Visual Similarity:</p>
-                                        <p className="text-purple-700">
-                                          Left: {Math.round((contextualAnalysis.analysis.visual_similarity.left_similarity || contextualAnalysis.analysis.left_neighbor_similarity || 0) * 100)}% | 
-                                          Right: {Math.round((contextualAnalysis.analysis.visual_similarity.right_similarity || contextualAnalysis.analysis.right_neighbor_similarity || 0) * 100)}%
-                                        </p>
-                                        {contextualAnalysis.analysis.visual_similarity.description && (
-                                          <p className="text-purple-800 mt-1 text-xs">
-                                            {contextualAnalysis.analysis.visual_similarity.description}
-                                          </p>
-                                        )}
-                                      </div>
-                                    )}
-                                    
-                                    {/* Additional Notes */}
-                                    {(contextualAnalysis.analysis.notes || contextualAnalysis.analysis.explanation) && (
-                                      <div className="p-2 bg-gray-50 rounded border border-gray-200">
-                                        <p className="text-gray-700">
-                                          <strong>Notes:</strong> {contextualAnalysis.analysis.notes || contextualAnalysis.analysis.explanation}
-                                        </p>
-                                      </div>
-                                    )}
-                                    
-                                    {/* Overall Confidence */}
-                                    {contextualAnalysis.analysis.overall_confidence !== undefined && (
-                                      <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                                        <p className="text-yellow-900">
-                                          <strong>Overall Confidence:</strong> {Math.round(contextualAnalysis.analysis.overall_confidence * 100)}%
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
 
                   {/* Action Buttons */}
                   <div className="space-y-2">
@@ -3346,6 +3112,242 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     )}
                   </div>
                 )}
+
+                  {/* Contextual Analysis - Experimental Feature (moved below FoodGraph results) */}
+                  {detection.brand_name && (
+                    <div className="mt-4 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-lg p-4 shadow-sm">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">🔬</span>
+                          <div>
+                            <h4 className="font-semibold text-orange-900">Contextual Analysis (Experimental)</h4>
+                            <p className="text-xs text-orange-700">Use neighboring products to infer brand & size</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setShowContextAnalysis(!showContextAnalysis)}
+                          className="px-3 py-1 bg-orange-200 hover:bg-orange-300 text-orange-900 rounded text-sm font-medium transition-colors"
+                        >
+                          {showContextAnalysis ? 'Hide' : 'Show'}
+                        </button>
+                      </div>
+                      
+                      {showContextAnalysis && (
+                        <div className="space-y-3">
+                          <div className="p-3 bg-white rounded border border-orange-200">
+                            <p className="text-xs text-gray-700 mb-2">
+                              <strong>How it works:</strong> Analyzes a larger shelf area including 3+ products on each side. 
+                              Gemini uses visual patterns and neighbor context to predict brand/size when labels are partially hidden.
+                            </p>
+                            <div className="mt-3 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <label className="text-xs font-semibold text-gray-700">Prompt Version:</label>
+                                <select
+                                  value={contextPromptVersion}
+                                  onChange={(e) => setContextPromptVersion(e.target.value)}
+                                  className="px-2 py-1 border border-gray-300 rounded text-xs"
+                                  disabled={analyzingContext}
+                                >
+                                  <option value="v1">V1 - Detailed Context</option>
+                                  <option value="v2">V2 - Strategy-Based</option>
+                                  <option value="v3">V3 - Concise</option>
+                                </select>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id="contextSaveResults"
+                                  checked={contextSaveResults}
+                                  onChange={(e) => setContextSaveResults(e.target.checked)}
+                                  disabled={analyzingContext}
+                                  className="rounded border-gray-300"
+                                />
+                                <label htmlFor="contextSaveResults" className="text-xs text-gray-700">
+                                  Save results to database
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleContextualAnalysis(detection.id)}
+                            disabled={analyzingContext}
+                            className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
+                          >
+                            {analyzingContext ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Analyzing Context...
+                              </>
+                            ) : (
+                              '🔍 Analyze with Neighbors'
+                            )}
+                          </button>
+                          
+                          {/* Contextual Analysis Results */}
+                          {contextualAnalysis && (
+                            <div className="space-y-3">
+                              {/* Saved Success Message */}
+                              {contextualAnalysis.saved && (
+                                <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded">
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle className="w-4 h-4 text-green-600" />
+                                    <p className="text-sm font-semibold text-green-800">
+                                      Results saved to database
+                                    </p>
+                                  </div>
+                                  <p className="text-xs text-green-700 mt-1">
+                                    Contextual analysis results have been stored and can be accessed later.
+                                  </p>
+                                </div>
+                              )}
+                              
+                              {/* Expanded Crop Preview */}
+                              {contextualAnalysis.expanded_crop_preview && (
+                                <div className="p-3 bg-white rounded border border-orange-200">
+                                  <p className="text-xs font-semibold text-gray-700 mb-2">📸 Expanded Crop (includes neighbors):</p>
+                                  <img 
+                                    src={contextualAnalysis.expanded_crop_preview} 
+                                    alt="Expanded crop" 
+                                    className="w-full rounded border border-gray-300"
+                                  />
+                                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                      <span className="font-semibold text-gray-600">Left neighbors:</span> {contextualAnalysis.neighbors.left.length}
+                                    </div>
+                                    <div>
+                                      <span className="font-semibold text-gray-600">Right neighbors:</span> {contextualAnalysis.neighbors.right.length}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Neighbor Context */}
+                              <div className="p-3 bg-white rounded border border-orange-200">
+                                <p className="text-xs font-semibold text-gray-700 mb-2">📦 Neighbor Products:</p>
+                                <div className="grid grid-cols-2 gap-3 text-xs">
+                                  <div>
+                                    <p className="font-semibold text-gray-600 mb-1">← Left:</p>
+                                    {contextualAnalysis.neighbors.left.length > 0 ? (
+                                      <ul className="space-y-1">
+                                        {contextualAnalysis.neighbors.left.map((n: any, i: number) => (
+                                          <li key={i} className="text-gray-700">
+                                            #{n.index}: {n.brand || 'unknown'} {n.size || ''}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    ) : (
+                                      <p className="text-gray-500 italic">No left neighbors</p>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-gray-600 mb-1">Right →:</p>
+                                    {contextualAnalysis.neighbors.right.length > 0 ? (
+                                      <ul className="space-y-1">
+                                        {contextualAnalysis.neighbors.right.map((n: any, i: number) => (
+                                          <li key={i} className="text-gray-700">
+                                            #{n.index}: {n.brand || 'unknown'} {n.size || ''}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    ) : (
+                                      <p className="text-gray-500 italic">No right neighbors</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* AI Analysis Results */}
+                              <div className="p-3 bg-white rounded border border-orange-200">
+                                <p className="text-xs font-semibold text-gray-700 mb-2">🤖 Gemini Analysis:</p>
+                                {contextualAnalysis.analysis.parse_error ? (
+                                  <div className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-2 rounded">
+                                    {contextualAnalysis.analysis.raw_response}
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2 text-xs">
+                                    {/* Brand Inference */}
+                                    {(contextualAnalysis.analysis.inferred_brand || contextualAnalysis.analysis.brand) && (
+                                      <div className="p-2 bg-blue-50 rounded border border-blue-200">
+                                        <p className="font-semibold text-blue-900">
+                                          Inferred Brand: {contextualAnalysis.analysis.inferred_brand || contextualAnalysis.analysis.brand}
+                                        </p>
+                                        {(contextualAnalysis.analysis.brand_confidence !== undefined) && (
+                                          <p className="text-blue-700">
+                                            Confidence: {Math.round((contextualAnalysis.analysis.brand_confidence || 0) * 100)}%
+                                          </p>
+                                        )}
+                                        <p className="text-blue-800 mt-1">
+                                          {contextualAnalysis.analysis.brand_reasoning || 
+                                           contextualAnalysis.analysis.brand_method || 
+                                           contextualAnalysis.analysis.reasoning || 
+                                           'No reasoning provided'}
+                                        </p>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Size Inference */}
+                                    {(contextualAnalysis.analysis.inferred_size || contextualAnalysis.analysis.size) && (
+                                      <div className="p-2 bg-green-50 rounded border border-green-200">
+                                        <p className="font-semibold text-green-900">
+                                          Inferred Size: {contextualAnalysis.analysis.inferred_size || contextualAnalysis.analysis.size}
+                                        </p>
+                                        {(contextualAnalysis.analysis.size_confidence !== undefined) && (
+                                          <p className="text-green-700">
+                                            Confidence: {Math.round((contextualAnalysis.analysis.size_confidence || 0) * 100)}%
+                                          </p>
+                                        )}
+                                        <p className="text-green-800 mt-1">
+                                          {contextualAnalysis.analysis.size_reasoning || 
+                                           contextualAnalysis.analysis.size_method || 
+                                           'No reasoning provided'}
+                                        </p>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Visual Similarity */}
+                                    {contextualAnalysis.analysis.visual_similarity && (
+                                      <div className="p-2 bg-purple-50 rounded border border-purple-200">
+                                        <p className="font-semibold text-purple-900 mb-1">Visual Similarity:</p>
+                                        <p className="text-purple-700">
+                                          Left: {Math.round((contextualAnalysis.analysis.visual_similarity.left_similarity || contextualAnalysis.analysis.left_neighbor_similarity || 0) * 100)}% | 
+                                          Right: {Math.round((contextualAnalysis.analysis.visual_similarity.right_similarity || contextualAnalysis.analysis.right_neighbor_similarity || 0) * 100)}%
+                                        </p>
+                                        {contextualAnalysis.analysis.visual_similarity.description && (
+                                          <p className="text-purple-800 mt-1 text-xs">
+                                            {contextualAnalysis.analysis.visual_similarity.description}
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
+                                    
+                                    {/* Additional Notes */}
+                                    {(contextualAnalysis.analysis.notes || contextualAnalysis.analysis.explanation) && (
+                                      <div className="p-2 bg-gray-50 rounded border border-gray-200">
+                                        <p className="text-gray-700">
+                                          <strong>Notes:</strong> {contextualAnalysis.analysis.notes || contextualAnalysis.analysis.explanation}
+                                        </p>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Overall Confidence */}
+                                    {contextualAnalysis.analysis.overall_confidence !== undefined && (
+                                      <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
+                                        <p className="text-yellow-900">
+                                          <strong>Overall Confidence:</strong> {Math.round(contextualAnalysis.analysis.overall_confidence * 100)}%
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
               </div>
               );
             })()}
