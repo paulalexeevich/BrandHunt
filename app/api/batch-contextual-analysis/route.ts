@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
     // Fetch ALL detections for neighbor context
     const { data: allDetections, error: allDetectionsError } = await supabase
       .from('branghunt_detections')
-      .select('id, detection_index, bounding_box, brand_name, brand_confidence, product_name, size, size_confidence')
+      .select('id, detection_index, bounding_box, brand_name, brand_confidence, product_name, size, size_confidence, is_product')
       .eq('image_id', imageId)
       .order('detection_index');
 
