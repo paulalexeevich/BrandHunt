@@ -737,15 +737,20 @@ export default function ProjectViewPage() {
               const data = JSON.parse(line.slice(6));
 
               if (data.type === 'progress') {
-                const statsLine = data.success !== undefined 
-                  ? `✅ ${data.success} matched | ⏸️ ${data.noMatch || 0} no match | ❌ ${data.errors || 0} errors`
+                const currentImageStats = data.success !== undefined 
+                  ? `Current image: ✅ ${data.success} | ⏸️ ${data.noMatch || 0} | ❌ ${data.errors || 0}`
+                  : '';
+                
+                const overallStats = totalProcessed > 0
+                  ? `Overall total: ${totalProcessed + (data.processed || 0)} processed (✅ ${totalSuccess + (data.success || 0)} | ⏸️ ${totalNoMatch + (data.noMatch || 0)} | ❌ ${totalErrors + (data.errors || 0)})`
                   : '';
                 
                 setMatchingProgress(
                   `🤖 Image ${i + 1}/${imageIds.length} | Product ${data.processed || 0}/${data.total || 0}\n` +
                   `Stage: ${data.stage || 'processing'}\n` +
                   `${data.message || ''}\n` +
-                  (statsLine ? `\n${statsLine}` : '')
+                  (currentImageStats ? `\n${currentImageStats}` : '') +
+                  (overallStats ? `\n${overallStats}` : '')
                 );
               } else if (data.type === 'complete') {
                 totalProcessed += data.processed || 0;
@@ -849,15 +854,20 @@ export default function ProjectViewPage() {
               const data = JSON.parse(line.slice(6));
 
               if (data.type === 'progress') {
-                const statsLine = data.success !== undefined 
-                  ? `✅ ${data.success} matched | ⏸️ ${data.noMatch || 0} no match | ❌ ${data.errors || 0} errors`
+                const currentImageStats = data.success !== undefined 
+                  ? `Current image: ✅ ${data.success} | ⏸️ ${data.noMatch || 0} | ❌ ${data.errors || 0}`
+                  : '';
+                
+                const overallStats = totalProcessed > 0
+                  ? `Overall total: ${totalProcessed + (data.processed || 0)} processed (✅ ${totalSuccess + (data.success || 0)} | ⏸️ ${totalNoMatch + (data.noMatch || 0)} | ❌ ${totalErrors + (data.errors || 0)})`
                   : '';
                 
                 setMatchingProgress(
                   `🎯 Image ${i + 1}/${imageIds.length} | Product ${data.processed || 0}/${data.total || 0}\n` +
                   `Stage: ${data.stage || 'processing'}\n` +
                   `${data.message || ''}\n` +
-                  (statsLine ? `\n${statsLine}` : '')
+                  (currentImageStats ? `\n${currentImageStats}` : '') +
+                  (overallStats ? `\n${overallStats}` : '')
                 );
               } else if (data.type === 'complete') {
                 totalProcessed += data.processed || 0;
