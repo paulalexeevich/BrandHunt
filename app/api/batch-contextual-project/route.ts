@@ -1,7 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getImageBase64ForProcessing, getImageMimeType } from '@/lib/image-processor';
+
+// Enable Node.js runtime for streaming support
+export const runtime = 'nodejs';
+export const maxDuration = 300; // 5 minutes for batch processing
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
@@ -15,6 +19,7 @@ interface BoundingBox {
 
 interface Detection {
   id: string;
+  image_id: string;
   detection_index: number;
   bounding_box: BoundingBox;
   brand_name: string | null;
@@ -23,15 +28,6 @@ interface Detection {
   size: string | null;
   size_confidence: number | null;
   is_product: boolean | null;
-}
-
-interface ImageResult {
-  imageId: string;
-  imageName: string;
-  processed: number;
-  corrected: number;
-  skipped: number;
-  errors: number;
 }
 
 /**
@@ -214,251 +210,282 @@ Return your analysis in JSON format:
   }
 }
 
-/**
- * Process single image: find and correct low-confidence brands
- */
-async function processImage(
-  imageId: string,
-  imageName: string,
-  supabase: any
-): Promise<ImageResult> {
-  console.log(`\n🖼️  Processing image: ${imageName} (${imageId})`);
-
-  const result: ImageResult = {
-    imageId,
-    imageName,
-    processed: 0,
-    corrected: 0,
-    skipped: 0,
-    errors: 0,
-  };
-
-  try {
-    // Fetch the image data
-    const { data: image, error: imageError } = await supabase
-      .from('branghunt_images')
-      .select('*')
-      .eq('id', imageId)
-      .single();
-
-    if (imageError || !image) {
-      console.error(`   ❌ Image not found`);
-      result.errors = 1;
-      return result;
-    }
-
-    // Fetch ALL detections for neighbor context
-    const { data: allDetections, error: allDetectionsError } = await supabase
-      .from('branghunt_detections')
-      .select('id, detection_index, bounding_box, brand_name, brand_confidence, product_name, size, size_confidence, is_product')
-      .eq('image_id', imageId)
-      .order('detection_index');
-
-    if (allDetectionsError || !allDetections) {
-      console.error(`   ❌ Failed to fetch detections`);
-      result.errors = 1;
-      return result;
-    }
-
-    // Filter detections that need contextual analysis:
-    // - Have been through info extraction (brand_name is not null)
-    // - brand_name is 'Unknown' OR brand_confidence < 0.91
-    // - SKIP products marked as is_product = false (not actual products)
-    const detectionsToProcess = allDetections.filter(det => {
-      // Skip non-products
-      if (det.is_product === false) return false;
-      
-      // Must have brand_name (info extraction completed)
-      if (!det.brand_name) return false;
-      
-      // Filter: Unknown OR confidence < 91%
-      const brandUnknown = det.brand_name.toLowerCase() === 'unknown';
-      const lowConfidence = det.brand_confidence !== null && det.brand_confidence < 0.91;
-      
-      return brandUnknown || lowConfidence;
-    });
-
-    console.log(`   📊 Found ${detectionsToProcess.length} detections needing contextual analysis (out of ${allDetections.length} total)`);
-    console.log(`      - Unknown brand: ${detectionsToProcess.filter(d => d.brand_name?.toLowerCase() === 'unknown').length}`);
-    console.log(`      - Low confidence (<91%): ${detectionsToProcess.filter(d => d.brand_confidence !== null && d.brand_confidence < 0.91 && d.brand_name?.toLowerCase() !== 'unknown').length}`);
-
-    if (detectionsToProcess.length === 0) {
-      console.log(`   ✅ All products have high-confidence brands (≥91%)`);
-      return result;
-    }
-
-    // Get image data once for all detections
-    const imageBase64 = await getImageBase64ForProcessing(image);
-
-    // Process all detections in parallel
-    const processResults = await Promise.all(
-      detectionsToProcess.map(async (detection) => {
-        try {
-          console.log(`      [#${detection.detection_index}] Analyzing...`);
-
-          // Find neighbors
-          const { left, right } = findNeighbors(detection, allDetections);
-          
-          if (left.length === 0 && right.length === 0) {
-            console.log(`         ⚠️ No neighbors found, skipping`);
-            return { status: 'skipped' };
-          }
-
-          console.log(`         Found ${left.length} left, ${right.length} right neighbors`);
-
-          // Calculate expanded box
-          const expandedBox = calculateExpandedBox(
-            detection.bounding_box,
-            left,
-            right
-          );
-
-          // Extract expanded crop
-          const expandedCropBase64 = await extractExpandedCrop(imageBase64, expandedBox);
-
-          // Run contextual analysis with Gemini
-          const analysis = await analyzeWithContext(
-            expandedCropBase64,
-            detection,
-            left,
-            right
-          );
-
-          if (analysis.parse_error) {
-            console.log(`         ❌ Failed to parse Gemini response`);
-            return { status: 'error' };
-          }
-
-          // ALWAYS overwrite brand and size with contextual results
-          const updateData: any = {
-            // Store contextual data
-            contextual_brand: analysis.inferred_brand,
-            contextual_brand_confidence: analysis.brand_confidence,
-            contextual_brand_reasoning: analysis.brand_reasoning,
-            contextual_size: analysis.inferred_size,
-            contextual_size_confidence: analysis.size_confidence,
-            contextual_size_reasoning: analysis.size_reasoning,
-            contextual_overall_confidence: analysis.overall_confidence,
-            contextual_notes: analysis.notes,
-            contextual_prompt_version: 'v1',
-            contextual_analyzed_at: new Date().toISOString(),
-            contextual_left_neighbor_count: left.length,
-            contextual_right_neighbor_count: right.length,
-            corrected_by_contextual: true,
-            contextual_correction_notes: `Brand: "${detection.brand_name}" (${Math.round((detection.brand_confidence || 0) * 100)}%) → "${analysis.inferred_brand}" (${Math.round((analysis.brand_confidence || 0) * 100)}%); Size: "${detection.size || 'Unknown'}" → "${analysis.inferred_size}"`,
-          };
-
-          // ALWAYS overwrite brand and size (no confidence comparison)
-          updateData.brand_name = analysis.inferred_brand;
-          updateData.brand_confidence = analysis.brand_confidence;
-          updateData.size = analysis.inferred_size;
-          updateData.size_confidence = analysis.size_confidence;
-
-          const { error: updateError } = await supabase
-            .from('branghunt_detections')
-            .update(updateData)
-            .eq('id', detection.id);
-
-          if (updateError) {
-            console.error(`         ❌ Failed to save:`, updateError);
-            return { status: 'error' };
-          }
-
-          console.log(`         ✅ Corrected: ${analysis.inferred_brand} (${Math.round((analysis.brand_confidence || 0) * 100)}%)`);
-          return { status: 'corrected' };
-
-        } catch (error) {
-          console.error(`         ❌ Error:`, error);
-          return { status: 'error' };
-        }
-      })
-    );
-
-    // Count results
-    result.processed = processResults.length;
-    result.corrected = processResults.filter(r => r.status === 'corrected').length;
-    result.skipped = processResults.filter(r => r.status === 'skipped').length;
-    result.errors = processResults.filter(r => r.status === 'error').length;
-
-    console.log(`   ✅ Image complete: ${result.corrected} corrected, ${result.skipped} skipped, ${result.errors} errors`);
-
-  } catch (error) {
-    console.error(`   ❌ Image processing error:`, error);
-    result.errors = 1;
-  }
-
-  return result;
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const { projectId } = await request.json();
+    const { projectId, concurrency = 50 } = await request.json();
 
     if (!projectId) {
-      return NextResponse.json({ 
-        error: 'Missing projectId parameter' 
-      }, { status: 400 });
+      const encoder = new TextEncoder();
+      return new Response(
+        encoder.encode(`data: ${JSON.stringify({ type: 'error', error: 'Missing projectId parameter' })}\n\n`),
+        { status: 400, headers: { 'Content-Type': 'text/event-stream' } }
+      );
     }
 
-    console.log(`🔬 Starting automated batch contextual analysis for project ${projectId}...`);
+    console.log(`🔬 Starting DETECTION-LEVEL batch contextual analysis for project ${projectId} with concurrency ${concurrency}...`);
 
     const supabase = await createAuthenticatedSupabaseClient();
 
     // Fetch all images in the project
     const { data: images, error: imagesError } = await supabase
       .from('branghunt_images')
-      .select('id, original_filename')
+      .select('*')
       .eq('project_id', projectId)
       .order('created_at');
 
     if (imagesError || !images || images.length === 0) {
-      return NextResponse.json({ 
-        error: 'No images found in project',
-        details: imagesError?.message 
-      }, { status: 404 });
+      const encoder = new TextEncoder();
+      return new Response(
+        encoder.encode(`data: ${JSON.stringify({ type: 'error', error: 'No images found in project' })}\n\n`),
+        { status: 404, headers: { 'Content-Type': 'text/event-stream' } }
+      );
     }
 
-    console.log(`📊 Found ${images.length} images in project`);
+    console.log(`📸 Found ${images.length} images in project`);
 
-    // Process each image sequentially (to avoid overwhelming Gemini API)
-    const imageResults: ImageResult[] = [];
-    
-    for (const image of images) {
-      const result = await processImage(image.id, image.original_filename, supabase);
-      imageResults.push(result);
+    // Fetch ALL detections from ALL images
+    const { data: allDetections, error: detectionsError } = await supabase
+      .from('branghunt_detections')
+      .select('*')
+      .in('image_id', images.map(img => img.id))
+      .not('brand_name', 'is', null)  // Must have brand_name (extraction completed)
+      .order('image_id', { ascending: true })
+      .order('detection_index', { ascending: true });
+
+    if (detectionsError) {
+      const encoder = new TextEncoder();
+      return new Response(
+        encoder.encode(`data: ${JSON.stringify({ type: 'error', error: 'Failed to fetch detections' })}\n\n`),
+        { status: 500, headers: { 'Content-Type': 'text/event-stream' } }
+      );
     }
 
-    // Calculate totals
-    const totalProcessed = imageResults.reduce((sum, r) => sum + r.processed, 0);
-    const totalCorrected = imageResults.reduce((sum, r) => sum + r.corrected, 0);
-    const totalSkipped = imageResults.reduce((sum, r) => sum + r.skipped, 0);
-    const totalErrors = imageResults.reduce((sum, r) => sum + r.errors, 0);
+    if (!allDetections || allDetections.length === 0) {
+      const encoder = new TextEncoder();
+      return new Response(
+        encoder.encode(`data: ${JSON.stringify({ type: 'complete', message: 'No detections with extracted info found' })}\n\n`),
+        { headers: { 'Content-Type': 'text/event-stream' } }
+      );
+    }
 
-    console.log(`\n✅ Batch contextual analysis complete for project:`);
-    console.log(`   Images processed: ${images.length}`);
-    console.log(`   Products analyzed: ${totalProcessed}`);
-    console.log(`   Brands corrected: ${totalCorrected}`);
-    console.log(`   Skipped (no neighbors): ${totalSkipped}`);
-    console.log(`   Errors: ${totalErrors}`);
+    // Filter detections that need contextual analysis
+    const detectionsToProcess = allDetections.filter(det => {
+      if (det.is_product === false) return false;
+      
+      const brandUnknown = det.brand_name?.toLowerCase() === 'unknown';
+      const lowConfidence = det.brand_confidence !== null && det.brand_confidence < 0.91;
+      
+      return brandUnknown || lowConfidence;
+    });
 
-    return NextResponse.json({
-      message: `Processed ${images.length} images, corrected ${totalCorrected} products`,
-      imagesProcessed: images.length,
-      totalProcessed,
-      totalCorrected,
-      totalSkipped,
-      totalErrors,
-      imageResults
+    const totalToProcess = detectionsToProcess.length;
+    console.log(`📊 Total detections to analyze: ${totalToProcess} (out of ${allDetections.length} total)`);
+    console.log(`   - Unknown brand: ${detectionsToProcess.filter(d => d.brand_name?.toLowerCase() === 'unknown').length}`);
+    console.log(`   - Low confidence (<91%): ${detectionsToProcess.filter(d => d.brand_confidence !== null && d.brand_confidence < 0.91 && d.brand_name?.toLowerCase() !== 'unknown').length}`);
+
+    // Create streaming response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const sendProgress = (data: any) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
+
+        try {
+          // Send initial progress
+          sendProgress({
+            type: 'start',
+            totalDetections: totalToProcess,
+            processedDetections: 0,
+            message: `Starting contextual analysis for ${totalToProcess} detections across ${images.length} images...`
+          });
+
+          if (totalToProcess === 0) {
+            sendProgress({
+              type: 'complete',
+              totalDetections: 0,
+              processedDetections: 0,
+              summary: { successful: 0, skipped: 0, failed: 0 },
+              message: 'All products have high-confidence brands (≥91%)'
+            });
+            controller.close();
+            return;
+          }
+
+          // Create image lookup map
+          const imageMap = new Map(images.map(img => [img.id, img]));
+          
+          // Create detections-by-image map for neighbor lookup
+          const detectionsByImage = new Map<string, Detection[]>();
+          allDetections.forEach(det => {
+            if (!detectionsByImage.has(det.image_id)) {
+              detectionsByImage.set(det.image_id, []);
+            }
+            detectionsByImage.get(det.image_id)!.push(det);
+          });
+
+          let processedCount = 0;
+          let correctedCount = 0;
+          let skippedCount = 0;
+          let errorCount = 0;
+
+          // Process detections with concurrency
+          for (let i = 0; i < detectionsToProcess.length; i += concurrency) {
+            const batch = detectionsToProcess.slice(i, i + concurrency);
+            const batchNum = Math.floor(i/concurrency) + 1;
+            const totalBatches = Math.ceil(detectionsToProcess.length/concurrency);
+            
+            console.log(`\n📦 Processing batch ${batchNum}/${totalBatches} (${batch.length} detections)...`);
+            
+            // Start all detections in batch in parallel
+            const batchPromises = batch.map(async (detection) => {
+              const image = imageMap.get(detection.image_id);
+              if (!image) {
+                return { success: false, skipped: false };
+              }
+
+              try {
+                // Get all detections for this image (for neighbors)
+                const imageDetections = detectionsByImage.get(detection.image_id) || [];
+                
+                // Find neighbors
+                const { left, right } = findNeighbors(detection, imageDetections);
+                
+                if (left.length === 0 && right.length === 0) {
+                  return { success: false, skipped: true };
+                }
+
+                // Get image data
+                const imageBase64 = await getImageBase64ForProcessing(image);
+                
+                // Calculate expanded box
+                const expandedBox = calculateExpandedBox(detection.bounding_box, left, right);
+                
+                // Extract expanded crop
+                const expandedCropBase64 = await extractExpandedCrop(imageBase64, expandedBox);
+                
+                // Run contextual analysis
+                const analysis = await analyzeWithContext(expandedCropBase64, detection, left, right);
+                
+                if (analysis.parse_error) {
+                  return { success: false, skipped: false };
+                }
+
+                // ALWAYS overwrite brand and size
+                const updateData: any = {
+                  contextual_brand: analysis.inferred_brand,
+                  contextual_brand_confidence: analysis.brand_confidence,
+                  contextual_brand_reasoning: analysis.brand_reasoning,
+                  contextual_size: analysis.inferred_size,
+                  contextual_size_confidence: analysis.size_confidence,
+                  contextual_size_reasoning: analysis.size_reasoning,
+                  contextual_overall_confidence: analysis.overall_confidence,
+                  contextual_notes: analysis.notes,
+                  contextual_prompt_version: 'v1',
+                  contextual_analyzed_at: new Date().toISOString(),
+                  contextual_left_neighbor_count: left.length,
+                  contextual_right_neighbor_count: right.length,
+                  corrected_by_contextual: true,
+                  contextual_correction_notes: `Brand: "${detection.brand_name}" (${Math.round((detection.brand_confidence || 0) * 100)}%) → "${analysis.inferred_brand}" (${Math.round((analysis.brand_confidence || 0) * 100)}%); Size: "${detection.size || 'Unknown'}" → "${analysis.inferred_size}"`,
+                  brand_name: analysis.inferred_brand,
+                  brand_confidence: analysis.brand_confidence,
+                  size: analysis.inferred_size,
+                  size_confidence: analysis.size_confidence,
+                };
+
+                const { error: updateError } = await supabase
+                  .from('branghunt_detections')
+                  .update(updateData)
+                  .eq('id', detection.id);
+
+                if (updateError) {
+                  throw new Error(`Database update failed: ${updateError.message}`);
+                }
+
+                return { success: true, skipped: false };
+
+              } catch (error) {
+                console.error(`❌ Detection error:`, error);
+                return { success: false, skipped: false };
+              }
+            });
+
+            // Await each detection sequentially to send progress updates
+            for (const promise of batchPromises) {
+              const result = await promise;
+              processedCount++;
+              
+              if (result.success) {
+                correctedCount++;
+              } else if (result.skipped) {
+                skippedCount++;
+              } else {
+                errorCount++;
+              }
+
+              // Send progress update after EACH detection
+              sendProgress({
+                type: 'progress',
+                totalDetections: totalToProcess,
+                processedDetections: processedCount,
+                corrected: correctedCount,
+                skipped: skippedCount,
+                failed: errorCount,
+                message: `Analyzing: ${processedCount}/${totalToProcess} detections (${correctedCount} corrected, ${skippedCount} skipped, ${errorCount} errors)`
+              });
+            }
+          }
+
+          console.log(`\n✅ Batch contextual analysis complete: ${correctedCount} corrected, ${skippedCount} skipped, ${errorCount} errors`);
+
+          // Send completion message
+          sendProgress({
+            type: 'complete',
+            totalDetections: totalToProcess,
+            processedDetections: processedCount,
+            summary: {
+              successful: correctedCount,
+              skipped: skippedCount,
+              failed: errorCount
+            },
+            message: `Completed: ${correctedCount}/${processedCount} brands corrected (${skippedCount} skipped, ${errorCount} errors)`
+          });
+
+          controller.close();
+        } catch (error) {
+          console.error('Error in batch contextual analysis:', error);
+          sendProgress({
+            type: 'error',
+            error: 'Batch contextual analysis failed',
+            details: error instanceof Error ? error.message : 'Unknown error'
+          });
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
 
   } catch (error) {
     console.error('Batch contextual analysis error:', error);
-    return NextResponse.json({ 
-      error: 'Batch contextual analysis failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    const encoder = new TextEncoder();
+    return new Response(
+      encoder.encode(`data: ${JSON.stringify({ 
+        type: 'error',
+        error: 'Batch contextual analysis failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      })}\n\n`),
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'text/event-stream' }
+      }
+    );
   }
 }
-
-export const maxDuration = 300; // 5 minutes for batch processing
 

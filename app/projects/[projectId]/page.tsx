@@ -541,14 +541,13 @@ export default function ProjectViewPage() {
     }
 
     setBatchContextual(true);
-    setBatchProgress(`🔬 Starting automated contextual analysis...\n📊 Finding products that need improvement...`);
+    setBatchProgress('🔬 Starting automated contextual analysis...');
 
     try {
-      // Call the automated batch contextual analysis endpoint for entire project
       const response = await fetch('/api/batch-contextual-project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, concurrency: 50 }),
         credentials: 'include'
       });
 
@@ -557,25 +556,74 @@ export default function ProjectViewPage() {
         throw new Error(result.details || result.error || 'Batch contextual analysis failed');
       }
 
-      const result = await response.json();
-      
-      setBatchProgress(
-        `✅ Contextual Analysis Complete!\n\n` +
-        `Images processed: ${result.imagesProcessed}\n` +
-        `Products analyzed: ${result.totalProcessed}\n` +
-        `Brands corrected: ${result.totalCorrected}\n` +
-        `Skipped (no neighbors): ${result.totalSkipped}\n` +
-        `Errors: ${result.totalErrors}`
-      );
+      // Handle Server-Sent Events stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      // Auto-hide success message after 5s
-      if (result.totalErrors === 0) {
-        setTimeout(() => setBatchProgress(''), 5000);
+      if (!reader) {
+        throw new Error('Failed to get response stream');
       }
 
-      // Reload images to update UI
-      await fetchImages(page);
-
+      console.log('📡 Starting SSE stream reader for batch contextual analysis...');
+      let buffer = '';
+      let chunkCount = 0;
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('📡 Stream complete, received', chunkCount, 'chunks');
+          break;
+        }
+        
+        chunkCount++;
+        const chunk = decoder.decode(value, { stream: true });
+        console.log(`📡 Chunk ${chunkCount}:`, chunk.substring(0, 100));
+        
+        buffer += chunk;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith('data: ')) continue;
+          
+          const dataStr = line.substring(6);
+          
+          try {
+            const data = JSON.parse(dataStr);
+            console.log('📊 SSE Event:', data.type, data);
+            
+            if (data.type === 'start') {
+              setBatchProgress(`🚀 Starting...\n${data.message}`);
+            } else if (data.type === 'progress') {
+              setBatchProgress(
+                `⚡ Analyzing: ${data.processedDetections}/${data.totalDetections} detections\n\n` +
+                `✅ Corrected: ${data.corrected}\n` +
+                `⏭️  Skipped: ${data.skipped}\n` +
+                `❌ Errors: ${data.failed}`
+              );
+            } else if (data.type === 'complete') {
+              const summary = data.summary || {};
+              setBatchProgress(
+                `✅ Contextual Analysis Complete!\n\n` +
+                `Total processed: ${data.processedDetections}\n` +
+                `Brands corrected: ${summary.successful || 0}\n` +
+                `Skipped (no neighbors): ${summary.skipped || 0}\n` +
+                `Errors: ${summary.failed || 0}`
+              );
+              
+              // Auto-hide success message after 5s
+              if ((summary.failed || 0) === 0) {
+                setTimeout(() => setBatchProgress(''), 5000);
+              }
+            } else if (data.type === 'error') {
+              throw new Error(data.details || data.error || 'Batch contextual analysis failed');
+            }
+          } catch (parseError) {
+            console.error('Failed to parse SSE data:', line, parseError);
+          }
+        }
+      }
     } catch (error) {
       console.error('Batch contextual analysis error:', error);
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
