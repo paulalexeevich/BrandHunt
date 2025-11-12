@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, CheckCircle, Package, Trash2, ChevronDown, Settings } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle, Package, Trash2, ChevronDown, Settings, Cpu } from 'lucide-react';
 import { getImageUrl } from '@/lib/image-utils';
 
 interface BoundingBox {
@@ -145,6 +145,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [showContextAnalysis, setShowContextAnalysis] = useState(false);
   const [contextSaveResults, setContextSaveResults] = useState(true);
   const [showBlock2, setShowBlock2] = useState(false);
+  const [showProcessingBlocks, setShowProcessingBlocks] = useState(false);
 
   useEffect(() => {
     fetchImage();
@@ -1401,14 +1402,27 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               <ArrowLeft className="w-4 h-4" />
               {image?.project_id ? 'Back to Project' : 'Back to Projects'}
             </Link>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={deleting}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete Image
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowProcessingBlocks(!showProcessingBlocks)}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  showProcessingBlocks
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-2 border-indigo-300'
+                }`}
+              >
+                <Cpu className="w-4 h-4" />
+                Image Processing
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Image
+              </button>
+            </div>
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{image.original_filename}</h1>
@@ -1481,7 +1495,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         )}
 
         {/* BLOCK 1 (continued): Extract Information - Only show after detection */}
-        {productsDetected && (() => {
+        {showProcessingBlocks && productsDetected && (() => {
           const needsInfo = detections.filter(d => !d.brand_name).length;
           const needsPrice = detections.filter(d => d.brand_name && (!d.price || d.price === 'Unknown')).length;
           const hasExtractionWork = needsInfo > 0 || needsPrice > 0;
@@ -1537,7 +1551,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         })()}
 
         {/* BLOCK 2: Product Matching with FoodGraph - Dual Pipeline */}
-        {productsDetected && (() => {
+        {showProcessingBlocks && productsDetected && (() => {
           const needsSearch = detections.filter(d => d.brand_name && !d.fully_analyzed).length;
           const isProcessing = processingPipelineAI || processingPipelineVisual;
           
@@ -1693,7 +1707,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         )}
 
         {/* Batch Processing Progress - Split by Blocks */}
-        {(processingStep1 || processingStep2 || step1Progress || step2Progress) && (
+        {showProcessingBlocks && (processingStep1 || processingStep2 || step1Progress || step2Progress) && (
           <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-lg p-4 mb-6">
             <h3 className="font-bold text-orange-900 mb-3">📊 Block 1 Progress: Extraction</h3>
             <div className="grid grid-cols-2 gap-3 text-sm">
@@ -1720,7 +1734,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
         )}
 
         {/* Pipeline Progress Tracking */}
-        {((processingPipelineAI || processingPipelineVisual || pipelineProgress) || (processingStep3 || step3Progress)) && (
+        {showProcessingBlocks && ((processingPipelineAI || processingPipelineVisual || pipelineProgress) || (processingStep3 || step3Progress)) && (
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-lg p-4 mb-6">
             <h3 className="font-bold text-blue-900 mb-3">
               📊 Block 2 Progress: {activePipeline === 'ai' ? '🤖 AI Filter Pipeline' : activePipeline === 'visual' ? '🎯 Visual-Only Pipeline' : 'FoodGraph Matching'}
