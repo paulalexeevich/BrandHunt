@@ -150,7 +150,10 @@ export async function POST(request: NextRequest) {
               message: `Searching FoodGraph...`,
               currentProduct: detection.brand_name || `Product #${detection.detection_index}`,
               processed: globalIndex + 1,
-              total: detections.length
+              total: detections.length,
+              success: cumulativeSuccess,
+              noMatch: cumulativeNoMatch,
+              errors: cumulativeErrors
             });
 
             // Parse product info
@@ -249,7 +252,10 @@ export async function POST(request: NextRequest) {
               message: `Pre-filtering ${foodgraphResults.length} results...`,
               resultsFound: foodgraphResults.length,
               processed: globalIndex + 1,
-              total: detections.length
+              total: detections.length,
+              success: cumulativeSuccess,
+              noMatch: cumulativeNoMatch,
+              errors: cumulativeErrors
             });
 
             console.log(`  [#${detection.detection_index}] Pre-filtering ${foodgraphResults.length} results...`);
@@ -324,7 +330,10 @@ export async function POST(request: NextRequest) {
               message: `🎯 Visual matching ${preFilteredResults.length} candidates...`,
               preFilteredCount: preFilteredResults.length,
               processed: globalIndex + 1,
-              total: detections.length
+              total: detections.length,
+              success: cumulativeSuccess,
+              noMatch: cumulativeNoMatch,
+              errors: cumulativeErrors
             });
 
             console.log(`  [#${detection.detection_index}] 🎯 VISUAL MATCHING: ${preFilteredResults.length} pre-filtered candidates...`);
@@ -467,7 +476,10 @@ export async function POST(request: NextRequest) {
                 stage: 'saving',
                 message: `Saving visual match...`,
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
 
               console.log(`  [#${detection.detection_index}] Saving visual match: ${bestMatch.product_name}`);

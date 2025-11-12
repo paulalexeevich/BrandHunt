@@ -150,7 +150,10 @@ export async function POST(request: NextRequest) {
               message: `Searching FoodGraph...`,
               currentProduct: detection.brand_name || `Product #${detection.detection_index}`,
               processed: globalIndex + 1,
-              total: detections.length
+              total: detections.length,
+              success: cumulativeSuccess,
+              noMatch: cumulativeNoMatch,
+              errors: cumulativeErrors
             });
 
             // Parse product info
@@ -219,7 +222,10 @@ export async function POST(request: NextRequest) {
               message: `Pre-filtering ${foodgraphResults.length} results...`,
               resultsFound: foodgraphResults.length,
               processed: globalIndex + 1,
-              total: detections.length
+              total: detections.length,
+              success: cumulativeSuccess,
+              noMatch: cumulativeNoMatch,
+              errors: cumulativeErrors
             });
 
             // SAVE STAGE 1: Raw search results
@@ -274,7 +280,10 @@ export async function POST(request: NextRequest) {
                 stage: 'saving',
                 message: `💾 Search: ${searchInserts.length} results saved`,
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
             }
 
@@ -344,7 +353,10 @@ export async function POST(request: NextRequest) {
                 stage: 'saving',
                 message: `💾 Pre-filter: ${preFilterInserts.length} results saved`,
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
             }
 
@@ -355,7 +367,10 @@ export async function POST(request: NextRequest) {
               message: `Pre-filtered to ${preFilteredResults.length} results`,
               preFilteredCount: preFilteredResults.length,
               processed: globalIndex + 1,
-              total: detections.length
+              total: detections.length,
+              success: cumulativeSuccess,
+              noMatch: cumulativeNoMatch,
+              errors: cumulativeErrors
             });
 
             if (preFilteredResults.length === 0) {
@@ -384,7 +399,10 @@ export async function POST(request: NextRequest) {
               message: `AI filtering ${preFilteredResults.length} results...`,
               resultsFound: preFilteredResults.length,
               processed: globalIndex + 1,
-              total: detections.length
+              total: detections.length,
+              success: cumulativeSuccess,
+              noMatch: cumulativeNoMatch,
+              errors: cumulativeErrors
             });
 
             console.log(`  [#${detection.detection_index}] AI filtering ${preFilteredResults.length} pre-filtered results...`);
@@ -688,7 +706,10 @@ export async function POST(request: NextRequest) {
                 stage: 'saving',
                 message: `Saving match...`,
                 processed: globalIndex + 1,
-                total: detections.length
+                total: detections.length,
+                success: cumulativeSuccess,
+                noMatch: cumulativeNoMatch,
+                errors: cumulativeErrors
               });
 
               console.log(`  [#${detection.detection_index}] Saving: ${bestMatch.product_name}`);
