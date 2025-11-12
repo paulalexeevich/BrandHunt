@@ -2192,6 +2192,31 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               
               return (
                 <div className="space-y-4">
+                  {/* FoodGraph Match - Show if saved */}
+                  {detection.fully_analyzed && detection.selected_foodgraph_image_url && (
+                    <div className="bg-white border-2 border-blue-300 rounded-lg p-4 shadow-sm">
+                      <div className="flex gap-3">
+                        <img
+                          src={detection.selected_foodgraph_image_url}
+                          alt={detection.selected_foodgraph_product_name || 'Product'}
+                          className="w-24 h-24 object-contain bg-white rounded-lg shadow-sm flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-blue-900 mb-1">📦 FoodGraph Match</p>
+                          <p className="text-sm font-bold text-blue-900 truncate">{detection.selected_foodgraph_product_name}</p>
+                          <p className="text-xs text-blue-700">{detection.selected_foodgraph_brand_name}</p>
+                          {detection.selected_foodgraph_gtin && (
+                            <div className="mt-2 pt-2 border-t border-blue-200">
+                              <p className="text-xs text-gray-600">
+                                <span className="font-semibold">UPC/GTIN:</span> <span className="font-mono text-blue-600">{detection.selected_foodgraph_gtin}</span>
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Extracted Product Information */}
                   {detection.brand_name ? (
                     <div className="bg-white border-2 border-gray-200 rounded-lg p-4 shadow-sm">
@@ -2220,31 +2245,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           💡 {detection.extraction_notes}
                         </div>
                       )}
-                      
-                      {/* FoodGraph Match - Show if saved */}
-                      {detection.fully_analyzed && detection.selected_foodgraph_image_url && (
-                        <div className="mb-4 p-3 bg-blue-50 border-2 border-blue-300 rounded-lg">
-                          <div className="flex gap-3">
-                            <img
-                              src={detection.selected_foodgraph_image_url}
-                              alt={detection.selected_foodgraph_product_name || 'Product'}
-                              className="w-24 h-24 object-contain bg-white rounded-lg shadow-sm flex-shrink-0"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-blue-900 mb-1">📦 FoodGraph Match</p>
-                              <p className="text-sm font-bold text-blue-900 truncate">{detection.selected_foodgraph_product_name}</p>
-                              <p className="text-xs text-blue-700">{detection.selected_foodgraph_brand_name}</p>
-                              {detection.selected_foodgraph_gtin && (
-                                <div className="mt-2 pt-2 border-t border-blue-200">
-                                  <p className="text-xs text-gray-600">
-                                    <span className="font-semibold">UPC/GTIN:</span> <span className="font-mono text-blue-600">{detection.selected_foodgraph_gtin}</span>
-                                  </p>
-                </div>
-                          )}
-                        </div>
-                      </div>
-                          </div>
-                        )}
                       
                       {/* Extracted Data from Image */}
                       <div className="space-y-2 text-sm">
