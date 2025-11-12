@@ -2,39 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { extractProductInfo } from '@/lib/gemini';
 import { getImageBase64ForProcessing, getImageMimeType } from '@/lib/image-processor';
+import { createSSEResponse, BatchProcessor, CumulativeStats, validateConcurrency } from '@/lib/batch-processor';
+import { fetchDetectionsByProject, fetchImagesForDetections } from '@/lib/batch-queries';
 
 // Enable Node.js runtime for streaming support
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for batch processing
 
-interface ExtractionResult {
+const MAX_CONCURRENCY = 300;
+const DEFAULT_CONCURRENCY = 150;
+
+interface DetectionResult {
+  success: boolean;
+  detectionId: string;
   imageId: string;
-  originalFilename: string;
-  status: 'success' | 'error';
-  processedDetections?: number;
+  detectionIndex: number;
   error?: string;
 }
 
 /**
  * POST /api/batch-extract-project
  * Extract product info (brand, name, description) from detected products across multiple images
- * Processes images in parallel with configurable concurrency
- * Returns streaming progress updates
+ * 
+ * REFACTORED to use Phase 1 utilities:
+ * - createSSEResponse() for streaming
+ * - BatchProcessor for concurrent processing
+ * - fetchDetectionsByProject() for queries
+ * - CumulativeStats for tracking
  */
-interface DetectionWithImage {
-  detection: any;
-  imageData: {
-    id: string;
-    file_path: string | null;
-    s3_url: string | null;
-    storage_type: string;
-    mime_type: string | null;
-  };
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const { projectId, concurrency = 300 } = await request.json();  // Testing 300 concurrent detections (~3000 RPM - pushing limits!)
+    const { projectId, concurrency } = await request.json();
 
     if (!projectId) {
       return NextResponse.json({ 
@@ -42,59 +40,22 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`📋 Starting DETECTION-LEVEL batch extraction for project ${projectId} with concurrency ${concurrency}...`);
+    const effectiveConcurrency = validateConcurrency(concurrency, DEFAULT_CONCURRENCY, MAX_CONCURRENCY);
+    console.log(`📋 Starting batch extraction for project ${projectId} (concurrency: ${effectiveConcurrency})`);
 
-    // Create authenticated Supabase client
     const supabase = await createAuthenticatedSupabaseClient();
 
-    // Fetch all images that have detections
-    const { data: images, error: imagesError } = await supabase
-      .from('branghunt_images')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('detection_completed', true)
-      .order('created_at');
+    // Use utility to fetch detections
+    const { detections, imageMap, imageIds } = await fetchDetectionsByProject(
+      supabase,
+      projectId,
+      {
+        isProduct: true,  // Include NULL (unclassified) and TRUE (products)
+        hasExtractedInfo: false  // Only detections without brand_name
+      }
+    );
 
-    if (imagesError) {
-      console.error('❌ Error fetching images:', imagesError);
-      return NextResponse.json({ 
-        error: 'Failed to fetch images',
-        details: imagesError.message 
-      }, { status: 500 });
-    }
-
-    if (!images || images.length === 0) {
-      console.log(`⚠️  No images found for project ${projectId} with detection_completed=true`);
-      return NextResponse.json({
-        message: 'No images with detections found',
-        processed: 0,
-        results: []
-      });
-    }
-
-    console.log(`📸 Found ${images.length} images with detections for project ${projectId}`);
-
-    // Fetch ALL detections from ALL images that need extraction
-    console.log(`🔍 Fetching all detections needing extraction...`);
-    const { data: allDetections, error: detectionsError } = await supabase
-      .from('branghunt_detections')
-      .select('*')
-      .in('image_id', images.map(img => img.id))
-      .is('brand_name', null)
-      .or('is_product.is.null,is_product.eq.true')
-      .order('image_id', { ascending: true })
-      .order('detection_index', { ascending: true });
-
-    if (detectionsError) {
-      console.error('❌ Error fetching detections:', detectionsError);
-      return NextResponse.json({ 
-        error: 'Failed to fetch detections',
-        details: detectionsError.message 
-      }, { status: 500 });
-    }
-
-    if (!allDetections || allDetections.length === 0) {
-      console.log(`ℹ️  No detections need extraction`);
+    if (detections.length === 0) {
       return NextResponse.json({
         message: 'No detections to process',
         processed: 0,
@@ -102,164 +63,61 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const totalDetectionsToExtract = allDetections.length;
-    console.log(`📊 Total detections to extract: ${totalDetectionsToExtract}`);
+    // Fetch image data for processing
+    const images = await fetchImagesForDetections(supabase, imageIds);
 
-    // Create a streaming response
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        const sendProgress = (data: any) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-        };
+    console.log(`📊 Found ${detections.length} detections across ${imageIds.length} images`);
 
-        try {
-          // Send initial progress
+    // Use SSE utility for streaming response
+    return createSSEResponse(async (sendProgress) => {
+      const stats = new CumulativeStats();
+
+      sendProgress({
+        type: 'start',
+        totalDetections: detections.length,
+        message: `Starting extraction for ${detections.length} detections...`
+      });
+
+      // Use BatchProcessor for concurrent processing
+      const processor = new BatchProcessor<any, DetectionResult>({
+        concurrency: effectiveConcurrency,
+        onProgress: (result, processed, total) => {
+          // Update stats
+          if (result.success) stats.increment('success');
+          else stats.increment('errors');
+
+          const currentStats = stats.get();
           sendProgress({
-            type: 'start',
-            totalDetections: totalDetectionsToExtract,
-            processedDetections: 0,
-            message: `Starting extraction for ${totalDetectionsToExtract} detections across ${images.length} images...`
+            type: 'progress',
+            totalDetections: total,
+            processedDetections: processed,
+            successful: currentStats.success,
+            failed: currentStats.errors,
+            message: `Processed ${processed}/${total} (${currentStats.success} successful, ${currentStats.errors} failed)`
           });
-
-          // Create image lookup map for fast access
-          const imageMap = new Map(images.map(img => [img.id, img]));
-
-          // Process detections with high concurrency (detection-level parallelism)
-          let processedDetectionsCount = 0;
-          let successfulDetections = 0;
-          let failedDetections = 0;
-          
-          // Process all detections in batches with high concurrency
-          for (let i = 0; i < allDetections.length; i += concurrency) {
-            const batch = allDetections.slice(i, i + concurrency);
-            const batchNum = Math.floor(i/concurrency) + 1;
-            const totalBatches = Math.ceil(allDetections.length/concurrency);
-            
-            console.log(`\n📦 Processing detection batch ${batchNum}/${totalBatches} (${batch.length} detections)...`);
-            
-            // Start all detections in batch processing in parallel
-            const batchPromises = batch.map(async (detection) => {
-              const image = imageMap.get(detection.image_id);
-              if (!image) {
-                console.error(`❌ Image not found for detection ${detection.id}`);
-                return { success: false, detection_id: detection.id };
-              }
-
-              try {
-                // Get image data (cached in memory if same image)
-                const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
-                const imageBase64 = await getImageBase64ForProcessing(image);
-                const mimeType = getImageMimeType(image);
-                
-                // Extract product info using Gemini
-                const productInfo = await extractProductInfo(
-                  imageBase64,
-                  mimeType,
-                  detection.bounding_box,
-                  projectId
-                );
-
-                // Save to database
-                const { error: updateError } = await supabase
-                  .from('branghunt_detections')
-                  .update({
-                    is_product: productInfo.isProduct,
-                    extraction_notes: productInfo.extractionNotes || null,
-                    brand_name: productInfo.brand,
-                    product_name: productInfo.productName,
-                    category: productInfo.category,
-                    flavor: productInfo.flavor,
-                    size: productInfo.size,
-                    brand_confidence: productInfo.brandConfidence,
-                    product_name_confidence: productInfo.productNameConfidence,
-                    category_confidence: productInfo.categoryConfidence,
-                    flavor_confidence: productInfo.flavorConfidence,
-                    size_confidence: productInfo.sizeConfidence,
-                    brand_extraction_response: JSON.stringify(productInfo),
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq('id', detection.id);
-
-                if (updateError) {
-                  throw new Error(`Database update failed: ${updateError.message}`);
-                }
-
-                return { 
-                  success: true, 
-                  detection_id: detection.id,
-                  image_id: detection.image_id,
-                  detection_index: detection.detection_index
-                };
-
-              } catch (error) {
-                console.error(`❌ Detection ${detection.id} error:`, error);
-                return { 
-                  success: false, 
-                  detection_id: detection.id,
-                  error: error instanceof Error ? error.message : 'Unknown error'
-                };
-              }
-            });
-
-            // Await each detection sequentially to send progress updates
-            for (const promise of batchPromises) {
-              const result = await promise;
-              processedDetectionsCount++;
-              
-              if (result.success) {
-                successfulDetections++;
-              } else {
-                failedDetections++;
-              }
-
-              // Send progress update after EACH detection
-              sendProgress({
-                type: 'progress',
-                totalDetections: totalDetectionsToExtract,
-                processedDetections: processedDetectionsCount,
-                successful: successfulDetections,
-                failed: failedDetections,
-                message: `Processed ${processedDetectionsCount}/${totalDetectionsToExtract} detections (${successfulDetections} successful, ${failedDetections} failed)`
-              });
-            }
-          }
-
-          console.log(`\n✅ Detection-level batch extraction complete: ${successfulDetections} successful, ${failedDetections} failed, ${processedDetectionsCount} total processed`);
-          console.log(`   Project: ${projectId}, Concurrency: ${concurrency}, Rate: ~${Math.round(concurrency * 60 / 2)} RPM`);
-
-          // Send completion message
-          sendProgress({
-            type: 'complete',
-            totalDetections: totalDetectionsToExtract,
-            processedDetections: processedDetectionsCount,
-            summary: {
-              totalDetections: processedDetectionsCount,
-              successful: successfulDetections,
-              failed: failedDetections
-            },
-            message: `Completed: ${successfulDetections}/${processedDetectionsCount} detections successful (${failedDetections} failed)`
-          });
-
-          controller.close();
-        } catch (error) {
-          console.error('Error in batch extraction:', error);
-          sendProgress({
-            type: 'error',
-            error: 'Batch extraction failed',
-            details: error instanceof Error ? error.message : 'Unknown error'
-          });
-          controller.close();
         }
-      }
-    });
+      });
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
+      // Process all detections
+      await processor.process(detections, async (detection) => {
+        return await processDetection(detection, images, supabase, projectId);
+      });
+
+      // Send completion
+      const finalStats = stats.get();
+      sendProgress({
+        type: 'complete',
+        totalDetections: detections.length,
+        processedDetections: detections.length,
+        summary: {
+          totalDetections: detections.length,
+          successful: finalStats.success,
+          failed: finalStats.errors
+        },
+        message: `Completed: ${finalStats.success}/${detections.length} successful (${finalStats.errors} failed)`
+      });
+
+      console.log(`✅ Batch extraction complete: ${finalStats.success} successful, ${finalStats.errors} failed`);
     });
 
   } catch (error) {
@@ -268,6 +126,76 @@ export async function POST(request: NextRequest) {
       error: 'Batch extraction failed',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
+  }
+}
+
+/**
+ * Process a single detection
+ * Extracted for clarity and testability
+ */
+async function processDetection(
+  detection: any,
+  imageMap: Map<string, any>,
+  supabase: any,
+  projectId: string
+): Promise<DetectionResult> {
+  const result: DetectionResult = {
+    success: false,
+    detectionId: detection.id,
+    imageId: detection.image_id,
+    detectionIndex: detection.detection_index
+  };
+
+  try {
+    const image = imageMap.get(detection.image_id);
+    if (!image) {
+      throw new Error(`Image not found for detection ${detection.id}`);
+    }
+
+    // Get image data
+    const imageBase64 = await getImageBase64ForProcessing(image);
+    const mimeType = getImageMimeType(image);
+    
+    // Extract product info using Gemini
+    const productInfo = await extractProductInfo(
+      imageBase64,
+      mimeType,
+      detection.bounding_box,
+      projectId
+    );
+
+    // Save to database
+    const { error: updateError } = await supabase
+      .from('branghunt_detections')
+      .update({
+        is_product: productInfo.isProduct,
+        extraction_notes: productInfo.extractionNotes || null,
+        brand_name: productInfo.brand,
+        product_name: productInfo.productName,
+        category: productInfo.category,
+        flavor: productInfo.flavor,
+        size: productInfo.size,
+        brand_confidence: productInfo.brandConfidence,
+        product_name_confidence: productInfo.productNameConfidence,
+        category_confidence: productInfo.categoryConfidence,
+        flavor_confidence: productInfo.flavorConfidence,
+        size_confidence: productInfo.sizeConfidence,
+        brand_extraction_response: JSON.stringify(productInfo),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', detection.id);
+
+    if (updateError) {
+      throw new Error(`Database update failed: ${updateError.message}`);
+    }
+
+    result.success = true;
+    return result;
+
+  } catch (error) {
+    console.error(`❌ Detection ${detection.id} error:`, error);
+    result.error = error instanceof Error ? error.message : 'Unknown error';
+    return result;
   }
 }
 

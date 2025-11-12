@@ -65,8 +65,10 @@ export async function fetchDetections(
   // If null or undefined, include all (no filter)
 
   // Extracted info filter
-  if (filters.hasExtractedInfo) {
+  if (filters.hasExtractedInfo === true) {
     query = query.not('brand_name', 'is', null);
+  } else if (filters.hasExtractedInfo === false) {
+    query = query.is('brand_name', null);
   }
 
   // Fully analyzed filters
@@ -124,8 +126,10 @@ export async function fetchDetectionsByProject(
     query = query.eq('is_product', false);
   }
 
-  if (filters.hasExtractedInfo) {
+  if (filters.hasExtractedInfo === true) {
     query = query.not('brand_name', 'is', null);
+  } else if (filters.hasExtractedInfo === false) {
+    query = query.is('brand_name', null);
   }
 
   if (filters.fullyAnalyzed) {
@@ -211,8 +215,10 @@ export async function countDetections(
     query = query.eq('is_product', false);
   }
 
-  if (filters.hasExtractedInfo) {
+  if (filters.hasExtractedInfo === true) {
     query = query.not('brand_name', 'is', null);
+  } else if (filters.hasExtractedInfo === false) {
+    query = query.is('brand_name', null);
   }
 
   if (filters.fullyAnalyzed) {
