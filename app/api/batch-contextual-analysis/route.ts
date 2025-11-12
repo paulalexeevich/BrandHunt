@@ -22,6 +22,7 @@ interface Detection {
   product_name: string | null;
   size: string | null;
   size_confidence: number | null;
+  is_product: boolean | null;
 }
 
 interface ContextualResult {
