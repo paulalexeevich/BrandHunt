@@ -486,7 +486,7 @@ export default function ProjectViewPage() {
                 // Handle both old format (images) and new format (detections)
                 const isDetectionLevel = data.summary.totalDetections !== undefined;
                 
-                let progressMsg;
+                let progressMsg: string;
                 if (isDetectionLevel) {
                   // New detection-level format
                   progressMsg = `✅ Completed: ${data.summary.successful}/${data.summary.totalDetections} detections successful`;

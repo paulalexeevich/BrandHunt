@@ -22,7 +22,7 @@ interface SearchAndSaveResult {
 interface ProgressUpdate {
   type: 'progress' | 'complete';
   detectionIndex?: number;
-  stage?: 'searching' | 'prefiltering' | 'filtering' | 'saving' | 'done' | 'error';
+  stage?: 'searching' | 'prefiltering' | 'filtering' | 'visual-matching' | 'saving' | 'done' | 'error';
   message?: string;
   resultsFound?: number;
   preFilteredCount?: number;
@@ -590,15 +590,15 @@ export async function POST(request: NextRequest) {
                 
                 // Prepare candidates for visual matching
                 const candidates = [...identicalMatches, ...almostSameMatches].map(m => ({
-                  id: m.result.id || String(Math.random()),
-                  gtin: m.result.product_gtin || m.result.key || '',
-                  productName: m.result.product_name || m.result.title || '',
-                  brandName: m.result.brand_name || m.result.companyBrand || '',
-                  size: m.result.measures || '',
-                  category: m.result.category || '',
-                  ingredients: m.result.ingredients || '',
-                  imageUrl: m.result.front_image_url || '',
-                  matchStatus: m.matchStatus
+                  id: String(m.result.id || Math.random()),
+                  gtin: String(m.result.product_gtin || m.result.key || ''),
+                  productName: String(m.result.product_name || m.result.title || ''),
+                  brandName: String(m.result.brand_name || m.result.companyBrand || ''),
+                  size: String(m.result.measures || ''),
+                  category: String(m.result.category || ''),
+                  ingredients: String(m.result.ingredients || ''),
+                  imageUrl: String(m.result.front_image_url || ''),
+                  matchStatus: m.matchStatus || 'almost_same' as MatchStatus
                 }));
                 
                 // Prepare extracted info
