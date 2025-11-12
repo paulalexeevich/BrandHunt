@@ -1394,7 +1394,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             <Link 
               href={image?.project_id ? `/projects/${image.project_id}` : '/projects'} 
               className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800"
@@ -1402,7 +1402,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               <ArrowLeft className="w-4 h-4" />
               {image?.project_id ? 'Back to Project' : 'Back to Projects'}
             </Link>
-            <div className="flex gap-3">
+            <div className="flex items-center gap-4">
+              {image.store_name && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                  <span className="inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
+                  <p className="text-sm text-gray-700 font-medium">
+                    {image.store_name}
+                  </p>
+                </div>
+              )}
               <button
                 onClick={() => setShowProcessingBlocks(!showProcessingBlocks)}
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
@@ -1423,15 +1431,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 Delete Image
               </button>
             </div>
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{image.original_filename}</h1>
-            {image.store_name && (
-              <p className="text-sm text-gray-600 mt-1 flex items-center">
-                <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                {image.store_name}
-              </p>
-            )}
           </div>
         </div>
 
