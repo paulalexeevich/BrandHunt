@@ -1117,22 +1117,12 @@ export default function ProjectViewPage() {
                     >
                       Dismiss
                     </button>
-                  )}
-                </div>
               )}
-              <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                <p className="text-sm text-gray-900 font-semibold mb-1">About Batch Processing:</p>
-                <ul className="text-xs text-gray-700 space-y-1">
-                  <li><strong>Batch Detect:</strong> Uses YOLO API for ultra-fast detection (~0.6s per image, 10 images in parallel)</li>
-                  <li><strong>Batch Extract:</strong> Detection-level parallelism - processes 300 detections simultaneously (TESTING MAX SPEED!)</li>
-                  <li><strong>Contextual Analysis:</strong> Automated correction for Unknown/low-confidence (&lt;91%) brands using shelf neighbors - ALWAYS overwrites brand/size</li>
-                  <li><strong>Gemini Rate Limit:</strong> 2000 requests/min - testing 300 concurrency (~3000 RPM, may hit limits)</li>
-                  <li><strong>Performance:</strong> Target ~30-45 seconds for 1382 detections (if rate limit allows)</li>
-                </ul>
-              </div>
             </div>
+          )}
+        </div>
 
-            {/* Images Grid */}
+        {/* Images Grid */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
                 Images {pagination ? `(${pagination.total} total, showing ${(page - 1) * 10 + 1}-${Math.min(page * 10, pagination.total)})` : `(${images.length})`}

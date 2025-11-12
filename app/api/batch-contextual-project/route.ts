@@ -203,7 +203,17 @@ Return your analysis in JSON format:
   
   // Parse JSON from response
   try {
-    const jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    // Remove markdown code fences
+    let jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    // Extract JSON object from mixed text (find first { to last })
+    const firstBrace = jsonText.indexOf('{');
+    const lastBrace = jsonText.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonText = jsonText.substring(firstBrace, lastBrace + 1);
+    }
+    
     return JSON.parse(jsonText);
   } catch (e) {
     console.error('❌ JSON parse error:', e instanceof Error ? e.message : e);
