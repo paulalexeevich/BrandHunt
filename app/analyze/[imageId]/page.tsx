@@ -2095,6 +2095,36 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 const box = detection.bounding_box;
                 const isSelected = detection.id === selectedDetection;
                 
+                // Determine match status for color coding
+                const isMatched = detection.selected_foodgraph_gtin && detection.selected_foodgraph_gtin.trim() !== '';
+                const isNotMatched = detection.fully_analyzed && detection.brand_name && !isMatched;
+                const hasMultipleMatches = detection.fully_analyzed && !isMatched && 
+                  detection.foodgraph_results && 
+                  detection.foodgraph_results.length >= 2;
+                
+                // Color logic: Selected (indigo) > Matched (green) > Multiple Matches (purple) > Not Matched (yellow) > Not Processed (gray)
+                let borderColor = '#9CA3AF'; // gray-400 for not processed
+                let bgColor = 'rgba(156, 163, 175, 0.1)';
+                let badgeColor = 'bg-gray-500';
+                
+                if (isSelected) {
+                  borderColor = '#4F46E5'; // indigo-600
+                  bgColor = 'rgba(79, 70, 229, 0.2)';
+                  badgeColor = 'bg-indigo-600';
+                } else if (isMatched) {
+                  borderColor = '#10B981'; // green-500
+                  bgColor = 'rgba(16, 185, 129, 0.1)';
+                  badgeColor = 'bg-green-600';
+                } else if (hasMultipleMatches) {
+                  borderColor = '#A855F7'; // purple-500
+                  bgColor = 'rgba(168, 85, 247, 0.1)';
+                  badgeColor = 'bg-purple-600';
+                } else if (isNotMatched) {
+                  borderColor = '#F59E0B'; // amber-500
+                  bgColor = 'rgba(245, 158, 11, 0.1)';
+                  badgeColor = 'bg-yellow-600';
+                }
+                
                 // Google's official coordinate conversion method:
                 // Gemini returns [ymin, xmin, ymax, xmax] normalized 0-1000
                 // Convert to pixels: coordinate / 1000 * dimension
@@ -2116,14 +2146,14 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       top: `${topPx}px`,
                       width: `${widthPx}px`,
                       height: `${heightPx}px`,
-                      border: `3px solid ${isSelected ? '#4F46E5' : detection.brand_name ? '#10B981' : '#F59E0B'}`,
-                      backgroundColor: isSelected ? 'rgba(79, 70, 229, 0.2)' : detection.brand_name ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                      border: `3px solid ${borderColor}`,
+                      backgroundColor: bgColor,
                       display: imageDimensions ? 'block' : 'none',
                     }}
                   >
                     {/* Product number badge */}
                     <div 
-                      className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${isSelected ? 'bg-indigo-600' : detection.brand_name ? 'bg-green-600' : 'bg-yellow-600'}`}
+                      className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${badgeColor}`}
                     >
                       #{index + 1}
                     </div>
