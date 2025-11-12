@@ -206,6 +206,8 @@ Return your analysis in JSON format:
     const jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     return JSON.parse(jsonText);
   } catch (e) {
+    console.error('❌ JSON parse error:', e instanceof Error ? e.message : e);
+    console.error('   Raw response (first 500 chars):', text.substring(0, 500));
     return { raw_response: text, parse_error: true };
   }
 }
@@ -380,10 +382,22 @@ export async function POST(request: NextRequest) {
                 const expandedBox = calculateExpandedBox(detection.bounding_box, left, right);
                 
                 // Extract expanded crop
-                const expandedCropBase64 = await extractExpandedCrop(imageBase64, expandedBox);
+                let expandedCropBase64;
+                try {
+                  expandedCropBase64 = await extractExpandedCrop(imageBase64, expandedBox);
+                } catch (cropError) {
+                  console.error(`❌ Crop extraction failed for detection ${detection.id}:`, cropError instanceof Error ? cropError.message : cropError);
+                  return { success: false, skipped: false, error: 'Crop extraction failed' };
+                }
                 
                 // Run contextual analysis
-                const analysis = await analyzeWithContext(expandedCropBase64, detection, left, right);
+                let analysis;
+                try {
+                  analysis = await analyzeWithContext(expandedCropBase64, detection, left, right);
+                } catch (geminiError) {
+                  console.error(`❌ Gemini API failed for detection ${detection.id}:`, geminiError instanceof Error ? geminiError.message : geminiError);
+                  return { success: false, skipped: false, error: 'Gemini API failed' };
+                }
                 
                 if (analysis.parse_error) {
                   console.error(`❌ Parse error for detection ${detection.id}:`, analysis.raw_response?.substring(0, 200));
