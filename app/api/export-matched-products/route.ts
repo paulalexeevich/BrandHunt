@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-server';
+import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import * as XLSX from 'xlsx';
 
 export async function GET(request: NextRequest) {
@@ -11,7 +11,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
     }
 
-    const supabase = createClient();
+    // Create authenticated Supabase client with user session
+    const supabase = await createAuthenticatedSupabaseClient();
 
     // Verify user has access to this project
     const { data: { user }, error: authError } = await supabase.auth.getUser();
