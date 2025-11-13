@@ -18,6 +18,7 @@ interface FoodGraphResultsListProps {
   savingResult: boolean;
   savedResultId: string | null;
   image?: ImageData | null;
+  onLoadResults?: () => Promise<void>;
 }
 
 export function FoodGraphResultsList({
@@ -30,7 +31,8 @@ export function FoodGraphResultsList({
   handleSaveResult,
   savingResult,
   savedResultId,
-  image
+  image,
+  onLoadResults
 }: FoodGraphResultsListProps) {
   
   // Calculate stage counts
@@ -56,9 +58,23 @@ export function FoodGraphResultsList({
   const hasVisualMatchData = visualMatchStageCount > 0 || 
                              aiFilterCandidates >= 2 || 
                              detection.selection_method === 'visual_matching';
-  const visualMatchCount = hasVisualMatchData 
-    ? (visualMatchStageCount > 0 ? visualMatchStageCount : aiMatchesCount)
-    : 0;
+  
+  // Calculate visual match count with proper fallback for Pipeline 2
+  let visualMatchCount = 0;
+  if (visualMatchStageCount > 0) {
+    // Results are loaded - use actual count
+    visualMatchCount = visualMatchStageCount;
+  } else if (hasVisualMatchData) {
+    // Results not loaded yet, but we know visual matching was done
+    // Check if detection has a selected match (indicates at least 1 result exists)
+    if (detection.selected_foodgraph_result_id || detection.selection_method === 'visual_matching') {
+      // Use AI matches count if available (Pipeline 1), or fallback to 1 (Pipeline 2)
+      visualMatchCount = aiMatchesCount > 0 ? aiMatchesCount : 1;
+    } else {
+      // Has candidates but no selection yet - use candidates count
+      visualMatchCount = aiFilterCandidates > 0 ? aiFilterCandidates : 0;
+    }
+  }
   
   // Use cumulative counts for button labels (UNIVERSAL)
   const stageStats = {
@@ -174,7 +190,14 @@ export function FoodGraphResultsList({
             🤖 AI Filter ({stageStats.ai_filter})
           </button>
           <button
-            onClick={() => setStageFilter('visual_match')}
+            onClick={async () => {
+              setStageFilter('visual_match');
+              // If count shows results but they're not loaded yet, trigger loading
+              if (visualMatchCount > 0 && visualMatchStageCount === 0 && onLoadResults) {
+                console.log('🎯 Visual Match clicked - triggering on-demand load...');
+                await onLoadResults();
+              }
+            }}
             disabled={visualMatchCount === 0}
             className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
               stageFilter === 'visual_match'

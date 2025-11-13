@@ -158,9 +158,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             setFilteredCount(detection.foodgraph_results.length);
           }
           setPreFilteredCount(detection.foodgraph_results.length);
-        } else if (detection && detection.fully_analyzed && !loadedDetectionIds.has(detection.id)) {
-          // Detection is fully analyzed but results weren't loaded - fetch them on demand (ONCE)
-          console.log(`📥 Fetching FoodGraph results on-demand for detection ${detection.id}`);
+        } else if (detection && (detection.fully_analyzed || detection.selection_method === 'visual_matching') && !loadedDetectionIds.has(detection.id)) {
+          // Detection is fully analyzed OR has visual matching but results weren't loaded - fetch them on demand (ONCE)
+          console.log(`📥 Fetching FoodGraph results on-demand for detection ${detection.id} (fully_analyzed=${detection.fully_analyzed}, selection_method=${detection.selection_method})`);
           
           // Mark as loaded immediately to prevent re-fetching
           setLoadedDetectionIds(prev => new Set([...prev, detection.id]));
@@ -2210,6 +2210,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         savingResult={savingResult}
                         savedResultId={savedResultId}
                         image={image}
+                        onLoadResults={async () => {
+                          console.log('📥 Loading FoodGraph results on-demand...');
+                          await fetchImage(true);
+                        }}
                       />
                       
                     {foodgraphResults.length > 50 && filteredCount === null && (
