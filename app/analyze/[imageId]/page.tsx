@@ -1157,6 +1157,23 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
 
               await fetchImage();
 
+              // Force reload FoodGraph results for currently selected detection
+              if (selectedDetection) {
+                console.log(`🔄 Reloading FoodGraph results for selected detection after pipeline completion`);
+                try {
+                  const response = await fetch(`/api/foodgraph-results/${selectedDetection}`);
+                  if (response.ok) {
+                    const data = await response.json();
+                    console.log(`📦 Reloaded ${data.results?.length || 0} FoodGraph results (including visual match data)`);
+                    if (data.results) {
+                      setFoodgraphResults(data.results);
+                    }
+                  }
+                } catch (err) {
+                  console.error('Failed to reload FoodGraph results:', err);
+                }
+              }
+
               alert(`✅ AI Filter Pipeline Complete!\n\n🔍 Processed: ${data.processed || data.total || 0} products\n✓ Saved: ${data.success || 0}\n⏸️ No Match: ${data.noMatch || 0}\n❌ Errors: ${data.errors || 0}`);
             }
           }
@@ -1267,6 +1284,23 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               });
 
               await fetchImage();
+
+              // Force reload FoodGraph results for currently selected detection
+              if (selectedDetection) {
+                console.log(`🔄 Reloading FoodGraph results for selected detection after pipeline completion`);
+                try {
+                  const response = await fetch(`/api/foodgraph-results/${selectedDetection}`);
+                  if (response.ok) {
+                    const data = await response.json();
+                    console.log(`📦 Reloaded ${data.results?.length || 0} FoodGraph results (including visual match data)`);
+                    if (data.results) {
+                      setFoodgraphResults(data.results);
+                    }
+                  }
+                } catch (err) {
+                  console.error('Failed to reload FoodGraph results:', err);
+                }
+              }
 
               alert(`✅ Visual-Only Pipeline Complete!\n\n🔍 Processed: ${data.processed || data.total || 0} products\n✓ Saved: ${data.success || 0}\n⏸️ No Match: ${data.noMatch || 0}\n❌ Errors: ${data.errors || 0}`);
             }
