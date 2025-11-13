@@ -217,7 +217,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     };
     
     loadFoodGraphResults();
-  }, [selectedDetection, detections]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDetection]); // Only depend on selectedDetection to avoid unnecessary re-runs when detections array reference changes
 
   const fetchImage = async (includeFoodGraphResults: boolean = false) => {
     // Prevent concurrent/rapid fetches
