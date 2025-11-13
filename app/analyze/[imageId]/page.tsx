@@ -1746,42 +1746,39 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   
                   {/* Extracted Product Information */}
                   {detection.brand_name ? (
-                    <div className="bg-white border-2 border-gray-200 rounded-lg p-4 shadow-sm">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Package className="w-5 h-5 text-indigo-600" />
-                        <h4 className="font-semibold text-gray-900">Product Information</h4>
-                      </div>
-                      
-                      {/* Classification Badges - Always show when brand_name exists */}
-                      <div className="mb-3 flex flex-wrap gap-2">
-                        {detection.is_product === false && (
-                          <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium">
-                            ❌ Not a Product
+                    <div className="bg-white border-2 border-gray-200 rounded-lg p-3 shadow-sm">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Package className="w-4 h-4 text-indigo-600" />
+                        <h4 className="font-semibold text-gray-900 text-sm">Product Information</h4>
+                        {/* Classification Badge inline with title */}
+                        {detection.is_product === true && (
+                          <span className="ml-auto px-1.5 py-0.5 bg-green-100 text-green-800 rounded text-[10px] font-medium">
+                            ✅ Is Product
                           </span>
                         )}
-                        {detection.is_product === true && (
-                          <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                            ✅ Is Product
+                        {detection.is_product === false && (
+                          <span className="ml-auto px-1.5 py-0.5 bg-red-100 text-red-800 rounded text-[10px] font-medium">
+                            ❌ Not a Product
                           </span>
                         )}
                       </div>
                       
                       {/* Extraction Notes */}
                       {detection.extraction_notes && (
-                        <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                        <div className="mb-2 p-1.5 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-800">
                           💡 {detection.extraction_notes}
                         </div>
                       )}
                       
                       {/* Extracted Data from Image */}
-                      <div className="space-y-2 text-sm">
+                      <div className="space-y-1 text-xs">
                         {detection.product_name && (
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
+                          <div className="flex items-center justify-between gap-1.5">
+                            <div className="flex-1 min-w-0">
                               <span className="font-semibold text-gray-700">Product:</span> <span className="text-indigo-600 font-semibold">{detection.product_name}</span>
                             </div>
                             {detection.product_name_confidence !== null && detection.product_name_confidence > 0 && (
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
                                 detection.product_name_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
                                 detection.product_name_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
                                 detection.product_name_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
@@ -1793,20 +1790,21 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             )}
                           </div>
                         )}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-gray-700">Brand:</span> {detection.brand_name}
+                        <div className="flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1 flex-1 min-w-0">
+                            <span className="font-semibold text-gray-700">Brand:</span>
+                            <span className="truncate">{detection.brand_name}</span>
                             {detection.corrected_by_contextual && (
                               <span 
-                                className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800 border border-purple-300"
+                                className="px-1 py-0.5 rounded text-[9px] font-semibold bg-purple-100 text-purple-800 border border-purple-300 flex-shrink-0"
                                 title={detection.contextual_correction_notes || 'Brand corrected by contextual analysis'}
                               >
-                                🔍 CONTEXTUAL
+                                🔍
                               </span>
                             )}
                           </div>
                           {detection.brand_confidence !== null && detection.brand_confidence > 0 && (
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
                               detection.brand_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
                               detection.brand_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
                               detection.brand_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
@@ -1818,12 +1816,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           )}
                         </div>
                         {detection.category && (
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center justify-between gap-1.5">
                             <div>
                               <span className="font-semibold text-gray-700">Category:</span> {detection.category}
                             </div>
                             {detection.category_confidence !== null && detection.category_confidence > 0 && (
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
                                 detection.category_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
                                 detection.category_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
                                 detection.category_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
@@ -1836,12 +1834,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           </div>
                         )}
                         {detection.flavor && detection.flavor !== 'Unknown' && (
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center justify-between gap-1.5">
                             <div>
                               <span className="font-semibold text-gray-700">Flavor:</span> <span className="text-purple-600">{detection.flavor}</span>
                             </div>
                             {detection.flavor_confidence !== null && detection.flavor_confidence > 0 && (
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
                                 detection.flavor_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
                                 detection.flavor_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
                                 detection.flavor_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
@@ -1854,20 +1852,21 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           </div>
                         )}
                         {detection.size && detection.size !== 'Unknown' && (
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-semibold text-gray-700">Size:</span> <span className="text-blue-600">{detection.size}</span>
+                          <div className="flex items-center justify-between gap-1.5">
+                            <div className="flex items-center gap-1">
+                              <span className="font-semibold text-gray-700">Size:</span>
+                              <span className="text-blue-600">{detection.size}</span>
                               {detection.corrected_by_contextual && detection.contextual_correction_notes && detection.contextual_correction_notes.toLowerCase().includes('size') && (
                                 <span 
-                                  className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800 border border-purple-300"
+                                  className="px-1 py-0.5 rounded text-[9px] font-semibold bg-purple-100 text-purple-800 border border-purple-300"
                                   title={detection.contextual_correction_notes}
                                 >
-                                  🔍 CONTEXTUAL
+                                  🔍
                                 </span>
                               )}
                             </div>
                             {detection.size_confidence !== null && detection.size_confidence > 0 && (
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
                                 detection.size_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
                                 detection.size_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
                                 detection.size_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
@@ -1880,12 +1879,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           </div>
                         )}
                         {detection.price && detection.price !== 'Unknown' && (
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center justify-between gap-1.5">
                             <div>
                               <span className="font-semibold text-gray-700">Price:</span> <span className="text-green-700 font-bold">{detection.price_currency === 'USD' ? '$' : detection.price_currency}{detection.price}</span>
                             </div>
                             {detection.price_confidence && detection.price_confidence > 0 && (
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
                                 detection.price_confidence >= 0.9 ? 'bg-green-100 text-green-800' :
                                 detection.price_confidence >= 0.7 ? 'bg-green-100 text-green-700' :
                                 detection.price_confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
