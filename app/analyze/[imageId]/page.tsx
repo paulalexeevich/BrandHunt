@@ -126,7 +126,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [showActions, setShowActions] = useState(false);
 
   useEffect(() => {
-    fetchImage(true); // Include FoodGraph results from database
+    fetchImage(); // Load WITHOUT FoodGraph results for fast page load
   }, [resolvedParams.imageId]);
 
   // Track both natural and displayed image dimensions
@@ -206,35 +206,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
             setFilteredCount(detection.foodgraph_results.length);
           }
           setPreFilteredCount(detection.foodgraph_results.length);
-        } else if (detection && (detection.fully_analyzed || detection.selection_method === 'visual_matching') && !loadedDetectionIds.has(detection.id)) {
-          // Detection is fully analyzed OR has visual matching but results weren't loaded - fetch them on demand (ONCE)
-          console.log(`📥 Fetching FoodGraph results on-demand for detection ${detection.id} (fully_analyzed=${detection.fully_analyzed}, selection_method=${detection.selection_method})`);
-          
-          // Mark as loaded immediately to prevent re-fetching
-          setLoadedDetectionIds(prev => new Set([...prev, detection.id]));
-          
-          try {
-            const response = await fetch(`/api/foodgraph-results/${detection.id}`);
-            if (response.ok) {
-              const data = await response.json();
-              console.log(`📦 Loaded ${data.results?.length || 0} FoodGraph results on-demand`);
-              
-              // ALWAYS set state, even for 0 results (NO MATCH case)
-              if (data.results) {
-                setFoodgraphResults(data.results);
-                const hasFilteredResults = data.results.some((r: any) => r.hasOwnProperty('is_match'));
-                if (hasFilteredResults) {
-                  const matchedCount = data.results.filter((r: any) => r.is_match === true).length;
-                  setFilteredCount(matchedCount);
-                } else {
-                  setFilteredCount(data.results.length);
-                }
-                setPreFilteredCount(data.results.length);
-              }
-            }
-          } catch (error) {
-            console.error('Failed to fetch FoodGraph results:', error);
-          }
         } else {
           // No existing results, reset state
           console.log(`🔄 useEffect - No FoodGraph results, clearing state`);
@@ -888,7 +859,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
   };
 
-  const handleSeeOptions = () => {
+  const handleSeeOptions = async () => {
     if (!selectedDetection) return;
 
     const detection = detections.find(d => d.id === selectedDetection);
@@ -901,9 +872,36 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
 
     // Show options and set Visual Match as default filter
-    // No API call - users can trigger actions manually if needed
     setShowFoodGraphOptions(true);
     setStageFilter('visual_match');
+
+    // Load FoodGraph results on-demand if not already loaded
+    if (foodgraphResults.length === 0 && detection.fully_analyzed && !loadedDetectionIds.has(detection.id)) {
+      console.log('📥 Loading FoodGraph results on-demand for See Options...');
+      setLoadedDetectionIds(prev => new Set([...prev, detection.id]));
+      
+      try {
+        const response = await fetch(`/api/foodgraph-results/${detection.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`📦 Loaded ${data.results?.length || 0} FoodGraph results`);
+          
+          if (data.results) {
+            setFoodgraphResults(data.results);
+            const hasFilteredResults = data.results.some((r: any) => r.hasOwnProperty('is_match'));
+            if (hasFilteredResults) {
+              const matchedCount = data.results.filter((r: any) => r.is_match === true).length;
+              setFilteredCount(matchedCount);
+            } else {
+              setFilteredCount(data.results.length);
+            }
+            setPreFilteredCount(data.results.length);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch FoodGraph results:', error);
+      }
+    }
   };
 
   const handleExtractInfoAll = async () => {
