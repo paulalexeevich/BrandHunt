@@ -1051,8 +1051,36 @@ export async function saveVisualMatchResults(
       }
     }
 
+    // If no candidates passed threshold but we have a selected match, still save it
+    if (resultsToSave.length === 0 && visualMatchResult.selectedGtin) {
+      console.log(`   ⚠️ No candidates passed threshold, but saving selected match anyway`);
+      const selectedCandidate = allCandidates.find(c => c.gtin === visualMatchResult.selectedGtin);
+      if (selectedCandidate) {
+        const selectedScore = visualMatchResult.candidateScores.find(s => s.candidateGtin === visualMatchResult.selectedGtin);
+        resultsToSave.push({
+          detection_id: detectionId,
+          search_term: searchTerm,
+          result_rank: selectedScore?.candidateIndex || 1,
+          product_gtin: selectedCandidate.gtin,
+          product_name: selectedCandidate.productName,
+          brand_name: selectedCandidate.brandName,
+          category: selectedCandidate.category || null,
+          front_image_url: selectedCandidate.imageUrl,
+          full_data: {
+            size: selectedCandidate.size,
+            ingredients: selectedCandidate.ingredients,
+            matchStatusFromAI: selectedCandidate.matchStatus
+          },
+          processing_stage: 'visual_match',
+          match_status: 'identical',
+          visual_similarity: selectedScore?.visualSimilarity || 0,
+          match_reason: `Selected as best match (below threshold). ${visualMatchResult.reasoning}`
+        });
+      }
+    }
+    
     if (resultsToSave.length === 0) {
-      console.log(`   ⚠️ No candidates passed threshold - nothing to save`);
+      console.log(`   ⚠️ No results to save`);
       return {
         success: true,
         savedCount: 0,
