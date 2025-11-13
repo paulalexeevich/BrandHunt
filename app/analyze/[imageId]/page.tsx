@@ -98,6 +98,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [processingPipelineAI, setProcessingPipelineAI] = useState(false);
   const [processingPipelineVisual, setProcessingPipelineVisual] = useState(false);
   const [pipelineProgress, setPipelineProgress] = useState<{ success: number; total: number; noMatch: number; errors: number } | null>(null);
+  
+  // FoodGraph options visibility state
+  const [showFoodGraphOptions, setShowFoodGraphOptions] = useState(false);
+  const [loadingFoodGraphResults, setLoadingFoodGraphResults] = useState(false);
   const [pipelineDetails, setPipelineDetails] = useState<Array<{ detectionIndex: number; product: string; stage: string; message: string }>>([]);
   const [activePipeline, setActivePipeline] = useState<'ai' | 'visual' | null>(null);
   const [detectionMethod, setDetectionMethod] = useState<'gemini' | 'yolo'>('yolo');
@@ -901,6 +905,37 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
       alert(`Failed to save result: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setSavingResult(false);
+    }
+  };
+
+  const handleSeeOptions = async () => {
+    if (!selectedDetection) return;
+
+    const detection = detections.find(d => d.id === selectedDetection);
+    if (!detection) return;
+
+    // Toggle visibility
+    if (showFoodGraphOptions) {
+      setShowFoodGraphOptions(false);
+      return;
+    }
+
+    // Show options and set Visual Match as default filter
+    setShowFoodGraphOptions(true);
+    setStageFilter('visual_match');
+
+    // Load FoodGraph results if not already loaded
+    if (foodgraphResults.length === 0 && detection.fully_analyzed) {
+      setLoadingFoodGraphResults(true);
+      try {
+        console.log('📥 Loading FoodGraph results on-demand...');
+        await fetchImage(true);
+      } catch (err) {
+        console.error('Error loading FoodGraph results:', err);
+        setError('Failed to load FoodGraph results');
+      } finally {
+        setLoadingFoodGraphResults(false);
+      }
     }
   };
 
@@ -2006,23 +2041,52 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   {/* FoodGraph Results */}
                   {(foodgraphResults.length > 0 || (detection.fully_analyzed && preFilteredCount !== null)) && (
                     <div>
-                      {/* Show banner for saved products indicating which was selected */}
-                      {detection.fully_analyzed && detection.selected_foodgraph_result_id && (
-                        <div className="mb-4 p-3 bg-green-50 border-l-4 border-green-500 rounded">
-                          <div className="flex items-start gap-2">
-                            <span className="text-green-600 text-lg">✓</span>
-                            <div className="flex-1">
-                              <p className="text-sm font-semibold text-green-800">
-                                Batch Processing Complete - Match Saved
-                              </p>
-                              <p className="text-xs text-green-700 mt-1">
-                                The result marked with "🎯 SELECTED" below was automatically chosen and saved during batch processing. 
-                                You can review all available options and their scores to verify the selection quality.
-                              </p>
+                      {/* See Options Button - Shows/hides FoodGraph results and filters */}
+                      <div className="mb-4">
+                        <button
+                          onClick={handleSeeOptions}
+                          disabled={loadingFoodGraphResults}
+                          className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold flex items-center justify-center gap-2 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loadingFoodGraphResults ? (
+                            <>
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                              Loading options...
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className={`w-5 h-5 transition-transform ${showFoodGraphOptions ? 'rotate-180' : ''}`} />
+                              ⚙️ {showFoodGraphOptions ? 'Hide' : 'See'} Options
+                              {!showFoodGraphOptions && foodgraphResults.length > 0 && (
+                                <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                                  {foodgraphResults.length} results
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* FoodGraph Options Section - Shown when user clicks See Options button */}
+                      {showFoodGraphOptions && (
+                        <>
+                          {/* Show banner for saved products indicating which was selected */}
+                          {detection.fully_analyzed && detection.selected_foodgraph_result_id && (
+                            <div className="mb-4 p-3 bg-green-50 border-l-4 border-green-500 rounded">
+                              <div className="flex items-start gap-2">
+                                <span className="text-green-600 text-lg">✓</span>
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold text-green-800">
+                                    Batch Processing Complete - Match Saved
+                                  </p>
+                                  <p className="text-xs text-green-700 mt-1">
+                                    The result marked with "🎯 SELECTED" below was automatically chosen and saved during batch processing. 
+                                    You can review all available options and their scores to verify the selection quality.
+                                  </p>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      )}
+                          )}
 
                       {/* Info banner when showing all with confidence */}
                       {showingAllWithConfidence && (
@@ -2208,6 +2272,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         + {foodgraphResults.length - 50} more results available
                       </p>
                     )}
+                        </>
+                      )}
                   </div>
                 )}
 
