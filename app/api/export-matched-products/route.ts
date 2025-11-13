@@ -32,12 +32,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
+    // First, fetch all images for this project to get their IDs
+    const { data: projectImages, error: imagesError } = await supabase
+      .from('branghunt_images')
+      .select('id')
+      .eq('project_id', projectId);
+
+    if (imagesError) {
+      console.error('Error fetching project images:', imagesError);
+      return NextResponse.json({ error: 'Failed to fetch project images', details: imagesError.message }, { status: 500 });
+    }
+
+    if (!projectImages || projectImages.length === 0) {
+      return NextResponse.json({ error: 'No images found in this project' }, { status: 404 });
+    }
+
+    const imageIds = projectImages.map(img => img.id);
+
     // Fetch all matched products (detections with selected_foodgraph_gtin)
     const { data: detections, error: fetchError } = await supabase
       .from('branghunt_detections')
       .select(`
         id,
         detection_index,
+        image_id,
         selected_foodgraph_gtin,
         selected_foodgraph_product_name,
         selected_foodgraph_brand,
@@ -52,14 +70,14 @@ export async function GET(request: NextRequest) {
           store_name
         )
       `)
-      .eq('branghunt_images.project_id', projectId)
+      .in('image_id', imageIds)
       .not('selected_foodgraph_gtin', 'is', null)
-      .order('branghunt_images.id', { ascending: true })
+      .order('image_id', { ascending: true })
       .order('detection_index', { ascending: true });
 
     if (fetchError) {
       console.error('Error fetching matched products:', fetchError);
-      return NextResponse.json({ error: 'Failed to fetch matched products' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch matched products', details: fetchError.message }, { status: 500 });
     }
 
     if (!detections || detections.length === 0) {
