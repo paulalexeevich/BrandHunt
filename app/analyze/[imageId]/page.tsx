@@ -2073,11 +2073,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             <>
                               <ChevronDown className={`w-5 h-5 transition-transform ${showFoodGraphOptions ? 'rotate-180' : ''}`} />
                               ⚙️ {showFoodGraphOptions ? 'Hide' : 'See'} Options
-                              {!showFoodGraphOptions && foodgraphResults.length > 0 && (
-                                <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                                  {foodgraphResults.length} results
-                                </span>
-                              )}
                             </>
                           )}
                         </button>
