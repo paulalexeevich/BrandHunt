@@ -1393,98 +1393,21 @@ export default function ProjectViewPage() {
                 Search, pre-filter, AI filter, and save product matches from FoodGraph database
               </p>
               
-              {/* Pipeline 1: With AI Filter (Current) */}
-              <div className="bg-white rounded-lg p-3 mb-3 border-2 border-blue-300">
-                <h3 className="text-sm font-semibold text-blue-900 mb-1.5 flex items-center gap-2">
-                  🤖 Pipeline 1: With AI Filter (Standard)
-                </h3>
-                <p className="text-xs text-gray-600 mb-2">
-                  Search → Pre-filter → <strong className="text-blue-700">AI Filter</strong> → Visual Match (2+ candidates) → Save
-                </p>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-1.5">
-                  <button
-                    onClick={() => handleBatchSearchAndSave(3)}
-                    disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
-                  >
-                    ⚡ 3
-                  </button>
-                  <button
-                    onClick={() => handleBatchSearchAndSave(10)}
-                    disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
-                  >
-                    ⚡⚡ 10
-                  </button>
-                  <button
-                    onClick={() => handleBatchSearchAndSave(20)}
-                    disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-3 py-2 bg-fuchsia-600 text-white rounded-lg hover:bg-fuchsia-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
-                  >
-                    ⚡⚡⚡ 20
-                  </button>
-                  <button
-                    onClick={() => handleBatchSearchAndSave(50)}
-                    disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-3 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
-                  >
-                    ✨ 50
-                  </button>
-                  <button
-                    onClick={() => handleBatchSearchAndSave(999999)}
-                    disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-3 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:from-orange-600 hover:to-red-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
-                  >
-                    🔥 ALL
-                  </button>
-                </div>
-              </div>
-
-              {/* Pipeline 2: Visual Only (New) */}
+              {/* Product Matching Pipeline */}
               <div className="bg-white rounded-lg p-3 border-2 border-green-300">
                 <h3 className="text-sm font-semibold text-green-900 mb-1.5 flex items-center gap-2">
-                  🎯 Pipeline 2: Visual-Only (No AI Filter)
+                  🎯 Product Matching Pipeline
                 </h3>
                 <p className="text-xs text-gray-600 mb-2">
-                  Search → Pre-filter → <strong className="text-green-700">Visual Match Directly</strong> → Save
+                  Search → Pre-filter → <strong className="text-green-700">Visual Match</strong> → Save
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-1.5">
-                  <button
-                    onClick={() => handleBatchSearchVisual(3)}
-                    disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
-                  >
-                    ⚡ 3
-                  </button>
-                  <button
-                    onClick={() => handleBatchSearchVisual(10)}
-                    disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
-                  >
-                    ⚡⚡ 10
-                  </button>
-                  <button
-                    onClick={() => handleBatchSearchVisual(20)}
-                    disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
-                  >
-                    ⚡⚡⚡ 20
-                  </button>
-                  <button
-                    onClick={() => handleBatchSearchVisual(50)}
-                    disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-3 py-2 bg-lime-600 text-white rounded-lg hover:bg-lime-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
-                  >
-                    ✨ 50
-                  </button>
-                  <button
-                    onClick={() => handleBatchSearchVisual(999999)}
-                    disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-3 py-2 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
-                  >
-                    🔥 ALL
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleBatchSearchVisual(20)}
+                  disabled={batchMatchingAI || batchMatchingVisual}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                >
+                  ⚡⚡⚡ Start Pipeline (20 concurrent)
+                </button>
               </div>
 
               {/* Processing Status */}
@@ -1493,7 +1416,7 @@ export default function ProjectViewPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
                     <span className="text-xs font-semibold text-blue-900">
-                      {batchMatchingAI ? '🤖 AI Filter Pipeline Running...' : '🎯 Visual-Only Pipeline Running...'}
+                      🎯 Product Matching Pipeline Running...
                     </span>
                   </div>
                   {matchingProgress && (
