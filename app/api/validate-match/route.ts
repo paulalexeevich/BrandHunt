@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     // Update the detection with human validation
     const { data, error } = await supabase
-      .from('detections')
+      .from('branghunt_detections')
       .update({
         human_validation: isCorrect,
         human_validation_at: new Date().toISOString()
