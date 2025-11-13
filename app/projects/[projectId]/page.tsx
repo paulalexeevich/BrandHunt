@@ -968,7 +968,7 @@ export default function ProjectViewPage() {
             {productStats && productStats.totalProducts > 0 && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-md p-6 mb-8 border border-indigo-100">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  📊 Product Statistics
+                  📊 Project Statistics
                 </h3>
                 <div className="flex gap-2 overflow-x-auto">
                   {/* Total Products */}
@@ -1040,6 +1040,100 @@ export default function ProjectViewPage() {
                 </div>
               </div>
             )}
+
+            {/* Images Gallery - Compact Horizontal */}
+            <div className="bg-white rounded-xl shadow-lg p-4 mb-8">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-bold text-gray-900">
+                  📷 Images {pagination ? `(${pagination.total} total)` : `(${images.length})`}
+                </h2>
+                {pagination && pagination.totalPages > 1 && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPage(page - 1)}
+                      disabled={page === 1}
+                      className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="px-3 py-1 text-xs text-gray-600">
+                      {page} / {pagination.totalPages}
+                    </span>
+                    <button
+                      onClick={() => setPage(page + 1)}
+                      disabled={page >= pagination.totalPages}
+                      className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {images.length === 0 ? (
+                <div className="text-center py-6">
+                  <ImageIcon className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                  <p className="text-xs text-gray-600">No images in this project yet</p>
+                </div>
+              ) : (
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {images.map((image) => {
+                    const detectionCount = getDetectionCount(image);
+                    return (
+                      <Link
+                        key={image.id}
+                        href={`/analyze/${image.id}`}
+                        className="group relative flex-shrink-0 bg-gray-50 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                        style={{ width: '120px' }}
+                      >
+                        {/* Image */}
+                        <div className="aspect-[3/4] relative bg-gray-200">
+                          {getImageUrl(image) ? (
+                            <img
+                              src={getImageUrl(image)}
+                              alt="Shelf"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ImageIcon className="w-8 h-8 text-gray-400" />
+                            </div>
+                          )}
+                          {/* Status Badge */}
+                          {image.status === 'detected' && (
+                            <div className="absolute top-1 right-1 bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                              {detectionCount}
+                            </div>
+                          )}
+                          {image.status === 'extracted' && (
+                            <div className="absolute top-1 right-1 bg-yellow-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                              {detectionCount}
+                            </div>
+                          )}
+                          {image.status === 'selected' && (
+                            <div className="absolute top-1 right-1 bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                              ✓ {detectionCount}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="p-1.5">
+                          {image.store_name && (
+                            <div className="text-[10px] text-gray-600 truncate">
+                              {image.store_name}
+                            </div>
+                          )}
+                          <div className="text-[9px] text-gray-500">
+                            {new Date(image.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Project Members */}
             <div className="bg-white rounded-xl shadow-lg p-4 mb-8">
@@ -1403,117 +1497,6 @@ export default function ProjectViewPage() {
               )}
             </div>
 
-        {/* Images Grid */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Images {pagination ? `(${pagination.total} total, showing ${(page - 1) * 10 + 1}-${Math.min(page * 10, pagination.total)})` : `(${images.length})`}
-              </h2>
-
-              {images.length === 0 ? (
-                <div className="text-center py-12">
-                  <ImageIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No images in this project yet</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Use the upload options above to add images
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {images.map((image) => {
-                    const detectionCount = getDetectionCount(image);
-                    return (
-                      <Link
-                        key={image.id}
-                        href={`/analyze/${image.id}`}
-                        className="group relative bg-gray-50 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                      >
-                        {/* Image */}
-                        <div className="aspect-[3/4] relative bg-gray-200">
-                          {getImageUrl(image) ? (
-                            <img
-                              src={getImageUrl(image)}
-                              alt="Shelf image"
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <ImageIcon className="w-16 h-16 text-gray-400" />
-                            </div>
-                          )}
-                          {/* Status Badge - 4 stages: uploaded, detected, extracted, selected */}
-                          {image.status === 'uploaded' && (
-                            <div className="absolute top-2 right-2 bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                              <Upload className="w-3 h-3" />
-                              Uploaded
-                            </div>
-                          )}
-                          {image.status === 'detected' && (
-                            <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                              <Target className="w-3 h-3" />
-                              {detectionCount} detected
-                            </div>
-                          )}
-                          {image.status === 'extracted' && (
-                            <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                              <Package className="w-3 h-3" />
-                              {detectionCount} extracted
-                            </div>
-                          )}
-                          {image.status === 'selected' && (
-                            <div className="absolute top-2 right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                              <CheckCircle className="w-3 h-3" />
-                              {detectionCount} selected
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div className="p-3">
-                          {image.store_name && (
-                            <div className="text-xs text-gray-600 mb-1 truncate">
-                              {image.store_name}
-                            </div>
-                          )}
-                          <div className="text-xs text-gray-500">
-                            {new Date(image.created_at).toLocaleDateString()}
-                          </div>
-                          {image.detection_completed && detectionCount > 0 && (
-                            <div className="text-xs text-green-600 font-semibold mt-1">
-                              {detectionCount} {detectionCount === 1 ? 'product' : 'products'} detected
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Pagination Controls */}
-              {pagination && pagination.totalPages > 1 && (
-                <div className="mt-6 flex items-center justify-between border-t pt-6">
-                  <div className="text-sm text-gray-600">
-                    Page {page} of {pagination.totalPages}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPage(page - 1)}
-                      disabled={page === 1}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => setPage(page + 1)}
-                      disabled={!pagination.hasMore}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </>
         )}
       </div>
