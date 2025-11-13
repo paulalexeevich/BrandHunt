@@ -1935,62 +1935,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     )}
                   </button>
                 )}
-                    
-                    {detection.brand_name && foodgraphResults.length === 0 && !detection.fully_analyzed && (
-                    <button
-                        onClick={handleSearchFoodGraph}
-                        disabled={loading}
-                        className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
-                      >
-                        {loading ? (
-                          <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            Searching...
-                          </>
-                        ) : (
-                          '🔍 Search FoodGraph'
-                        )}
-                    </button>
-                    )}
-                    
-                    {foodgraphResults.length > 0 && preFilteredCount === null && !detection.fully_analyzed && (
-                      <button
-                        onClick={handlePreFilter}
-                        disabled={preFiltering}
-                        className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
-                      >
-                        {preFiltering ? (
-                          <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            Pre-filtering...
-                          </>
-                        ) : (
-                          <>
-                            📊 Pre-Filter by Brand/Size/Retailer ({foodgraphResults.length} results)
-                            <span className="ml-2 text-xs bg-orange-600 text-white px-2 py-0.5 rounded-full">≥85%</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                    
-                    {preFilteredCount !== null && filteredCount === null && !detection.fully_analyzed && (
-                      <button
-                        onClick={handleFilterResults}
-                        disabled={filtering}
-                        className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
-                      >
-                        {filtering ? (
-                          <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            AI Filtering...
-                          </>
-                        ) : (
-                          <>🤖 Filter with AI ({foodgraphResults.length} results)</>
-                        )}
-                      </button>
-                    )}
-                    
-                    {/* Visual Match Button - Shows AFTER AI Filter when there are 2+ candidates */}
                     </div>
 
                   {/* FoodGraph Results */}
@@ -2201,8 +2145,21 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   </div>
                 )}
 
-                  {/* Actions Button - Contains Contextual Analysis, Visual Match, Extract Price */}
-                  {detection.brand_name && (
+                  {/* Actions Button - Contains Search, Pre-filter, AI Filter, Contextual Analysis, Visual Match, Extract Price */}
+                  {(() => {
+                    const hasSearchAction = foodgraphResults.length === 0 && !detection.fully_analyzed && detection.brand_name;
+                    const hasPreFilterAction = foodgraphResults.length > 0 && preFilteredCount === null && !detection.fully_analyzed;
+                    const hasAIFilterAction = preFilteredCount !== null && filteredCount === null && !detection.fully_analyzed;
+                    const hasContextualAnalysis = detection.brand_name;
+                    const identicalCount = foodgraphResults.filter(r => (r as any).match_status === 'identical' || r.is_match === true).length;
+                    const almostSameCount = foodgraphResults.filter(r => (r as any).match_status === 'almost_same').length;
+                    const totalCandidates = identicalCount + almostSameCount;
+                    const hasVisualMatch = totalCandidates >= 2 && !detection.selected_foodgraph_result_id;
+                    const hasExtractPrice = detection.brand_name && (!detection.price || detection.price === 'Unknown');
+                    
+                    const hasAnyAction = hasSearchAction || hasPreFilterAction || hasAIFilterAction || hasContextualAnalysis || hasVisualMatch || hasExtractPrice;
+                    
+                    return hasAnyAction && (
                     <div className="mt-4">
                       <button
                         onClick={() => setShowActions(!showActions)}
@@ -2212,13 +2169,22 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         ⚙️ Actions
                         <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
                           {[
+                            // Search FoodGraph
+                            (foodgraphResults.length === 0 && !detection.fully_analyzed) ? 'Search' : null,
+                            // Pre-filter
+                            (foodgraphResults.length > 0 && preFilteredCount === null && !detection.fully_analyzed) ? 'Pre-filter' : null,
+                            // AI Filter
+                            (preFilteredCount !== null && filteredCount === null && !detection.fully_analyzed) ? 'AI Filter' : null,
+                            // Contextual Analysis
                             detection.brand_name ? 'Contextual Analysis' : null,
+                            // Visual Match
                             (() => {
                               const identicalCount = foodgraphResults.filter(r => (r as any).match_status === 'identical' || r.is_match === true).length;
                               const almostSameCount = foodgraphResults.filter(r => (r as any).match_status === 'almost_same').length;
                               const totalCandidates = identicalCount + almostSameCount;
                               return totalCandidates >= 2 && !detection.selected_foodgraph_result_id ? 'Visual Match' : null;
                             })(),
+                            // Extract Price
                             (!detection.price || detection.price === 'Unknown') ? 'Extract Price' : null
                           ].filter(Boolean).length}
                         </span>
@@ -2226,6 +2192,90 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       
                       {showActions && (
                         <div className="mt-3 space-y-3">
+                          {/* Search FoodGraph */}
+                          {foodgraphResults.length === 0 && !detection.fully_analyzed && (
+                            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-lg p-4 shadow-sm">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-2xl">🔍</span>
+                                <div>
+                                  <h4 className="font-semibold text-blue-900">Search FoodGraph</h4>
+                                  <p className="text-xs text-blue-700">Find matching products in FoodGraph database</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={handleSearchFoodGraph}
+                                disabled={loading}
+                                className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
+                              >
+                                {loading ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Searching...
+                                  </>
+                                ) : (
+                                  '🔍 Search FoodGraph'
+                                )}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Pre-filter */}
+                          {foodgraphResults.length > 0 && preFilteredCount === null && !detection.fully_analyzed && (
+                            <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-300 rounded-lg p-4 shadow-sm">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-2xl">📊</span>
+                                <div>
+                                  <h4 className="font-semibold text-orange-900">Pre-filter Results</h4>
+                                  <p className="text-xs text-orange-700">Filter by brand, size, and retailer (≥85% match)</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={handlePreFilter}
+                                disabled={preFiltering}
+                                className="w-full px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
+                              >
+                                {preFiltering ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Pre-filtering...
+                                  </>
+                                ) : (
+                                  <>
+                                    📊 Pre-Filter ({foodgraphResults.length} results)
+                                    <span className="ml-2 text-xs bg-orange-800 text-white px-2 py-0.5 rounded-full">≥85%</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* AI Filter */}
+                          {preFilteredCount !== null && filteredCount === null && !detection.fully_analyzed && (
+                            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-300 rounded-lg p-4 shadow-sm">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-2xl">🤖</span>
+                                <div>
+                                  <h4 className="font-semibold text-purple-900">AI Filter</h4>
+                                  <p className="text-xs text-purple-700">Use AI to compare each candidate with detected product</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={handleFilterResults}
+                                disabled={filtering}
+                                className="w-full px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
+                              >
+                                {filtering ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    AI Filtering...
+                                  </>
+                                ) : (
+                                  <>🤖 Filter with AI ({foodgraphResults.length} results)</>
+                                )}
+                              </button>
+                            </div>
+                          )}
+
                           {/* Contextual Analysis - Experimental Feature */}
                           <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-lg p-4 shadow-sm">
                             <div className="flex items-center justify-between mb-3">
@@ -2534,7 +2584,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         </div>
                       )}
                     </div>
-                  )}
+                    );
+                  })()}
 
               </div>
               );
