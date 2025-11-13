@@ -335,6 +335,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const handleBoundingBoxClick = (detectionId: string) => {
     setSelectedDetection(detectionId);
     
+    // Reset options visibility when switching products
+    setShowFoodGraphOptions(false);
+    
     // Load existing foodgraph_results from the detection if available
     const detection = detections.find(d => d.id === detectionId);
     console.log(`🔍 Clicked on detection:`, {
@@ -2041,7 +2044,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     </div>
 
                   {/* FoodGraph Results */}
-                  {(foodgraphResults.length > 0 || (detection.fully_analyzed && preFilteredCount !== null)) && (
+                  {(foodgraphResults.length > 0 || detection.fully_analyzed || detection.selected_foodgraph_result_id) && (
                     <div>
                       {/* See Options Button - Shows/hides FoodGraph results and filters */}
                       <div className="mb-4">
