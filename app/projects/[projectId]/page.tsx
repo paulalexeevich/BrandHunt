@@ -1253,24 +1253,15 @@ export default function ProjectViewPage() {
             <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Add Images to Project</h2>
               <p className="text-gray-600 mb-4">
-                Upload images to this project using bulk Excel upload or single S3 URL
+                Upload images to this project using bulk Excel upload
               </p>
-              <div className="flex gap-4">
-                <Link
-                  href={`/excel-upload?projectId=${projectId}`}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg"
-                >
-                  <FileSpreadsheet className="w-5 h-5" />
-                  <span className="font-semibold">Bulk Upload Excel</span>
-                </Link>
-                <Link
-                  href={`/?projectId=${projectId}`}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-lg"
-                >
-                  <LinkIcon className="w-5 h-5" />
-                  <span className="font-semibold">S3 URL Upload</span>
-                </Link>
-              </div>
+              <Link
+                href={`/excel-upload?projectId=${projectId}`}
+                className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg"
+              >
+                <FileSpreadsheet className="w-5 h-5" />
+                <span className="font-semibold">Bulk Upload Excel</span>
+              </Link>
             </div>
 
             {/* Batch Processing Controls */}
