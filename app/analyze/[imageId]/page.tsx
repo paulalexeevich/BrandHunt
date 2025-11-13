@@ -1761,6 +1761,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               
               return (
                 <div className="space-y-4">
+                  {/* Product ID Badge - Top Right */}
+                  <div className="flex justify-end">
+                    <div className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg shadow-md font-semibold text-sm">
+                      #{detectionIndex + 1}
+                    </div>
+                  </div>
+
                   {/* FoodGraph Match - Show if saved */}
                   {detection.fully_analyzed && detection.selected_foodgraph_image_url && (
                     <div className="bg-white border-2 border-blue-300 rounded-lg p-4 shadow-sm">
