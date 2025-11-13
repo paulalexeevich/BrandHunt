@@ -1053,7 +1053,7 @@ export async function saveVisualMatchResults(
             ingredients: candidate.ingredients,
             matchStatusFromAI: candidate.matchStatus
           },
-          processing_stage: 'visual_match',
+          processing_stage: 'visual_match' as const,
           match_status: matchStatus,
           visual_similarity: score.visualSimilarity,
           match_reason: reason
@@ -1100,7 +1100,7 @@ export async function saveVisualMatchResults(
             ingredients: selectedCandidate.ingredients,
             matchStatusFromAI: selectedCandidate.matchStatus
           },
-          processing_stage: 'visual_match',
+          processing_stage: 'visual_match' as const,
           match_status: 'identical',
           visual_similarity: visualSim,
           match_reason: `Selected as best match (below threshold). ${visualMatchResult.reasoning}`

@@ -3,9 +3,50 @@
  * Displays FoodGraph search results with stage filtering and product cards
  */
 
-import React from 'react';
-import { Package, CheckCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Package, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Detection, FoodGraphResult, ProcessingStage, ImageData } from '@/types/analyze';
+
+/**
+ * CollapsibleReasoning Component
+ * Shows truncated reasoning by default with expand/collapse functionality
+ */
+function CollapsibleReasoning({ reasoning }: { reasoning: string }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const PREVIEW_LENGTH = 50; // characters to show in preview
+  
+  const shouldTruncate = reasoning.length > PREVIEW_LENGTH;
+  const displayText = isExpanded || !shouldTruncate 
+    ? reasoning 
+    : reasoning.slice(0, PREVIEW_LENGTH) + '...';
+  
+  return (
+    <div className="flex items-start gap-1">
+      <p className="text-[10px] text-purple-900 leading-tight italic flex-1">
+        🤖 {displayText}
+      </p>
+      {shouldTruncate && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex-shrink-0 text-[10px] text-purple-700 hover:text-purple-900 font-semibold flex items-center gap-0.5 transition-colors"
+          aria-label={isExpanded ? 'Hide reasoning' : 'Show full reasoning'}
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="w-3 h-3" />
+              Hide
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-3 h-3" />
+              Show
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
 
 interface FoodGraphResultsListProps {
   detection: Detection;
@@ -394,9 +435,7 @@ function ProductCard({
             {/* AI Reasoning */}
             {matchReason && filteredCount !== null && (
               <div className="mt-1 p-1.5 bg-purple-50 border border-purple-200 rounded">
-                <p className="text-[10px] text-purple-900 leading-tight italic">
-                  🤖 {matchReason}
-                </p>
+                <CollapsibleReasoning reasoning={matchReason} />
               </div>
             )}
           </div>

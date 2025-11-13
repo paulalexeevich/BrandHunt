@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, CheckCircle, Package, Trash2, ChevronDown, Settings, Cpu } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle, Package, Trash2, ChevronDown, Settings, Cpu, ChevronUp } from 'lucide-react';
 import { getImageUrl } from '@/lib/image-utils';
 import { ImageStatisticsPanel } from '@/components/ImageStatisticsPanel';
 import { FoodGraphResultsList } from '@/components/FoodGraphResultsList';
@@ -16,6 +16,47 @@ import type {
   ProcessingStage, 
   StageStats 
 } from '@/types/analyze';
+
+/**
+ * CollapsibleReasoning Component
+ * Shows truncated reasoning by default with expand/collapse functionality
+ */
+function CollapsibleReasoning({ reasoning }: { reasoning: string }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const PREVIEW_LENGTH = 50; // characters to show in preview
+  
+  const shouldTruncate = reasoning.length > PREVIEW_LENGTH;
+  const displayText = isExpanded || !shouldTruncate 
+    ? reasoning 
+    : reasoning.slice(0, PREVIEW_LENGTH) + '...';
+  
+  return (
+    <div>
+      <p className="text-gray-800 leading-relaxed inline">
+        {displayText}
+      </p>
+      {shouldTruncate && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="ml-2 text-xs text-purple-700 hover:text-purple-900 font-semibold inline-flex items-center gap-0.5 transition-colors"
+          aria-label={isExpanded ? 'Hide reasoning' : 'Show full reasoning'}
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="w-3 h-3" />
+              Hide
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-3 h-3" />
+              Show
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function AnalyzePage({ params }: { params: Promise<{ imageId: string }> }) {
   const resolvedParams = use(params);
@@ -2156,7 +2197,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                 
                                 <div className="pt-2 border-t border-gray-200">
                                   <p className="font-medium text-gray-700 mb-1">Reasoning:</p>
-                                  <p className="text-gray-800 leading-relaxed">{visualMatchResult.reasoning}</p>
+                                  <CollapsibleReasoning reasoning={visualMatchResult.reasoning} />
                                 </div>
                                 
                                 {visualMatchResult.totalCandidates && (
@@ -2388,12 +2429,16 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                             Confidence: {Math.round((contextualAnalysis.analysis.brand_confidence || 0) * 100)}%
                                           </p>
                                         )}
-                                        <p className="text-blue-800 mt-1">
-                                          {contextualAnalysis.analysis.brand_reasoning || 
-                                           contextualAnalysis.analysis.brand_method || 
-                                           contextualAnalysis.analysis.reasoning || 
-                                           'No reasoning provided'}
-                                        </p>
+                                        <div className="mt-1">
+                                          <CollapsibleReasoning 
+                                            reasoning={
+                                              contextualAnalysis.analysis.brand_reasoning || 
+                                              contextualAnalysis.analysis.brand_method || 
+                                              contextualAnalysis.analysis.reasoning || 
+                                              'No reasoning provided'
+                                            }
+                                          />
+                                        </div>
                                       </div>
                                     )}
                                     
@@ -2408,11 +2453,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                             Confidence: {Math.round((contextualAnalysis.analysis.size_confidence || 0) * 100)}%
                                           </p>
                                         )}
-                                        <p className="text-green-800 mt-1">
-                                          {contextualAnalysis.analysis.size_reasoning || 
-                                           contextualAnalysis.analysis.size_method || 
-                                           'No reasoning provided'}
-                                        </p>
+                                        <div className="mt-1">
+                                          <CollapsibleReasoning 
+                                            reasoning={
+                                              contextualAnalysis.analysis.size_reasoning || 
+                                              contextualAnalysis.analysis.size_method || 
+                                              'No reasoning provided'
+                                            }
+                                          />
+                                        </div>
                                       </div>
                                     )}
                                     
