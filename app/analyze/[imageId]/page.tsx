@@ -1489,6 +1489,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           pipelineProgress={pipelineProgress}
           step3Details={step3Details}
           pipelineDetails={pipelineDetails}
+          matched={detections.filter(d => d.selected_foodgraph_gtin && d.selected_foodgraph_gtin.trim() !== '').length}
+          totalProducts={detections.length}
           handleExtractInfoAll={handleExtractInfoAll}
           handleExtractPriceAll={handleExtractPriceAll}
           handlePipelineAI={handlePipelineAI}

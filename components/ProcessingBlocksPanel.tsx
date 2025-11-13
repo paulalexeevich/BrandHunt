@@ -45,6 +45,10 @@ interface ProcessingBlocksPanelProps {
   step3Details: ProgressDetail[];
   pipelineDetails: ProgressDetail[];
   
+  // Statistics for progress bar
+  matched: number;
+  totalProducts: number;
+  
   // Handlers
   handleExtractInfoAll: () => void;
   handleExtractPriceAll: () => void;
@@ -70,6 +74,8 @@ export function ProcessingBlocksPanel({
   pipelineProgress,
   step3Details,
   pipelineDetails,
+  matched,
+  totalProducts,
   handleExtractInfoAll,
   handleExtractPriceAll,
   handlePipelineAI,
@@ -119,28 +125,43 @@ export function ProcessingBlocksPanel({
           {/* Collapsible Content */}
           {showBlock2 && (
             <>
-              {/* Pipeline 2: Visual-Only */}
-              <div className="bg-white rounded-lg p-3 mb-3 border-2 border-green-300">
-                <h3 className="text-sm font-semibold text-green-900 mb-2">
-                  🎯 Product Matching Pipeline
-                </h3>
-                <p className="text-[10px] text-gray-600 mb-2">
-                  Search → Pre-filter → <strong className="text-green-700">Visual Match</strong> → Save
-                </p>
-                <button
-                  onClick={() => handlePipelineVisual(20)}
-                  disabled={isProcessing || needsSearch === 0}
-                  className="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all font-semibold disabled:opacity-50 text-sm"
-                >
-                  {processingPipelineVisual && activePipeline === 'visual' ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
-                      Processing...
-                    </>
-                  ) : (
-                    '⚡⚡⚡ Start Pipeline (20 concurrent)'
-                  )}
-                </button>
+              {/* Pipeline: Progress + Start Button in One Line */}
+              <div className="bg-white rounded-lg p-3 mb-3 border-2 border-emerald-300">
+                <div className="flex items-center gap-3">
+                  {/* Progress Bar */}
+                  <div className="flex-1">
+                    <div className="flex justify-between text-xs text-gray-600 mb-1.5">
+                      <span className="font-medium">Processing Progress</span>
+                      <span className="font-semibold">{matched} / {totalProducts} Saved ({Math.round((matched / totalProducts) * 100)}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-0.5"
+                        style={{ width: `${(matched / totalProducts) * 100}%` }}
+                      >
+                        {matched > 0 && (
+                          <span className="text-[10px] font-bold text-white">✓</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Start Pipeline Button */}
+                  <button
+                    onClick={() => handlePipelineVisual(20)}
+                    disabled={isProcessing || needsSearch === 0}
+                    className="flex-shrink-0 px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all font-semibold disabled:opacity-50 text-sm whitespace-nowrap shadow-md"
+                  >
+                    {processingPipelineVisual && activePipeline === 'visual' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                        Processing...
+                      </>
+                    ) : (
+                      '⚡⚡⚡ Start Pipeline (20)'
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Processing Status */}

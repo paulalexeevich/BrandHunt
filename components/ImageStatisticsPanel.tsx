@@ -187,23 +187,6 @@ export function ImageStatisticsPanel({
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="mt-2.5 bg-white rounded-lg shadow-sm px-3 py-2 border border-gray-200">
-        <div className="flex justify-between text-xs text-gray-600 mb-1.5">
-          <span className="font-medium">Processing Progress</span>
-          <span className="font-semibold">{matched} / {totalProducts} Saved ({Math.round((matched / totalProducts) * 100)}%)</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-          <div 
-            className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-0.5"
-            style={{ width: `${(matched / totalProducts) * 100}%` }}
-          >
-            {matched > 0 && (
-              <span className="text-[9px] font-bold text-white">✓</span>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
