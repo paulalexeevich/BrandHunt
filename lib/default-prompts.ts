@@ -204,11 +204,11 @@ Return JSON with this EXACT structure:
   "candidateScores": [
     {
       "candidateIndex": 1,
-      "candidateId": "{{candidateId}}",
+      "candidateId": "candidate-1",
       "visualSimilarity": 0.0 to 1.0,
       "passedThreshold": true or false (≥ 0.7)
     }
-    // ... one entry for each candidate
+    // ... one entry for each candidate (use candidateIndex for matching)
   ]
 }
 

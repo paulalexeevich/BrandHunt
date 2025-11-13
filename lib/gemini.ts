@@ -915,12 +915,13 @@ ${c.ingredients ? `- Ingredients: ${c.ingredients.substring(0, 200)}...` : ''}`
       console.log(`❌ No match selected - ${selection.reasoning}`);
     }
 
-    // Enrich candidate scores with GTIN (Gemini doesn't have access to it)
+    // Enrich candidate scores with GTIN and ID (Gemini only has access to index)
+    // Match by candidateIndex (1-based) instead of candidateId since Gemini may return GTIN in that field
     const enrichedCandidateScores: CandidateScore[] = selection.candidateScores.map(score => {
-      const candidate = candidates.find(c => c.id === score.candidateId);
+      const candidate = candidates[score.candidateIndex - 1]; // candidateIndex is 1-based
       return {
         candidateIndex: score.candidateIndex,
-        candidateId: score.candidateId,
+        candidateId: candidate?.id || score.candidateId, // Use actual candidate ID from array
         candidateGtin: candidate?.gtin || 'Unknown',
         visualSimilarity: score.visualSimilarity,
         passedThreshold: score.passedThreshold
