@@ -117,6 +117,7 @@ export default function ProjectViewPage() {
   const [memberLoading, setMemberLoading] = useState(false);
   const [showAboutRoles, setShowAboutRoles] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   
@@ -948,6 +949,7 @@ export default function ProjectViewPage() {
             <button
               onClick={async () => {
                 try {
+                  setExportingExcel(true);
                   console.log('🚀 Starting export for projectId:', projectId);
                   const response = await fetch(`/api/export-matched-products?projectId=${projectId}`, {
                     credentials: 'include',
@@ -959,6 +961,7 @@ export default function ProjectViewPage() {
                     const error = await response.json();
                     console.error('❌ Export error:', error);
                     alert(`Export failed: ${error.error || 'Unknown error'}\n${error.details || ''}`);
+                    setExportingExcel(false);
                     return;
                   }
                   
@@ -974,16 +977,32 @@ export default function ProjectViewPage() {
                   window.URL.revokeObjectURL(url);
                   document.body.removeChild(a);
                   console.log('✅ Export complete!');
+                  setExportingExcel(false);
                 } catch (error) {
                   console.error('💥 Export exception:', error);
                   alert(`Failed to export matched products: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                  setExportingExcel(false);
                 }
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
+              disabled={exportingExcel}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-semibold ${
+                exportingExcel
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
               title="Export matched products to Excel"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              Export Matched
+              {exportingExcel ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating Excel...
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Export Matched
+                </>
+              )}
             </button>
             <button
               onClick={() => setShowMembersPanel(!showMembersPanel)}
