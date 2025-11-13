@@ -1687,12 +1687,12 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       display: imageDimensions ? 'block' : 'none',
                     }}
                   >
-                    {/* Product number badge */}
-                    <div 
+                    {/* Product number badge - hidden */}
+                    {/* <div 
                       className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${badgeColor}`}
                     >
                       #{index + 1}
-                    </div>
+                    </div> */}
                   </div>
                 );
               }) : null}
