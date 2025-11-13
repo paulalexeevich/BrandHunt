@@ -354,148 +354,166 @@ export async function POST(request: NextRequest) {
           let skippedCount = 0;
           let errorCount = 0;
 
-          // Process detections with concurrency
-          for (let i = 0; i < detectionsToProcess.length; i += concurrency) {
-            const batch = detectionsToProcess.slice(i, i + concurrency);
-            const batchNum = Math.floor(i/concurrency) + 1;
-            const totalBatches = Math.ceil(detectionsToProcess.length/concurrency);
+          // Helper function to process a single detection
+          const processDetection = async (detection: Detection) => {
+            console.log(`🔍 [#${detection.detection_index}] Starting detection ${detection.id}`);
             
-            console.log(`\n📦 Processing batch ${batchNum}/${totalBatches} (${batch.length} detections)...`);
-            
-            // Start all detections in batch in parallel
-            const batchPromises = batch.map(async (detection) => {
-              console.log(`🔍 [#${detection.detection_index}] Starting detection ${detection.id}`);
-              
-              const image = imageMap.get(detection.image_id);
-              if (!image) {
-                console.error(`❌ [#${detection.detection_index}] Image not found for detection ${detection.id}`);
-                return { success: false, skipped: false, error: 'Image not found' };
-              }
-              console.log(`   ✓ Image found`);
+            const image = imageMap.get(detection.image_id);
+            if (!image) {
+              console.error(`❌ [#${detection.detection_index}] Image not found for detection ${detection.id}`);
+              return { success: false, skipped: false, error: 'Image not found' };
+            }
+            console.log(`   ✓ Image found`);
 
+            try {
+              // Get all detections for this image (for neighbors)
+              const imageDetections = detectionsByImage.get(detection.image_id) || [];
+              console.log(`   ✓ Found ${imageDetections.length} detections for image`);
+              
+              // Find neighbors
+              const { left, right } = findNeighbors(detection, imageDetections);
+              console.log(`   ✓ Found ${left.length} left, ${right.length} right neighbors`);
+              
+              if (left.length === 0 && right.length === 0) {
+                console.log(`   ⚠️ No neighbors, skipping`);
+                return { success: false, skipped: true };
+              }
+
+              // Get image data from cache
+              const imageBase64 = imageDataCache.get(detection.image_id);
+              if (!imageBase64) {
+                console.error(`❌ [#${detection.detection_index}] Image data not in cache for detection ${detection.id}`);
+                return { success: false, skipped: false, error: 'Image data not loaded' };
+              }
+              console.log(`   ✓ Image data retrieved from cache (${Math.round(imageBase64.length / 1024)}KB)`);
+              
+              // Calculate expanded box
+              const expandedBox = calculateExpandedBox(detection.bounding_box, left, right);
+              console.log(`   ✓ Expanded box calculated: ${JSON.stringify(expandedBox)}`);
+              
+              // Extract expanded crop
+              let expandedCropBase64;
               try {
-                // Get all detections for this image (for neighbors)
-                const imageDetections = detectionsByImage.get(detection.image_id) || [];
-                console.log(`   ✓ Found ${imageDetections.length} detections for image`);
-                
-                // Find neighbors
-                const { left, right } = findNeighbors(detection, imageDetections);
-                console.log(`   ✓ Found ${left.length} left, ${right.length} right neighbors`);
-                
-                if (left.length === 0 && right.length === 0) {
-                  console.log(`   ⚠️ No neighbors, skipping`);
-                  return { success: false, skipped: true };
-                }
-
-                // Get image data from cache
-                const imageBase64 = imageDataCache.get(detection.image_id);
-                if (!imageBase64) {
-                  console.error(`❌ [#${detection.detection_index}] Image data not in cache for detection ${detection.id}`);
-                  return { success: false, skipped: false, error: 'Image data not loaded' };
-                }
-                console.log(`   ✓ Image data retrieved from cache (${Math.round(imageBase64.length / 1024)}KB)`);
-                
-                // Calculate expanded box
-                const expandedBox = calculateExpandedBox(detection.bounding_box, left, right);
-                console.log(`   ✓ Expanded box calculated: ${JSON.stringify(expandedBox)}`);
-                
-                // Extract expanded crop
-                let expandedCropBase64;
-                try {
-                  console.log(`   🖼️  Extracting crop...`);
-                  expandedCropBase64 = await extractExpandedCrop(imageBase64, expandedBox);
-                  console.log(`   ✓ Crop extracted (${Math.round(expandedCropBase64.length / 1024)}KB)`);
-                } catch (cropError) {
-                  console.error(`❌ [#${detection.detection_index}] Crop extraction failed:`, cropError instanceof Error ? cropError.message : cropError);
-                  console.error(`   Detection box:`, detection.bounding_box);
-                  console.error(`   Expanded box:`, expandedBox);
-                  return { success: false, skipped: false, error: 'Crop extraction failed' };
-                }
-                
-                // Run contextual analysis
-                let analysis;
-                try {
-                  console.log(`   🤖 Calling Gemini API...`);
-                  analysis = await analyzeWithContext(expandedCropBase64, detection, left, right);
-                  console.log(`   ✓ Gemini response received`);
-                } catch (geminiError) {
-                  console.error(`❌ [#${detection.detection_index}] Gemini API failed:`, geminiError instanceof Error ? geminiError.message : geminiError);
-                  return { success: false, skipped: false, error: 'Gemini API failed' };
-                }
-                
-                if (analysis.parse_error) {
-                  console.error(`❌ [#${detection.detection_index}] Parse error:`, analysis.raw_response?.substring(0, 200));
-                  return { success: false, skipped: false, error: 'Parse error' };
-                }
-                console.log(`   ✓ Analysis parsed: ${analysis.inferred_brand} (${Math.round((analysis.brand_confidence || 0) * 100)}%)`);
-
-
-                // ALWAYS overwrite brand and size
-                const updateData: any = {
-                  contextual_brand: analysis.inferred_brand,
-                  contextual_brand_confidence: analysis.brand_confidence,
-                  contextual_brand_reasoning: analysis.brand_reasoning,
-                  contextual_size: analysis.inferred_size,
-                  contextual_size_confidence: analysis.size_confidence,
-                  contextual_size_reasoning: analysis.size_reasoning,
-                  contextual_overall_confidence: analysis.overall_confidence,
-                  contextual_notes: analysis.notes,
-                  contextual_prompt_version: 'v1',
-                  contextual_analyzed_at: new Date().toISOString(),
-                  contextual_left_neighbor_count: left.length,
-                  contextual_right_neighbor_count: right.length,
-                  corrected_by_contextual: true,
-                  contextual_correction_notes: `Brand: "${detection.brand_name}" (${Math.round((detection.brand_confidence || 0) * 100)}%) → "${analysis.inferred_brand}" (${Math.round((analysis.brand_confidence || 0) * 100)}%); Size: "${detection.size || 'Unknown'}" → "${analysis.inferred_size}"`,
-                  brand_name: analysis.inferred_brand,
-                  brand_confidence: analysis.brand_confidence,
-                  size: analysis.inferred_size,
-                  size_confidence: analysis.size_confidence,
-                };
-
-                console.log(`   💾 Saving to database...`);
-                const { error: updateError } = await supabase
-                  .from('branghunt_detections')
-                  .update(updateData)
-                  .eq('id', detection.id);
-
-                if (updateError) {
-                  console.error(`❌ [#${detection.detection_index}] Database update failed:`, updateError.message);
-                  console.error(`   Update data keys:`, Object.keys(updateData));
-                  throw new Error(`Database update failed: ${updateError.message}`);
-                }
-
-                console.log(`   ✅ SUCCESS: Detection #${detection.detection_index} completed\n`);
-                return { success: true, skipped: false };
-
-              } catch (error) {
-                console.error(`❌ Detection ${detection.id} (#${detection.detection_index}) error:`, error instanceof Error ? error.message : error);
-                return { success: false, skipped: false, error: error instanceof Error ? error.message : 'Unknown error' };
+                console.log(`   🖼️  Extracting crop...`);
+                expandedCropBase64 = await extractExpandedCrop(imageBase64, expandedBox);
+                console.log(`   ✓ Crop extracted (${Math.round(expandedCropBase64.length / 1024)}KB)`);
+              } catch (cropError) {
+                console.error(`❌ [#${detection.detection_index}] Crop extraction failed:`, cropError instanceof Error ? cropError.message : cropError);
+                console.error(`   Detection box:`, detection.bounding_box);
+                console.error(`   Expanded box:`, expandedBox);
+                return { success: false, skipped: false, error: 'Crop extraction failed' };
               }
-            });
-
-            // Await each detection sequentially to send progress updates
-            for (const promise of batchPromises) {
-              const result = await promise;
-              processedCount++;
               
-              if (result.success) {
-                correctedCount++;
-              } else if (result.skipped) {
-                skippedCount++;
-              } else {
-                errorCount++;
+              // Run contextual analysis
+              let analysis;
+              try {
+                console.log(`   🤖 Calling Gemini API...`);
+                analysis = await analyzeWithContext(expandedCropBase64, detection, left, right);
+                console.log(`   ✓ Gemini response received`);
+              } catch (geminiError) {
+                console.error(`❌ [#${detection.detection_index}] Gemini API failed:`, geminiError instanceof Error ? geminiError.message : geminiError);
+                return { success: false, skipped: false, error: 'Gemini API failed' };
+              }
+              
+              if (analysis.parse_error) {
+                console.error(`❌ [#${detection.detection_index}] Parse error:`, analysis.raw_response?.substring(0, 200));
+                return { success: false, skipped: false, error: 'Parse error' };
+              }
+              console.log(`   ✓ Analysis parsed: ${analysis.inferred_brand} (${Math.round((analysis.brand_confidence || 0) * 100)}%)`);
+
+
+              // ALWAYS overwrite brand and size
+              const updateData: any = {
+                contextual_brand: analysis.inferred_brand,
+                contextual_brand_confidence: analysis.brand_confidence,
+                contextual_brand_reasoning: analysis.brand_reasoning,
+                contextual_size: analysis.inferred_size,
+                contextual_size_confidence: analysis.size_confidence,
+                contextual_size_reasoning: analysis.size_reasoning,
+                contextual_overall_confidence: analysis.overall_confidence,
+                contextual_notes: analysis.notes,
+                contextual_prompt_version: 'v1',
+                contextual_analyzed_at: new Date().toISOString(),
+                contextual_left_neighbor_count: left.length,
+                contextual_right_neighbor_count: right.length,
+                corrected_by_contextual: true,
+                contextual_correction_notes: `Brand: "${detection.brand_name}" (${Math.round((detection.brand_confidence || 0) * 100)}%) → "${analysis.inferred_brand}" (${Math.round((analysis.brand_confidence || 0) * 100)}%); Size: "${detection.size || 'Unknown'}" → "${analysis.inferred_size}"`,
+                brand_name: analysis.inferred_brand,
+                brand_confidence: analysis.brand_confidence,
+                size: analysis.inferred_size,
+                size_confidence: analysis.size_confidence,
+              };
+
+              console.log(`   💾 Saving to database...`);
+              const { error: updateError } = await supabase
+                .from('branghunt_detections')
+                .update(updateData)
+                .eq('id', detection.id);
+
+              if (updateError) {
+                console.error(`❌ [#${detection.detection_index}] Database update failed:`, updateError.message);
+                console.error(`   Update data keys:`, Object.keys(updateData));
+                throw new Error(`Database update failed: ${updateError.message}`);
               }
 
-              // Send progress update after EACH detection
-              sendProgress({
-                type: 'progress',
-                totalDetections: totalToProcess,
-                processedDetections: processedCount,
-                corrected: correctedCount,
-                skipped: skippedCount,
-                failed: errorCount,
-                message: `Analyzing: ${processedCount}/${totalToProcess} detections (${correctedCount} corrected, ${skippedCount} skipped, ${errorCount} errors)`
+              console.log(`   ✅ SUCCESS: Detection #${detection.detection_index} completed\n`);
+              return { success: true, skipped: false };
+
+            } catch (error) {
+              console.error(`❌ Detection ${detection.id} (#${detection.detection_index}) error:`, error instanceof Error ? error.message : error);
+              return { success: false, skipped: false, error: error instanceof Error ? error.message : 'Unknown error' };
+            }
+          };
+
+          // ROLLING WINDOW CONCURRENCY: Maintain constant pool of active operations
+          console.log(`\n🔄 Using rolling window concurrency with pool size: ${concurrency}`);
+          
+          const activePromises = new Set<Promise<void>>();
+          let nextDetectionIndex = 0;
+
+          // Process detections with rolling window
+          while (nextDetectionIndex < detectionsToProcess.length || activePromises.size > 0) {
+            // Fill the pool up to concurrency limit
+            while (nextDetectionIndex < detectionsToProcess.length && activePromises.size < concurrency) {
+              const detection = detectionsToProcess[nextDetectionIndex];
+              nextDetectionIndex++;
+              
+              // Create a promise that processes the detection and updates counters
+              const promise = (async () => {
+                const result = await processDetection(detection);
+                processedCount++;
+                
+                if (result.success) {
+                  correctedCount++;
+                } else if (result.skipped) {
+                  skippedCount++;
+                } else {
+                  errorCount++;
+                }
+
+                // Send progress update after EACH detection completes
+                sendProgress({
+                  type: 'progress',
+                  totalDetections: totalToProcess,
+                  processedDetections: processedCount,
+                  corrected: correctedCount,
+                  skipped: skippedCount,
+                  failed: errorCount,
+                  message: `Analyzing: ${processedCount}/${totalToProcess} detections (${correctedCount} corrected, ${skippedCount} skipped, ${errorCount} errors) [Active: ${activePromises.size}]`
+                });
+              })();
+
+              activePromises.add(promise);
+              
+              // Remove promise from active set when it completes
+              promise.finally(() => {
+                activePromises.delete(promise);
               });
+            }
+
+            // Wait for at least one promise to complete before continuing
+            if (activePromises.size > 0) {
+              await Promise.race(activePromises);
             }
           }
 
