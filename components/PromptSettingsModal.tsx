@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Save, RotateCcw, History } from 'lucide-react';
-import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT } from '@/lib/default-prompts';
+import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT, DEFAULT_VISUAL_MATCH_PROMPT } from '@/lib/default-prompts';
 
 interface PromptTemplate {
   id: string;
@@ -22,16 +22,19 @@ interface PromptSettingsModalProps {
 const STEP_NAMES = {
   extract_info: 'Extract Product Information',
   ai_filter: 'AI Product Matching',
+  visual_match: 'Visual Match Selection',
 };
 
 const STEP_DESCRIPTIONS = {
   extract_info: 'This prompt instructs the AI to extract product details (brand, name, category, etc.) from shelf images.',
   ai_filter: 'This prompt instructs the AI to compare product images and determine if they match.',
+  visual_match: 'This prompt instructs the AI to select the best match from multiple product candidates using visual similarity and metadata.',
 };
 
 const DEFAULT_PROMPTS = {
   extract_info: DEFAULT_EXTRACT_INFO_PROMPT,
   ai_filter: DEFAULT_AI_FILTER_PROMPT,
+  visual_match: DEFAULT_VISUAL_MATCH_PROMPT,
 };
 
 export default function PromptSettingsModal({ projectId, isOpen, onClose }: PromptSettingsModalProps) {

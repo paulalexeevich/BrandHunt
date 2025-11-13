@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
-import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT } from '@/lib/default-prompts';
+import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT, DEFAULT_VISUAL_MATCH_PROMPT } from '@/lib/default-prompts';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
 
@@ -10,10 +10,25 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
  * Returns the custom prompt if found, otherwise returns the default prompt
  */
 export async function getPromptTemplate(projectId: string | null, stepName: string): Promise<string> {
+  // Default prompts based on step name
+  const getDefaultPrompt = (step: string): string => {
+    switch (step) {
+      case 'extract_info':
+        return DEFAULT_EXTRACT_INFO_PROMPT;
+      case 'ai_filter':
+        return DEFAULT_AI_FILTER_PROMPT;
+      case 'visual_match':
+        return DEFAULT_VISUAL_MATCH_PROMPT;
+      default:
+        console.warn(`Unknown step name: ${step}, defaulting to extract_info prompt`);
+        return DEFAULT_EXTRACT_INFO_PROMPT;
+    }
+  };
+
   // If no project ID, return default
   if (!projectId) {
     console.log(`No project ID provided for ${stepName}, using default prompt`);
-    return stepName === 'extract_info' ? DEFAULT_EXTRACT_INFO_PROMPT : DEFAULT_AI_FILTER_PROMPT;
+    return getDefaultPrompt(stepName);
   }
 
   try {
@@ -29,14 +44,14 @@ export async function getPromptTemplate(projectId: string | null, stepName: stri
 
     if (error || !template) {
       console.log(`No custom prompt found for project ${projectId}, step ${stepName}, using default`);
-      return stepName === 'extract_info' ? DEFAULT_EXTRACT_INFO_PROMPT : DEFAULT_AI_FILTER_PROMPT;
+      return getDefaultPrompt(stepName);
     }
 
     console.log(`Using custom prompt for project ${projectId}, step ${stepName}`);
     return template.prompt_template;
   } catch (error) {
     console.error(`Error fetching prompt template:`, error);
-    return stepName === 'extract_info' ? DEFAULT_EXTRACT_INFO_PROMPT : DEFAULT_AI_FILTER_PROMPT;
+    return getDefaultPrompt(stepName);
   }
 }
 
@@ -783,7 +798,11 @@ export async function selectBestMatchFromMultiple(
     };
   }
 
-  // Build the prompt
+  // Fetch the custom prompt template or use default
+  console.log(`🎯 Fetching visual match prompt template for projectId: ${projectId || 'null (using default)'}`);
+  const promptTemplate = await getPromptTemplate(projectId || null, 'visual_match');
+  
+  // Build the candidate descriptions
   const candidateDescriptions = candidates.map((c, idx) => 
     `Candidate ${idx + 1} (GTIN: ${c.gtin}):
 - Product Name: ${c.productName}
@@ -794,48 +813,16 @@ export async function selectBestMatchFromMultiple(
 ${c.ingredients ? `- Ingredients: ${c.ingredients.substring(0, 200)}...` : ''}`
   ).join('\n\n');
 
-  const prompt = `You are a visual product matching expert. Your task is to select the BEST MATCH from multiple product candidates.
-
-SHELF PRODUCT (what we detected):
-- Brand: ${extractedInfo.brand}
-- Product Name: ${extractedInfo.productName}
-- Size: ${extractedInfo.size}
-- Flavor: ${extractedInfo.flavor}
-- Category: ${extractedInfo.category}
-
-CANDIDATES (${candidates.length} options):
-${candidateDescriptions}
-
-IMAGES PROVIDED:
-- Image 1: The cropped product from the retail shelf (THIS IS THE REFERENCE)
-- Images 2-${candidateImages.length + 1}: Product images for each candidate
-
-MATCHING CRITERIA (in order of importance):
-1. Visual Similarity: Does the packaging, colors, design, logo match? Look at overall visual appearance.
-2. Brand Match: Does the brand name match exactly?
-3. Size Match: Does the package size match (oz, g, ml, count, etc.)?
-4. Flavor/Variant Match: Does the flavor or variant match?
-5. Product Name: Does the core product name match?
-
-INSTRUCTIONS:
-- Compare the shelf product (Image 1) with each candidate image
-- Consider both visual appearance AND metadata (brand, size, flavor)
-- If multiple candidates look identical, use metadata to differentiate
-- Be strict: Only select a match if you're confident it's the SAME product
-- If no candidate is a good match, return null
-
-Return a JSON object with this EXACT structure:
-{
-  "selectedCandidateIndex": 1-${candidates.length} or null if no good match,
-  "confidence": 0.0 to 1.0,
-  "reasoning": "Detailed explanation of why this candidate was selected or why no match was found",
-  "visualSimilarityScore": 0.0 to 1.0,
-  "brandMatch": true or false,
-  "sizeMatch": true or false,
-  "flavorMatch": true or false
-}
-
-Only return the JSON object, nothing else.`;
+  // Replace placeholders in the prompt template
+  const prompt = promptTemplate
+    .replace(/\{\{brand\}\}/g, extractedInfo.brand)
+    .replace(/\{\{productName\}\}/g, extractedInfo.productName)
+    .replace(/\{\{size\}\}/g, extractedInfo.size)
+    .replace(/\{\{flavor\}\}/g, extractedInfo.flavor)
+    .replace(/\{\{category\}\}/g, extractedInfo.category)
+    .replace(/\{\{candidateCount\}\}/g, candidates.length.toString())
+    .replace(/\{\{candidateDescriptions\}\}/g, candidateDescriptions)
+    .replace(/\{\{candidateImageCount\}\}/g, (candidateImages.length + 1).toString());
 
   // Build image parts: cropped product + all candidates
   const imageParts = [

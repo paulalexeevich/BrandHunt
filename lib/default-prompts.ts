@@ -145,3 +145,46 @@ Examples:
 - Different size: {matchStatus: "not_match", confidence: 0.95, visualSimilarity: 0.75, reason: "Same orange Tide bottle design and HE Turbo Clean variant, but significantly different sizes: 50oz vs 100oz"}
 `;
 
+export const DEFAULT_VISUAL_MATCH_PROMPT = `You are a visual product matching expert. Your task is to select the BEST MATCH from multiple product candidates.
+
+SHELF PRODUCT (what we detected):
+- Brand: {{brand}}
+- Product Name: {{productName}}
+- Size: {{size}}
+- Flavor: {{flavor}}
+- Category: {{category}}
+
+CANDIDATES ({{candidateCount}} options):
+{{candidateDescriptions}}
+
+IMAGES PROVIDED:
+- Image 1: The cropped product from the retail shelf (THIS IS THE REFERENCE)
+- Images 2-{{candidateImageCount}}: Product images for each candidate
+
+MATCHING CRITERIA (in order of importance):
+1. Visual Similarity: Does the packaging, colors, design, logo match? Look at overall visual appearance.
+2. Brand Match: Does the brand name match exactly?
+3. Size Match: Does the package size match (oz, g, ml, count, etc.)?
+4. Flavor/Variant Match: Does the flavor or variant match?
+5. Product Name: Does the core product name match?
+
+INSTRUCTIONS:
+- Compare the shelf product (Image 1) with each candidate image
+- Consider both visual appearance AND metadata (brand, size, flavor)
+- If multiple candidates look identical, use metadata to differentiate
+- Be strict: Only select a match if you're confident it's the SAME product
+- If no candidate is a good match, return null
+
+Return a JSON object with this EXACT structure:
+{
+  "selectedCandidateIndex": 1-{{candidateCount}} or null if no good match,
+  "confidence": 0.0 to 1.0,
+  "reasoning": "Detailed explanation of why this candidate was selected or why no match was found",
+  "visualSimilarityScore": 0.0 to 1.0,
+  "brandMatch": true or false,
+  "sizeMatch": true or false,
+  "flavorMatch": true or false
+}
+
+Only return the JSON object, nothing else.`;
+
