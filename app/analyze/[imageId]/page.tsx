@@ -126,7 +126,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [showActions, setShowActions] = useState(false);
 
   useEffect(() => {
-    fetchImage();
+    fetchImage(true); // Include FoodGraph results from database
   }, [resolvedParams.imageId]);
 
   // Track both natural and displayed image dimensions
@@ -338,33 +338,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     // Reset options visibility when switching products
     setShowFoodGraphOptions(false);
     
-    // Load existing foodgraph_results from the detection if available
-    const detection = detections.find(d => d.id === detectionId);
-    console.log(`🔍 Clicked on detection:`, {
-      id: detection?.id,
-      detection_index: detection?.detection_index,
-      fully_analyzed: detection?.fully_analyzed,
-      has_foodgraph_results: !!detection?.foodgraph_results,
-      foodgraph_results_length: detection?.foodgraph_results?.length || 0,
-      foodgraph_results_sample: detection?.foodgraph_results?.[0]
-    });
-    
-    if (detection && detection.foodgraph_results && detection.foodgraph_results.length > 0) {
-      // Detection has saved FoodGraph results (e.g., from batch processing)
-      console.log(`📦 Loading ${detection.foodgraph_results.length} saved FoodGraph results for product #${detection.detection_index}`);
-      setFoodgraphResults(detection.foodgraph_results);
-      // Set filtered count to indicate AI filtering was done during batch processing
-      setFilteredCount(detection.foodgraph_results.length);
-      setPreFilteredCount(detection.foodgraph_results.length);
-      console.log(`✅ State updated - foodgraphResults should now have ${detection.foodgraph_results.length} items`);
-    } else {
-      // No saved results, clear state for manual workflow
-      console.log(`⚠️ No saved FoodGraph results found - clearing state`);
-      setFoodgraphResults([]);
-      setFoodgraphSearchTerm(null);
-      setFilteredCount(null);
-      setPreFilteredCount(null);
-    }
+    // FoodGraph results will be loaded automatically by the useEffect
+    // (lines 179-249) when selectedDetection changes
   };
 
   const handleExtractBrand = async (detectionId: string) => {
