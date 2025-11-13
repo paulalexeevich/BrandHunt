@@ -172,7 +172,12 @@ export default function ProjectViewPage() {
             id,
             is_product,
             brand_name,
-            fully_analyzed
+            fully_analyzed,
+            selected_foodgraph_gtin,
+            human_validation,
+            branghunt_foodgraph_results (
+              id
+            )
           )
         `)
         .eq('project_id', projectId);
@@ -203,8 +208,8 @@ export default function ProjectViewPage() {
           d.brand_name && 
           !d.fully_analyzed && 
           !d.selected_foodgraph_gtin &&
-          d.foodgraph_results && 
-          d.foodgraph_results.length >= 2
+          d.branghunt_foodgraph_results && 
+          d.branghunt_foodgraph_results.length >= 2
         ).length,
         incorrect: allDetections.filter((d: any) => d.human_validation === false).length
       };
