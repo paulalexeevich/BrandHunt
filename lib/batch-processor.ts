@@ -137,7 +137,7 @@ export class BatchProcessor<T, R> {
         const globalIdx = i + batchIdx;
         try {
           const result = await processor(item, globalIdx);
-          return { success: true, result, index: globalIdx };
+          return { success: true as const, result, index: globalIdx };
         } catch (error) {
           // Handle error through callback if provided
           if (this.options.onError) {
@@ -147,17 +147,17 @@ export class BatchProcessor<T, R> {
                 item,
                 globalIdx
               );
-              return { success: true, result: fallbackResult, index: globalIdx };
+              return { success: true as const, result: fallbackResult, index: globalIdx };
             } catch (callbackError) {
               return {
-                success: false,
+                success: false as const,
                 error: callbackError instanceof Error ? callbackError : new Error(String(callbackError)),
                 index: globalIdx
               };
             }
           }
           return {
-            success: false,
+            success: false as const,
             error: error instanceof Error ? error : new Error(String(error)),
             index: globalIdx
           };
@@ -176,7 +176,7 @@ export class BatchProcessor<T, R> {
         } else {
           stats.failed++;
           // Store error for debugging if needed
-          console.error(`Item ${outcome.index} failed:`, 'error' in outcome ? outcome.error : 'Unknown error');
+          console.error(`Item ${outcome.index} failed:`, outcome.error);
         }
       }
     }
