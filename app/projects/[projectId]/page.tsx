@@ -946,6 +946,40 @@ export default function ProjectViewPage() {
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={async () => {
+                try {
+                  const response = await fetch(`/api/export-matched-products?projectId=${projectId}`, {
+                    credentials: 'include',
+                  });
+                  
+                  if (!response.ok) {
+                    const error = await response.json();
+                    alert(error.error || 'Failed to export matched products');
+                    return;
+                  }
+                  
+                  // Download the file
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `Matched_Products_${new Date().toISOString().split('T')[0]}.xlsx`;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  document.body.removeChild(a);
+                } catch (error) {
+                  console.error('Error exporting:', error);
+                  alert('Failed to export matched products');
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
+              title="Export matched products to Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Export Matched
+            </button>
+            <button
               onClick={() => setShowMembersPanel(!showMembersPanel)}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-semibold"
             >
