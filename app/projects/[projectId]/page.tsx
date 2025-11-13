@@ -1045,7 +1045,7 @@ export default function ProjectViewPage() {
                   {/* Not Processed */}
                   <div className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-gray-300 bg-gray-50 shadow-sm min-w-[90px]">
                     <span className="text-2xl font-bold text-gray-700">{productStats.notProcessed}</span>
-                    <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">Not Proc</span>
+                    <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">Pending</span>
                   </div>
 
                   {/* Not Product */}

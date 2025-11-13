@@ -128,7 +128,7 @@ export function ImageStatisticsPanel({
             }`}
           >
             <span className="text-2xl font-bold text-gray-600">{notProcessed}</span>
-            <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">Not Proc</span>
+            <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">Pending</span>
             {activeFilter === 'not_identified' && <span className="text-[8px] text-gray-600 font-semibold mt-0.5">●</span>}
           </button>
           
