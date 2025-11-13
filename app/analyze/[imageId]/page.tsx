@@ -115,8 +115,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [contextPromptVersion, setContextPromptVersion] = useState('v1');
   const [showContextAnalysis, setShowContextAnalysis] = useState(false);
   const [contextSaveResults, setContextSaveResults] = useState(true);
-  const [showBlock2, setShowBlock2] = useState(false);
-  const [showProcessingBlocks, setShowProcessingBlocks] = useState(false);
+  const [showBlock2, setShowBlock2] = useState(true);
+  const [showProcessingBlocks, setShowProcessingBlocks] = useState(true);
   const [showActions, setShowActions] = useState(false);
 
   useEffect(() => {
