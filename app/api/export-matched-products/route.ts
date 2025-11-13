@@ -75,9 +75,8 @@ export async function GET(request: NextRequest) {
         image_id,
         selected_foodgraph_gtin,
         selected_foodgraph_product_name,
-        selected_foodgraph_brand,
-        selected_foodgraph_manufacturer,
-        selected_foodgraph_size,
+        selected_foodgraph_brand_name,
+        size,
         selected_foodgraph_image_url,
         branghunt_images (
           id,
@@ -106,9 +105,31 @@ export async function GET(request: NextRequest) {
 
     console.log('📊 Creating Excel with', detections.length, 'products...');
 
+    // Fetch FoodGraph results for manufacturer and measure data
+    const gtins = detections.map((d: any) => d.selected_foodgraph_gtin).filter(Boolean);
+    console.log('🔍 Fetching FoodGraph data for', gtins.length, 'GTINs...');
+    
+    const { data: foodgraphData } = await supabase
+      .from('branghunt_foodgraph_results')
+      .select('product_gtin, measures, full_data')
+      .in('product_gtin', gtins);
+
+    // Create a map for quick lookup
+    const foodgraphMap = new Map();
+    foodgraphData?.forEach((item: any) => {
+      foodgraphMap.set(item.product_gtin, {
+        measure: item.measures || 'N/A',
+        manufacturer: item.full_data?.companyManufacturer || 'N/A'
+      });
+    });
+
+    console.log('📋 FoodGraph data fetched for', foodgraphMap.size, 'products');
+
     // Transform data for Excel
     const excelData = detections.map((detection: any) => {
       const image = detection.branghunt_images;
+      const foodgraphInfo = foodgraphMap.get(detection.selected_foodgraph_gtin) || {};
+      
       return {
         'Product GTIN': detection.selected_foodgraph_gtin || '',
         'Shelf Photo': image?.original_filename || image?.s3_url || 'N/A',
@@ -116,9 +137,9 @@ export async function GET(request: NextRequest) {
         'Store Name': image?.store_name || 'N/A',
         'FoodGraph Front Photo': detection.selected_foodgraph_image_url || 'N/A',
         'Product Name': detection.selected_foodgraph_product_name || 'N/A',
-        'Brand': detection.selected_foodgraph_brand || 'N/A',
-        'Manufacturer': detection.selected_foodgraph_manufacturer || 'N/A',
-        'Product Measure': detection.selected_foodgraph_size || 'N/A',
+        'Brand': detection.selected_foodgraph_brand_name || 'N/A',
+        'Manufacturer': foodgraphInfo.manufacturer || 'N/A',
+        'Product Measure': foodgraphInfo.measure || detection.size || 'N/A',
       };
     });
 
@@ -153,6 +174,8 @@ export async function GET(request: NextRequest) {
 
     const filename = `${project?.project_name || 'Project'}_Matched_Products_${new Date().toISOString().split('T')[0]}.xlsx`;
 
+    console.log('✅ Excel file created:', filename);
+
     // Return Excel file
     return new NextResponse(excelBuffer, {
       status: 200,
@@ -162,9 +185,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error exporting matched products:', error);
+    console.error('💥 Error exporting matched products:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
