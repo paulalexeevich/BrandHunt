@@ -1724,7 +1724,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   {/* FoodGraph Match - Show if saved */}
                   {detection.fully_analyzed && detection.selected_foodgraph_image_url && (
                     <div className="bg-white border-2 border-blue-300 rounded-lg p-4 shadow-sm">
-                      <div className="flex gap-3">
+                      <div className="flex gap-3 mb-3">
                         <img
                           src={detection.selected_foodgraph_image_url}
                           alt={detection.selected_foodgraph_product_name || 'Product'}
@@ -1732,7 +1732,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-blue-900 mb-1">📦 FoodGraph Match</p>
-                          <p className="text-sm font-bold text-blue-900 truncate">{detection.selected_foodgraph_product_name}</p>
+                          <p className="text-sm font-bold text-blue-900 line-clamp-2">{detection.selected_foodgraph_product_name}</p>
                           <p className="text-xs text-blue-700">{detection.selected_foodgraph_brand_name}</p>
                           {detection.selected_foodgraph_gtin && (
                             <div className="mt-2 pt-2 border-t border-blue-200">
@@ -1742,6 +1742,66 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                             </div>
                           )}
                         </div>
+                      </div>
+                      
+                      {/* Human Validation Buttons */}
+                      <div className="flex gap-2 pt-3 border-t border-blue-200">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const response = await fetch(`/api/validate-match`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  detectionId: detection.id,
+                                  isCorrect: true
+                                })
+                              });
+                              if (response.ok) {
+                                alert('✓ Marked as Correct');
+                                fetchImage(); // Refresh
+                              }
+                            } catch (error) {
+                              console.error('Error:', error);
+                              alert('Failed to save validation');
+                            }
+                          }}
+                          className={`flex-1 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                            detection.human_validation === true
+                              ? 'bg-green-600 text-white ring-2 ring-green-400'
+                              : 'bg-green-100 text-green-700 hover:bg-green-200 border-2 border-green-300'
+                          }`}
+                        >
+                          {detection.human_validation === true ? '✓ Correct' : '👍 Correct'}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const response = await fetch(`/api/validate-match`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  detectionId: detection.id,
+                                  isCorrect: false
+                                })
+                              });
+                              if (response.ok) {
+                                alert('✗ Marked as Incorrect');
+                                fetchImage(); // Refresh
+                              }
+                            } catch (error) {
+                              console.error('Error:', error);
+                              alert('Failed to save validation');
+                            }
+                          }}
+                          className={`flex-1 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                            detection.human_validation === false
+                              ? 'bg-red-600 text-white ring-2 ring-red-400'
+                              : 'bg-red-100 text-red-700 hover:bg-red-200 border-2 border-red-300'
+                          }`}
+                        >
+                          {detection.human_validation === false ? '✗ Incorrect' : '👎 Incorrect'}
+                        </button>
                       </div>
                     </div>
                   )}

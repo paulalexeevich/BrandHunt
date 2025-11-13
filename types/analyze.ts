@@ -52,6 +52,9 @@ export interface Detection {
   // Contextual analysis fields
   corrected_by_contextual: boolean | null;
   contextual_correction_notes: string | null;
+  // Human validation
+  human_validation: boolean | null;
+  human_validation_at: string | null;
 }
 
 export interface FoodGraphResult {
