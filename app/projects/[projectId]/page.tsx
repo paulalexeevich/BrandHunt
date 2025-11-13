@@ -1274,88 +1274,98 @@ export default function ProjectViewPage() {
               </div>
             </div>
 
-            {/* Upload Options */}
-            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Add Images to Project</h2>
-              <p className="text-gray-600 mb-4">
-                Upload images to this project using bulk Excel upload
+            {/* Combined Workflow: Upload & Process */}
+            <div className="bg-gradient-to-br from-slate-50 to-gray-100 rounded-xl shadow-lg p-4 mb-8 border border-gray-200">
+              <h2 className="text-base font-bold text-gray-900 mb-2 flex items-center gap-2">
+                📋 Block 1: Image Upload & Processing Pipeline
+              </h2>
+              <p className="text-xs text-gray-600 mb-3">
+                Sequential workflow: Upload → Detect → Extract → Analyze
               </p>
-              <Link
-                href={`/excel-upload?projectId=${projectId}`}
-                className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg"
-              >
-                <FileSpreadsheet className="w-5 h-5" />
-                <span className="font-semibold">Bulk Upload Excel</span>
-              </Link>
-            </div>
+              
+              {/* Step 1: Upload */}
+              <div className="mb-2">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-purple-600 text-white text-xs font-bold">1</div>
+                  <span className="text-xs font-semibold text-gray-700">Upload Images</span>
+                </div>
+                <Link
+                  href={`/excel-upload?projectId=${projectId}`}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow text-sm font-semibold w-full"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Bulk Upload Excel
+                </Link>
+              </div>
 
-            {/* Batch Processing Controls */}
-            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Batch Processing</h2>
-              <p className="text-gray-600 mb-4">
-                Process multiple images in parallel for faster analysis
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                <button
-                  onClick={handleBatchDetect}
-                  disabled={batchDetecting || batchExtracting || batchContextual}
-                  className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {batchDetecting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span className="font-semibold">Detecting Products...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Target className="w-5 h-5" />
-                      <span className="font-semibold">Batch Detect Products</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={handleBatchExtract}
-                  disabled={batchDetecting || batchExtracting || batchContextual}
-                  className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {batchExtracting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span className="font-semibold">Extracting Info...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Package className="w-5 h-5" />
-                      <span className="font-semibold">Batch Extract Info</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={handleBatchContextual}
-                  disabled={batchDetecting || batchExtracting || batchContextual}
-                  className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg hover:from-orange-700 hover:to-amber-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {batchContextual ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span className="font-semibold">Analyzing Context...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-xl">🔬</span>
-                      <span className="font-semibold">Contextual Analysis</span>
-                    </>
-                  )}
-                </button>
+              {/* Step 2-4: Process */}
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold">2</div>
+                  <span className="text-xs font-semibold text-gray-700">Process Images</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <button
+                    onClick={handleBatchDetect}
+                    disabled={batchDetecting || batchExtracting || batchContextual}
+                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition-all shadow text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {batchDetecting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Detecting...
+                      </>
+                    ) : (
+                      <>
+                        <Target className="w-4 h-4" />
+                        Detect
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleBatchExtract}
+                    disabled={batchDetecting || batchExtracting || batchContextual}
+                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {batchExtracting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Extracting...
+                      </>
+                    ) : (
+                      <>
+                        <Package className="w-4 h-4" />
+                        Extract
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleBatchContextual}
+                    disabled={batchDetecting || batchExtracting || batchContextual}
+                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg hover:from-orange-700 hover:to-amber-700 transition-all shadow text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {batchContextual ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-base">🔬</span>
+                        Analyze
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
               {/* Progress Message */}
               {batchProgress && (
-                <div className={`p-4 rounded-lg ${
+                <div className={`mt-2 p-2 rounded-lg ${
                   batchProgress.includes('✅') ? 'bg-green-50 border border-green-200' :
                   batchProgress.includes('❌') ? 'bg-red-50 border border-red-200' :
                   'bg-blue-50 border border-blue-200'
                 }`}>
-                  <p className={`text-sm font-medium whitespace-pre-line ${
+                  <p className={`text-xs font-medium whitespace-pre-line ${
                     batchProgress.includes('✅') ? 'text-green-900' :
                     batchProgress.includes('❌') ? 'text-red-900' :
                     'text-blue-900'
@@ -1365,129 +1375,129 @@ export default function ProjectViewPage() {
                   {batchProgress.includes('❌') && (
                     <button
                       onClick={() => setBatchProgress('')}
-                      className="mt-3 px-3 py-1 bg-white border border-gray-300 rounded text-xs text-gray-700 hover:bg-gray-50"
+                      className="mt-2 px-2 py-1 bg-white border border-gray-300 rounded text-[10px] text-gray-700 hover:bg-gray-50"
                     >
                       Dismiss
                     </button>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
         
         {/* Product Matching Pipelines */}
-            <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-xl shadow-lg p-6 mb-8 border border-indigo-200">
-              <h2 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+            <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-xl shadow-lg p-4 mb-8 border border-indigo-200">
+              <h2 className="text-base font-bold text-gray-900 mb-2 flex items-center gap-2">
                 🔍 Block 2: Product Matching with FoodGraph
               </h2>
-              <p className="text-gray-600 mb-6">
+              <p className="text-xs text-gray-600 mb-3">
                 Search, pre-filter, AI filter, and save product matches from FoodGraph database
               </p>
               
               {/* Pipeline 1: With AI Filter (Current) */}
-              <div className="bg-white rounded-lg p-4 mb-4 border-2 border-blue-300">
-                <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center gap-2">
+              <div className="bg-white rounded-lg p-3 mb-3 border-2 border-blue-300">
+                <h3 className="text-sm font-semibold text-blue-900 mb-1.5 flex items-center gap-2">
                   🤖 Pipeline 1: With AI Filter (Standard)
                 </h3>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-xs text-gray-600 mb-2">
                   Search → Pre-filter → <strong className="text-blue-700">AI Filter</strong> → Visual Match (2+ candidates) → Save
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-1.5">
                   <button
                     onClick={() => handleBatchSearchAndSave(3)}
                     disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
                   >
-                    ⚡ 3 at once
+                    ⚡ 3
                   </button>
                   <button
                     onClick={() => handleBatchSearchAndSave(10)}
                     disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                    className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
                   >
-                    ⚡⚡ 10 at once
+                    ⚡⚡ 10
                   </button>
                   <button
                     onClick={() => handleBatchSearchAndSave(20)}
                     disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-4 py-3 bg-fuchsia-600 text-white rounded-lg hover:bg-fuchsia-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                    className="px-3 py-2 bg-fuchsia-600 text-white rounded-lg hover:bg-fuchsia-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
                   >
-                    ⚡⚡⚡ 20 at once
+                    ⚡⚡⚡ 20
                   </button>
                   <button
                     onClick={() => handleBatchSearchAndSave(50)}
                     disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-4 py-3 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                    className="px-3 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
                   >
-                    ✨ 50 at once
+                    ✨ 50
                   </button>
                   <button
                     onClick={() => handleBatchSearchAndSave(999999)}
                     disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-4 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:from-orange-600 hover:to-red-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                    className="px-3 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:from-orange-600 hover:to-red-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
                   >
-                    🔥 ALL 🔥
+                    🔥 ALL
                   </button>
                 </div>
               </div>
 
               {/* Pipeline 2: Visual Only (New) */}
-              <div className="bg-white rounded-lg p-4 mb-4 border-2 border-green-300">
-                <h3 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
+              <div className="bg-white rounded-lg p-3 border-2 border-green-300">
+                <h3 className="text-sm font-semibold text-green-900 mb-1.5 flex items-center gap-2">
                   🎯 Pipeline 2: Visual-Only (No AI Filter)
                 </h3>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-xs text-gray-600 mb-2">
                   Search → Pre-filter → <strong className="text-green-700">Visual Match Directly</strong> → Save
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-1.5">
                   <button
                     onClick={() => handleBatchSearchVisual(3)}
                     disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
                   >
-                    ⚡ 3 at once
+                    ⚡ 3
                   </button>
                   <button
                     onClick={() => handleBatchSearchVisual(10)}
                     disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                    className="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
                   >
-                    ⚡⚡ 10 at once
+                    ⚡⚡ 10
                   </button>
                   <button
                     onClick={() => handleBatchSearchVisual(20)}
                     disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                    className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
                   >
-                    ⚡⚡⚡ 20 at once
+                    ⚡⚡⚡ 20
                   </button>
                   <button
                     onClick={() => handleBatchSearchVisual(50)}
                     disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-4 py-3 bg-lime-600 text-white rounded-lg hover:bg-lime-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                    className="px-3 py-2 bg-lime-600 text-white rounded-lg hover:bg-lime-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
                   >
-                    ✨ 50 at once
+                    ✨ 50
                   </button>
                   <button
                     onClick={() => handleBatchSearchVisual(999999)}
                     disabled={batchMatchingAI || batchMatchingVisual}
-                    className="px-4 py-3 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                    className="px-3 py-2 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs"
                   >
-                    🔥 ALL 🔥
+                    🔥 ALL
                   </button>
                 </div>
               </div>
 
               {/* Processing Status */}
               {(batchMatchingAI || batchMatchingVisual) && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                    <span className="font-semibold text-blue-900">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mt-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                    <span className="text-xs font-semibold text-blue-900">
                       {batchMatchingAI ? '🤖 AI Filter Pipeline Running...' : '🎯 Visual-Only Pipeline Running...'}
                     </span>
                   </div>
                   {matchingProgress && (
-                    <p className="text-sm text-blue-800 whitespace-pre-line font-mono">
+                    <p className="text-xs text-blue-800 whitespace-pre-line font-mono">
                       {matchingProgress}
                     </p>
                   )}
