@@ -79,6 +79,7 @@ interface ImageData {
 interface ProjectMember {
   id: string;
   user_id: string;
+  email?: string; // Email address from auth.users
   role: 'owner' | 'admin' | 'member' | 'viewer';
   added_at: string;
   added_by: string;
@@ -1196,7 +1197,7 @@ export default function ProjectViewPage() {
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-gray-900">
-                                {member.user_id.substring(0, 8)}...
+                                {member.email || `${member.user_id.substring(0, 8)}...`}
                               </span>
                               {isCurrentUser && (
                                 <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">

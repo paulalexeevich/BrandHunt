@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAuthenticatedSupabaseClient } from '@/lib/auth';
+import { createAuthenticatedSupabaseClient, createServiceRoleClient } from '@/lib/auth';
 
 // GET /api/projects/[projectId]/members - List all members of a project
 export async function GET(
@@ -10,7 +10,7 @@ export async function GET(
     const { projectId } = await params;
     const supabase = await createAuthenticatedSupabaseClient();
 
-    // Fetch project members with user details
+    // Fetch project members
     const { data: members, error } = await supabase
       .from('branghunt_project_members')
       .select(`
@@ -33,11 +33,28 @@ export async function GET(
       );
     }
 
-    // Note: We can't directly join with auth.users table due to RLS
-    // So we return user_ids and let the frontend fetch user details if needed
-    // Or we could create a server-side service role client for this
+    // Fetch user emails using service role client (bypasses RLS)
+    const serviceSupabase = createServiceRoleClient();
+    const { data: { users }, error: usersError } = await serviceSupabase.auth.admin.listUsers();
+
+    if (usersError) {
+      console.error('Failed to fetch user details:', usersError);
+      // Return members without emails rather than failing completely
+      return NextResponse.json({ members: members || [] });
+    }
+
+    // Create a map of user_id -> email for quick lookup
+    const userEmailMap = new Map(
+      users.map(user => [user.id, user.email || 'No email'])
+    );
+
+    // Enrich members with email addresses
+    const membersWithEmails = (members || []).map(member => ({
+      ...member,
+      email: userEmailMap.get(member.user_id) || 'Unknown'
+    }));
     
-    return NextResponse.json({ members: members || [] });
+    return NextResponse.json({ members: membersWithEmails });
   } catch (error) {
     console.error('Error in GET /api/projects/[projectId]/members:', error);
     return NextResponse.json(
