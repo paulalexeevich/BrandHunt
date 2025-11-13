@@ -1023,54 +1023,54 @@ export default function ProjectViewPage() {
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   📊 Product Statistics
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+                <div className="flex gap-2 overflow-x-auto">
                   {/* Total Products */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-900 ring-2 ring-gray-900">
-                    <div className="text-2xl font-bold text-gray-900">{productStats.totalProducts}</div>
-                    <div className="text-xs text-gray-600 mt-1">Total Products</div>
-                    <div className="text-xs text-gray-900 font-semibold mt-1">● Active</div>
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-gray-900 ring-2 ring-gray-900 bg-white shadow-sm min-w-[90px]">
+                    <span className="text-2xl font-bold text-gray-900">{productStats.totalProducts}</span>
+                    <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">Total</span>
+                    <span className="text-[8px] text-gray-900 font-semibold mt-0.5">●</span>
                   </div>
 
                   {/* Processed */}
-                  <div className="bg-blue-50 rounded-lg p-4 shadow-sm border border-blue-200">
-                    <div className="text-2xl font-bold text-blue-700">{productStats.processed}</div>
-                    <div className="text-xs text-blue-600 mt-1">Processed</div>
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-blue-200 bg-blue-50 shadow-sm min-w-[90px]">
+                    <span className="text-2xl font-bold text-blue-700">{productStats.processed}</span>
+                    <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">Processed</span>
                   </div>
 
                   {/* Not Processed */}
-                  <div className="bg-gray-50 rounded-lg p-4 shadow-sm border border-gray-300">
-                    <div className="text-2xl font-bold text-gray-700">{productStats.notProcessed}</div>
-                    <div className="text-xs text-gray-600 mt-1">Not Processed</div>
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-gray-300 bg-gray-50 shadow-sm min-w-[90px]">
+                    <span className="text-2xl font-bold text-gray-700">{productStats.notProcessed}</span>
+                    <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">Not Proc</span>
                   </div>
 
                   {/* Not Product */}
-                  <div className="bg-red-50 rounded-lg p-4 shadow-sm border border-red-200">
-                    <div className="text-2xl font-bold text-red-700">{productStats.notProduct}</div>
-                    <div className="text-xs text-red-600 mt-1">Not Product</div>
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-red-200 bg-red-50 shadow-sm min-w-[90px]">
+                    <span className="text-2xl font-bold text-red-700">{productStats.notProduct}</span>
+                    <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">Not Product</span>
                   </div>
 
                   {/* Matched */}
-                  <div className="bg-green-50 rounded-lg p-4 shadow-sm border border-green-200">
-                    <div className="text-2xl font-bold text-green-700">{productStats.matched}</div>
-                    <div className="text-xs text-green-600 mt-1">✓ Matched</div>
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-green-200 bg-green-50 shadow-sm min-w-[90px]">
+                    <span className="text-2xl font-bold text-green-700">{productStats.matched}</span>
+                    <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">✓ Matched</span>
                   </div>
 
                   {/* Not Matched */}
-                  <div className="bg-yellow-50 rounded-lg p-4 shadow-sm border border-yellow-200">
-                    <div className="text-2xl font-bold text-yellow-700">{productStats.notMatched}</div>
-                    <div className="text-xs text-yellow-600 mt-1">Not Matched</div>
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-yellow-200 bg-yellow-50 shadow-sm min-w-[90px]">
+                    <span className="text-2xl font-bold text-yellow-700">{productStats.notMatched}</span>
+                    <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">Not Match</span>
                   </div>
 
                   {/* 2+ Matches */}
-                  <div className="bg-purple-50 rounded-lg p-4 shadow-sm border border-purple-200">
-                    <div className="text-2xl font-bold text-purple-700">{productStats.multipleMatches}</div>
-                    <div className="text-xs text-purple-600 mt-1">2+ Matches</div>
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-purple-200 bg-purple-50 shadow-sm min-w-[90px]">
+                    <span className="text-2xl font-bold text-purple-700">{productStats.multipleMatches}</span>
+                    <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">2+ Match</span>
                   </div>
 
                   {/* Incorrect */}
-                  <div className="bg-orange-50 rounded-lg p-4 shadow-sm border border-orange-200">
-                    <div className="text-2xl font-bold text-orange-700">{productStats.incorrect}</div>
-                    <div className="text-xs text-orange-600 mt-1">✗ Incorrect</div>
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-orange-200 bg-orange-50 shadow-sm min-w-[90px]">
+                    <span className="text-2xl font-bold text-orange-700">{productStats.incorrect}</span>
+                    <span className="text-[9px] font-medium text-gray-600 mt-0.5 text-center whitespace-nowrap">✗ Incorrect</span>
                   </div>
                 </div>
 
