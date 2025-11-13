@@ -46,27 +46,6 @@ export function ImageStatisticsPanel({
   );
   const notMatched = notMatchedDetections.length;
   
-  // Debug logging
-  console.log('📊 STATISTICS DEBUG:');
-  console.log(`   Total detections: ${detections.length}`);
-  console.log(`   Processed (has brand): ${processed}`);
-  console.log(`   Matched: ${matched}`);
-  console.log(`   Not Matched: ${notMatched}`);
-  console.log('   Matched products:', matchedDetections.map(d => ({
-    idx: d.detection_index,
-    brand: d.brand_name,
-    fully_analyzed: d.fully_analyzed,
-    has_gtin: !!d.selected_foodgraph_gtin,
-    results_count: d.foodgraph_results?.length || 0
-  })));
-  console.log('   Not Matched products:', notMatchedDetections.map(d => ({
-    idx: d.detection_index,
-    brand: d.brand_name,
-    fully_analyzed: d.fully_analyzed,
-    has_gtin: !!d.selected_foodgraph_gtin,
-    results_count: d.foodgraph_results?.length || 0
-  })));
-  
   // 2+ Matches = Products with multiple results needing manual review
   const multipleMatches = detections.filter(d => 
     d.brand_name && 
