@@ -90,7 +90,7 @@ export interface ImageData {
   project_id?: string | null;
 }
 
-export type FilterType = 'all' | 'not_product' | 'processed' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches';
+export type FilterType = 'all' | 'not_product' | 'processed' | 'not_identified' | 'one_match' | 'no_match' | 'multiple_matches' | 'incorrect';
 
 export type ProcessingStage = 'search' | 'pre_filter' | 'ai_filter' | 'visual_match';
 

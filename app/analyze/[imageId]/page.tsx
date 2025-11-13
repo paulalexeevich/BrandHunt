@@ -1546,6 +1546,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                          detection.foodgraph_results && 
                          detection.foodgraph_results.length >= 2;
                 }
+                if (activeFilter === 'incorrect') {
+                  return detection.human_validation === false;
+                }
                 return false;
               });
 
@@ -1555,7 +1558,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 'not_identified': 'Not Processed',
                 'one_match': '✓ Matched',
                 'no_match': 'Not Matched',
-                'multiple_matches': '2+ Matches'
+                'multiple_matches': '2+ Matches',
+                'incorrect': '✗ Incorrect'
               };
 
               const filterColors = {
@@ -1564,7 +1568,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 'not_identified': 'bg-gray-100 border-gray-300 text-gray-900',
                 'one_match': 'bg-green-100 border-green-300 text-green-900',
                 'no_match': 'bg-yellow-100 border-yellow-300 text-yellow-900',
-                'multiple_matches': 'bg-purple-100 border-purple-300 text-purple-900'
+                'multiple_matches': 'bg-purple-100 border-purple-300 text-purple-900',
+                'incorrect': 'bg-orange-100 border-orange-300 text-orange-900'
               };
 
               return (

@@ -75,6 +75,11 @@ export function ImageStatisticsPanel({
     d.foodgraph_results && 
     d.foodgraph_results.length >= 2
   ).length;
+  
+  // Human Validation: Incorrect matches
+  const incorrectValidations = detections.filter(d => 
+    d.human_validation === false
+  ).length;
 
   return (
     <div className="mb-3">
@@ -84,7 +89,7 @@ export function ImageStatisticsPanel({
       
       {/* Horizontal Layout: All stats in one row */}
       <div className="bg-white rounded-lg shadow-sm p-3 border border-gray-200">
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
           {/* Processed */}
           <button
             onClick={() => setActiveFilter('processed')}
@@ -167,6 +172,20 @@ export function ImageStatisticsPanel({
             <span className="text-3xl font-bold text-purple-600">{multipleMatches}</span>
             <span className="text-[10px] font-medium text-gray-600 mt-1 text-center">2+ Matches</span>
             {activeFilter === 'multiple_matches' && <span className="text-[9px] text-purple-600 font-semibold mt-0.5">● Active</span>}
+          </button>
+          
+          {/* Incorrect Validations */}
+          <button
+            onClick={() => setActiveFilter('incorrect')}
+            className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:scale-105 ${
+              activeFilter === 'incorrect' 
+                ? 'bg-orange-50 border-orange-500 ring-2 ring-orange-300' 
+                : 'border-gray-200 hover:border-orange-300'
+            }`}
+          >
+            <span className="text-3xl font-bold text-orange-600">{incorrectValidations}</span>
+            <span className="text-[10px] font-medium text-gray-600 mt-1 text-center">✗ Incorrect</span>
+            {activeFilter === 'incorrect' && <span className="text-[9px] text-orange-600 font-semibold mt-0.5">● Active</span>}
           </button>
         </div>
       </div>
