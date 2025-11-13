@@ -1438,17 +1438,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 Image Processing
               </button>
               <button
-                onClick={() => setShowProductIds(!showProductIds)}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                  showProductIds
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-300'
-                }`}
-              >
-                {showProductIds ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                {showProductIds ? 'Hide IDs' : 'Show IDs'}
-              </button>
-              <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={deleting}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400"
@@ -1566,6 +1555,17 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Image</h2>
+              <button
+                onClick={() => setShowProductIds(!showProductIds)}
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
+                  showProductIds
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-300'
+                }`}
+              >
+                {showProductIds ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                {showProductIds ? 'Hide IDs' : 'Show IDs'}
+              </button>
             </div>
 
             {/* Active Filter Indicator */}
