@@ -148,7 +148,7 @@ export function ProcessingBlocksPanel({
                   
                   {/* Start Pipeline Button */}
                   <button
-                    onClick={() => handlePipelineVisual(20)}
+                    onClick={() => handlePipelineVisual(100)}
                     disabled={isProcessing || needsSearch === 0}
                     className="flex-shrink-0 px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all font-semibold disabled:opacity-50 text-sm whitespace-nowrap shadow-md"
                   >
@@ -158,7 +158,7 @@ export function ProcessingBlocksPanel({
                         Processing...
                       </>
                     ) : (
-                      '⚡⚡⚡ Start Pipeline (20)'
+                      '⚡⚡⚡ Start Pipeline (100)'
                     )}
                   </button>
                 </div>
