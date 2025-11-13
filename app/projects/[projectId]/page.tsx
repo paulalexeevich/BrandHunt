@@ -26,6 +26,7 @@ import {
   Eye,
   Edit,
   Settings,
+  Info,
 } from 'lucide-react';
 import AuthNav from '@/components/AuthNav';
 import { createClient } from '@/lib/supabase-browser';
@@ -114,6 +115,8 @@ export default function ProjectViewPage() {
   const [newMemberUserId, setNewMemberUserId] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<'admin' | 'member' | 'viewer'>('member');
   const [memberLoading, setMemberLoading] = useState(false);
+  const [showAboutRoles, setShowAboutRoles] = useState(false);
+  const [showMembersPanel, setShowMembersPanel] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   
@@ -941,7 +944,16 @@ export default function ProjectViewPage() {
               </>
             )}
           </div>
-          <AuthNav />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowMembersPanel(!showMembersPanel)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-semibold"
+            >
+              <Users className="w-4 h-4" />
+              Members ({members.length})
+            </button>
+            <AuthNav />
+          </div>
         </div>
 
         {/* Loading State */}
@@ -1136,12 +1148,20 @@ export default function ProjectViewPage() {
             </div>
 
             {/* Project Members */}
-            <div className="bg-white rounded-xl shadow-lg p-4 mb-8">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-indigo-600" />
-                  Project Members ({members.length})
-                </h2>
+            {showMembersPanel && (
+              <div className="bg-white rounded-xl shadow-lg p-4 mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-indigo-600" />
+                    Project Members ({members.length})
+                    <button
+                      onClick={() => setShowAboutRoles(!showAboutRoles)}
+                      className="ml-1 p-1 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                      title="About Roles"
+                    >
+                      <Info className="w-4 h-4" />
+                    </button>
+                  </h2>
                 <button
                   onClick={handleShowAddMember}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
@@ -1299,16 +1319,19 @@ export default function ProjectViewPage() {
               </div>
 
               {/* Info about roles */}
-              <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs text-blue-900 font-semibold mb-1">About Roles:</p>
-                <ul className="text-[11px] text-blue-800 space-y-0.5">
-                  <li><strong>Owner:</strong> Full control, cannot be removed</li>
-                  <li><strong>Admin:</strong> Can manage members and edit content</li>
-                  <li><strong>Member:</strong> Can edit content and add images</li>
-                  <li><strong>Viewer:</strong> Read-only access to project</li>
-                </ul>
+              {showAboutRoles && (
+                <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-900 font-semibold mb-1">About Roles:</p>
+                  <ul className="text-[11px] text-blue-800 space-y-0.5">
+                    <li><strong>Owner:</strong> Full control, cannot be removed</li>
+                    <li><strong>Admin:</strong> Can manage members and edit content</li>
+                    <li><strong>Member:</strong> Can edit content and add images</li>
+                    <li><strong>Viewer:</strong> Read-only access to project</li>
+                  </ul>
+                </div>
+              )}
               </div>
-            </div>
+            )}
 
             {/* Combined Workflow: Upload & Process */}
             <div className="bg-gradient-to-br from-slate-50 to-gray-100 rounded-xl shadow-lg p-4 mb-8 border border-gray-200">
