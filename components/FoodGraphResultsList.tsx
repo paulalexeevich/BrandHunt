@@ -357,28 +357,6 @@ function ProductCard({
             </div>
           )}
 
-          {/* Match Status badge */}
-          {filteredCount !== null && (
-            <div className="absolute -top-1 -right-1 z-10">
-              {matchStatus === 'identical' ? (
-                <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-[10px] font-bold rounded flex items-center gap-1 shadow-md">
-                  🎯 IDENTICAL
-                </span>
-              ) : matchStatus === 'almost_same' ? (
-                <span className="px-1.5 py-0.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-[10px] font-bold rounded flex items-center gap-1 shadow-md">
-                  🔍 ALMOST SAME
-                </span>
-              ) : passedThreshold ? (
-                <span className="px-1.5 py-0.5 bg-green-600 text-white text-[10px] font-bold rounded flex items-center gap-1">
-                  ✓ PASS
-                </span>
-              ) : (
-                <span className="px-1.5 py-0.5 bg-gray-400 text-white text-[10px] font-medium rounded">
-                  NO MATCH
-                </span>
-              )}
-            </div>
-          )}
           
           {result.front_image_url ? (
             <img
@@ -416,12 +394,28 @@ function ProductCard({
               </div>
             )}
             
-            {/* Visual Similarity Score */}
+            {/* Visual Similarity Score with Match Status */}
             {(result as any).visual_similarity !== null && (result as any).visual_similarity !== undefined && filteredCount !== null && (
               <div className="flex items-center gap-1 mt-1">
                 <span className="text-[10px] font-semibold text-indigo-700">
                   👁️ Visual Similarity:
                 </span>
+                
+                {/* Match Status Badge */}
+                {matchStatus === 'identical' ? (
+                  <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-[10px] font-bold rounded flex items-center gap-0.5 shadow-sm">
+                    🎯 IDENTICAL
+                  </span>
+                ) : matchStatus === 'almost_same' ? (
+                  <span className="px-1.5 py-0.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-[10px] font-bold rounded flex items-center gap-0.5 shadow-sm">
+                    🔍 ALMOST SAME
+                  </span>
+                ) : passedThreshold ? (
+                  <span className="px-1.5 py-0.5 bg-green-600 text-white text-[10px] font-bold rounded flex items-center gap-0.5">
+                    ✓ PASS
+                  </span>
+                ) : null}
+                
                 <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
                   (result as any).visual_similarity >= 0.9 ? 'bg-green-100 text-green-800' :
                   (result as any).visual_similarity >= 0.7 ? 'bg-blue-100 text-blue-800' :
