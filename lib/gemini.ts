@@ -992,6 +992,17 @@ export async function saveVisualMatchResults(
     console.log(`   Total candidates: ${visualMatchResult.candidateScores.length}`);
     console.log(`   Passed threshold: ${visualMatchResult.candidateScores.filter(s => s.passedThreshold).length}`);
     console.log(`   Selected: ${visualMatchResult.selectedGtin || 'None'}`);
+    
+    // 🐛 DEBUG: Log full visual match result to diagnose 0.0% bug
+    console.log(`\n🔍 DEBUG: Full visualMatchResult object:`);
+    console.log(`   selectedGtin: ${visualMatchResult.selectedGtin}`);
+    console.log(`   confidence: ${visualMatchResult.confidence}`);
+    console.log(`   visualSimilarityScore: ${visualMatchResult.visualSimilarityScore}`);
+    console.log(`   candidateScores (${visualMatchResult.candidateScores.length}):`);
+    visualMatchResult.candidateScores.forEach(score => {
+      const isSelected = score.candidateGtin === visualMatchResult.selectedGtin;
+      console.log(`      ${isSelected ? '⭐' : '  '} ${score.candidateIndex}: ${score.candidateGtin} → ${(score.visualSimilarity * 100).toFixed(1)}% (${score.passedThreshold ? 'PASS' : 'FAIL'})`);
+    });
 
     const resultsToSave: Array<{
       detection_id: string;
@@ -1027,7 +1038,7 @@ export async function saveVisualMatchResults(
           ? `Selected as best match. ${visualMatchResult.reasoning}`
           : `Passed visual similarity threshold (${(score.visualSimilarity * 100).toFixed(1)}%)`;
 
-        resultsToSave.push({
+        const rowToSave = {
           detection_id: detectionId,
           search_term: searchTerm,
           result_rank: score.candidateIndex,
@@ -1045,9 +1056,12 @@ export async function saveVisualMatchResults(
           match_status: matchStatus,
           visual_similarity: score.visualSimilarity,
           match_reason: reason
-        });
+        };
+        
+        resultsToSave.push(rowToSave);
 
         console.log(`   ${isSelected ? '✅' : '➕'} ${matchStatus.toUpperCase()}: ${candidate.productName} - ${(score.visualSimilarity * 100).toFixed(1)}%`);
+        console.log(`      🐛 DEBUG: Saving GTIN ${candidate.gtin} with visual_similarity = ${score.visualSimilarity} (${(score.visualSimilarity * 100).toFixed(1)}%)`);
       }
     }
 
@@ -1057,6 +1071,20 @@ export async function saveVisualMatchResults(
       const selectedCandidate = allCandidates.find(c => c.gtin === visualMatchResult.selectedGtin);
       if (selectedCandidate) {
         const selectedScore = visualMatchResult.candidateScores.find(s => s.candidateGtin === visualMatchResult.selectedGtin);
+        const visualSim = selectedScore?.visualSimilarity || 0;
+        
+        console.log(`   🐛 DEBUG: Fallback save - selectedScore found: ${!!selectedScore}`);
+        if (selectedScore) {
+          console.log(`      Selected score visualSimilarity: ${selectedScore.visualSimilarity} (${(selectedScore.visualSimilarity * 100).toFixed(1)}%)`);
+          console.log(`      Selected score candidateGtin: ${selectedScore.candidateGtin}`);
+          console.log(`      Matches selectedGtin: ${selectedScore.candidateGtin === visualMatchResult.selectedGtin}`);
+        } else {
+          console.log(`      ⚠️ WARNING: Could not find selectedScore in candidateScores array!`);
+          console.log(`      Looking for GTIN: ${visualMatchResult.selectedGtin}`);
+          console.log(`      Available GTINs: ${visualMatchResult.candidateScores.map(s => s.candidateGtin).join(', ')}`);
+        }
+        console.log(`      Will save with visual_similarity = ${visualSim} (${(visualSim * 100).toFixed(1)}%)`);
+        
         resultsToSave.push({
           detection_id: detectionId,
           search_term: searchTerm,
@@ -1073,7 +1101,7 @@ export async function saveVisualMatchResults(
           },
           processing_stage: 'visual_match',
           match_status: 'identical',
-          visual_similarity: selectedScore?.visualSimilarity || 0,
+          visual_similarity: visualSim,
           match_reason: `Selected as best match (below threshold). ${visualMatchResult.reasoning}`
         });
       }
