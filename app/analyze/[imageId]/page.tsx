@@ -200,7 +200,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     loadFoodGraphResults();
   }, [selectedDetection, detections]);
 
-  const fetchImage = async () => {
+  const fetchImage = async (includeFoodGraphResults: boolean = false) => {
     // Prevent concurrent/rapid fetches
     if (isFetching) {
       console.log('⚠️ Fetch already in progress, skipping...');
@@ -209,10 +209,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
 
     setIsFetching(true);
     const fetchStart = Date.now();
-    console.log(`🚀 Starting fetch for image ${resolvedParams.imageId}`);
+    console.log(`🚀 Starting fetch for image ${resolvedParams.imageId}${includeFoodGraphResults ? ' (including FoodGraph results)' : ''}`);
     
     try {
-      const response = await fetch(`/api/results/${resolvedParams.imageId}`);
+      const url = includeFoodGraphResults 
+        ? `/api/results/${resolvedParams.imageId}?includeFoodGraphResults=true`
+        : `/api/results/${resolvedParams.imageId}`;
+      const response = await fetch(url);
       const fetchTime = Date.now() - fetchStart;
       console.log(`⏱️ API fetch completed in ${fetchTime}ms`);
       
@@ -1155,24 +1158,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 errors: data.errors || 0
               });
 
-              await fetchImage();
-
-              // Force reload FoodGraph results for currently selected detection
-              if (selectedDetection) {
-                console.log(`🔄 Reloading FoodGraph results for selected detection after pipeline completion`);
-                try {
-                  const response = await fetch(`/api/foodgraph-results/${selectedDetection}`);
-                  if (response.ok) {
-                    const data = await response.json();
-                    console.log(`📦 Reloaded ${data.results?.length || 0} FoodGraph results (including visual match data)`);
-                    if (data.results) {
-                      setFoodgraphResults(data.results);
-                    }
-                  }
-                } catch (err) {
-                  console.error('Failed to reload FoodGraph results:', err);
-                }
-              }
+              // Fetch image WITH FoodGraph results to update Visual Match counts
+              await fetchImage(true);
 
               alert(`✅ AI Filter Pipeline Complete!\n\n🔍 Processed: ${data.processed || data.total || 0} products\n✓ Saved: ${data.success || 0}\n⏸️ No Match: ${data.noMatch || 0}\n❌ Errors: ${data.errors || 0}`);
             }
@@ -1283,24 +1270,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 errors: data.errors || 0
               });
 
-              await fetchImage();
-
-              // Force reload FoodGraph results for currently selected detection
-              if (selectedDetection) {
-                console.log(`🔄 Reloading FoodGraph results for selected detection after pipeline completion`);
-                try {
-                  const response = await fetch(`/api/foodgraph-results/${selectedDetection}`);
-                  if (response.ok) {
-                    const data = await response.json();
-                    console.log(`📦 Reloaded ${data.results?.length || 0} FoodGraph results (including visual match data)`);
-                    if (data.results) {
-                      setFoodgraphResults(data.results);
-                    }
-                  }
-                } catch (err) {
-                  console.error('Failed to reload FoodGraph results:', err);
-                }
-              }
+              // Fetch image WITH FoodGraph results to update Visual Match counts
+              await fetchImage(true);
 
               alert(`✅ Visual-Only Pipeline Complete!\n\n🔍 Processed: ${data.processed || data.total || 0} products\n✓ Saved: ${data.success || 0}\n⏸️ No Match: ${data.noMatch || 0}\n❌ Errors: ${data.errors || 0}`);
             }

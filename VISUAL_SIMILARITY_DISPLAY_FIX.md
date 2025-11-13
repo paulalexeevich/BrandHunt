@@ -1,4 +1,4 @@
-# Visual Similarity Display Fix - November 13, 2025
+# Visual Similarity Display Fix - November 13, 2025 (UPDATED)
 
 ## Problem
 
@@ -6,8 +6,16 @@ User reported that visual similarity percentages and match status badges were no
 - The pipeline completed successfully
 - A product was selected and saved (visible in "FoodGraph Match" section)
 - The Visual Match filter button showed **(0)** instead of the expected count
+- Pre-filter results showed "NO MATCH" badges instead of visual similarity data
 
-## Root Cause
+## Root Cause (ACTUAL)
+
+The `/api/results/${imageId}` endpoint has an **opt-in query parameter** for loading FoodGraph results:
+
+```typescript
+// Line 46 in app/api/results/[imageId]/route.ts
+const includeFoodGraphResults = url.searchParams.get('includeFoodGraphResults') === 'true';
+```
 
 When the Visual Match pipeline completes:
 
@@ -17,73 +25,94 @@ When the Visual Match pipeline completes:
    - `match_status` ('identical' or 'almost_same')
    - `match_reason` (AI reasoning)
 
-2. ✅ **Detection IS updated** with selected match info
+2. ✅ **Detection IS updated** with selected match info in `branghunt_detections`
 
-3. ❌ **FoodGraph results are NOT reloaded** for the currently selected detection
+3. ❌ **FoodGraph results are NOT loaded** when `fetchImage()` refreshes detections
 
-The issue: The page uses **on-demand loading** for FoodGraph results. After pipeline completion:
-- `fetchImage()` refreshes the detections list
-- But it doesn't reload FoodGraph results for the currently selected detection
-- The UI continues showing OLD cached data (Pre-filter results)
-- The Visual Match button shows (0) because the component has stale data
+The issue: After pipeline completion:
+- `fetchImage()` calls `/api/results/${imageId}` WITHOUT the `?includeFoodGraphResults=true` parameter
+- The API skips loading FoodGraph results for performance reasons (lines 44-92)
+- Detections are refreshed but WITHOUT their `foodgraph_results` array populated
+- The Visual Match button counts 0 results because `detection.foodgraph_results` is undefined
+- When user clicks a detection, on-demand loading tries to fetch results separately, but shows cached/stale data
 
 ## The Fix
 
-Added automatic reload of FoodGraph results for the currently selected detection after BOTH pipelines complete.
+Modified `fetchImage()` to accept an optional parameter for including FoodGraph results, and updated both pipeline completion handlers to use it.
 
 ### Changed File
 `app/analyze/[imageId]/page.tsx`
 
-### Pipeline 1: AI Filter (lines 1160-1175)
+### Change 1: Updated fetchImage() Function (lines 203-249)
+```typescript
+const fetchImage = async (includeFoodGraphResults: boolean = false) => {
+  // Prevent concurrent/rapid fetches
+  if (isFetching) {
+    console.log('⚠️ Fetch already in progress, skipping...');
+    return;
+  }
+
+  setIsFetching(true);
+  const fetchStart = Date.now();
+  console.log(`🚀 Starting fetch for image ${resolvedParams.imageId}${includeFoodGraphResults ? ' (including FoodGraph results)' : ''}`);
+  
+  try {
+    // ADD QUERY PARAMETER when needed
+    const url = includeFoodGraphResults 
+      ? `/api/results/${resolvedParams.imageId}?includeFoodGraphResults=true`
+      : `/api/results/${resolvedParams.imageId}`;
+    const response = await fetch(url);
+    
+    // ... rest of function unchanged ...
+  }
+};
+```
+
+**Key Change:** Added optional `includeFoodGraphResults` parameter that appends `?includeFoodGraphResults=true` query string when `true`.
+
+### Change 2: Pipeline 1 (AI Filter) Completion Handler (line 1162)
 ```typescript
 } else if (data.type === 'complete') {
-  // ... existing progress update code ...
-  
-  await fetchImage();
+  setPipelineProgress({ ... });
 
-  // Force reload FoodGraph results for currently selected detection
-  if (selectedDetection) {
-    console.log(`🔄 Reloading FoodGraph results for selected detection after pipeline completion`);
-    try {
-      const response = await fetch(`/api/foodgraph-results/${selectedDetection}`);
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`📦 Reloaded ${data.results?.length || 0} FoodGraph results (including visual match data)`);
-        if (data.results) {
-          setFoodgraphResults(data.results);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to reload FoodGraph results:', err);
-    }
-  }
+  // Fetch image WITH FoodGraph results to update Visual Match counts
+  await fetchImage(true);  // ← Changed from fetchImage()
 
   alert(`✅ AI Filter Pipeline Complete!...`);
 }
 ```
 
-### Pipeline 2: Visual-Only (lines 1271-1286)
-Same logic applied to the Visual-Only pipeline completion handler.
+### Change 3: Pipeline 2 (Visual-Only) Completion Handler (line 1274)
+```typescript
+} else if (data.type === 'complete') {
+  setPipelineProgress({ ... });
+
+  // Fetch image WITH FoodGraph results to update Visual Match counts
+  await fetchImage(true);  // ← Changed from fetchImage()
+
+  alert(`✅ Visual-Only Pipeline Complete!...`);
+}
+```
 
 ## How It Works
 
 **Before Fix:**
-1. User selects detection → FoodGraph results loaded and cached
-2. User runs Visual Match pipeline
-3. Pipeline completes, saves visual match data to database
-4. `fetchImage()` refreshes detections list
-5. ❌ FoodGraph results remain cached (old Pre-filter data)
-6. Visual Match button shows (0) because component has stale data
+1. User runs Visual Match pipeline
+2. Pipeline completes, saves visual match data to `branghunt_foodgraph_results` table
+3. `fetchImage()` calls `/api/results/${imageId}` WITHOUT query parameter
+4. API returns detections WITHOUT `foodgraph_results` array (performance optimization)
+5. ❌ Detections refresh but don't include FoodGraph results
+6. ❌ Visual Match button counts results from `detection.foodgraph_results` → finds undefined → shows (0)
+7. ❌ User clicks detection → on-demand loading shows stale cached data
 
 **After Fix:**
-1. User selects detection → FoodGraph results loaded and cached
-2. User runs Visual Match pipeline
-3. Pipeline completes, saves visual match data to database
-4. `fetchImage()` refreshes detections list
-5. ✅ `fetch('/api/foodgraph-results/${selectedDetection}')` reloads FoodGraph results
-6. ✅ `setFoodgraphResults(data.results)` updates component state with new data
-7. ✅ Visual Match button shows correct count (e.g., Visual Match (8))
-8. ✅ Visual similarity badges and percentages display when user clicks filter
+1. User runs Visual Match pipeline
+2. Pipeline completes, saves visual match data to `branghunt_foodgraph_results` table
+3. `fetchImage(true)` calls `/api/results/${imageId}?includeFoodGraphResults=true`
+4. API returns detections WITH `foodgraph_results` array populated
+5. ✅ Detections refresh with all FoodGraph results included (search, pre_filter, ai_filter, visual_match)
+6. ✅ Visual Match button counts results from `detection.foodgraph_results` → shows correct count (e.g., Visual Match (8))
+7. ✅ User clicks detection → immediately sees visual match data with similarity percentages and badges
 
 ## Expected Results After Fix
 
@@ -261,27 +290,23 @@ manually refresh or re-select detection."
 
 ## Key Learnings
 
-### 1. On-Demand Loading + Batch Updates = Stale Data
-When using on-demand loading with caching (loadedDetectionIds), batch operations that update the database won't automatically refresh cached data. Need to explicitly reload after batch operations complete.
+### 1. Check API Query Parameters When Data Doesn't Load
+The `/api/results` endpoint had an **opt-in parameter** `?includeFoodGraphResults=true` that controlled whether FoodGraph results were included. Missing this parameter caused the issue. **Always check API contracts** - especially optional parameters that affect what data is returned.
 
-### 2. React State Updates Don't Trigger Re-Fetch
-Simply clearing cache (`setLoadedDetectionIds(new Set())`) doesn't immediately reload data. React needs a separate trigger (useEffect dependency change, direct fetch call, etc.).
+### 2. Performance Optimizations Can Hide Bugs
+The API was optimized to skip loading FoodGraph results by default (saving 8-17 seconds on page load). This optimization worked during initial development but broke when pipelines started relying on those results being present after completion. **Document opt-in behaviors** clearly.
 
-### 3. Fetch + Update State = Immediate Visibility
-Direct fetch followed by setState provides immediate feedback:
-```typescript
-const response = await fetch(`/api/endpoint`);
-const data = await response.json();
-setState(data);  // Immediate UI update
-```
+### 3. Trace the Full Data Flow
+The bug appeared in the UI (Visual Match count showing 0), but the root cause was in the API fetch (missing query parameter). The initial fix attempted to patch the UI layer, but the real fix needed to be in the data loading layer. **Don't fix symptoms - fix root causes.**
 
-Better than relying on side effects or cache invalidation.
+### 4. Default Parameters Should Be Explicit
+Changed `fetchImage()` to accept `fetchImage(includeFoodGraphResults: boolean = false)` with explicit default. This makes the behavior clear at call sites: `fetchImage()` vs `fetchImage(true)`. **Explicit is better than implicit.**
 
-### 4. Apply Fix to ALL Pipelines
-If the fix applies to one pipeline (Visual-Only), it likely applies to others (AI Filter). Maintain consistency across similar code paths.
+### 5. Test After Pipeline Completion States
+The issue only appeared AFTER pipelines completed, not during normal manual workflows. **Test state transitions** - what happens after batch operations? After pipeline completion? After data updates?
 
-### 5. Always Test the Full User Flow
-Issue wasn't in the visual matching logic or display components - it was in the data loading flow between batch processing and UI display. Test end-to-end flows, not just individual components.
+### 6. Apply Fixes Consistently Across Similar Code Paths
+If Pipeline 1 (AI Filter) needs the fix, Pipeline 2 (Visual-Only) probably does too. **Maintain consistency** across parallel code paths to avoid partial fixes.
 
 ## Related Documentation
 
