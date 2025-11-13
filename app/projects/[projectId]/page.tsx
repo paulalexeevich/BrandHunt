@@ -964,64 +964,6 @@ export default function ProjectViewPage() {
         {/* Project Stats Dashboard */}
         {!loading && !error && project && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-              {/* Total Images */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <ImageIcon className="w-6 h-6 text-blue-600" />
-                  <span className="text-sm font-semibold text-gray-700">Total Images</span>
-                </div>
-                <div className="text-3xl font-bold text-blue-700 mb-1">
-                  {project.total_images}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {project.images_with_detection} with detection
-                </div>
-              </div>
-
-              {/* Total Products */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <Target className="w-6 h-6 text-purple-600" />
-                  <span className="text-sm font-semibold text-gray-700">Total Products</span>
-                </div>
-                <div className="text-3xl font-bold text-purple-700 mb-1">
-                  {project.total_detections}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {project.detections_fully_analyzed} fully analyzed
-                </div>
-              </div>
-
-              {/* Brand Extracted */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <CheckCircle className="w-6 h-6 text-yellow-600" />
-                  <span className="text-sm font-semibold text-gray-700">Brand Extracted</span>
-                </div>
-                <div className="text-3xl font-bold text-yellow-700 mb-1">
-                  {project.detections_brand_extracted}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {Math.round((project.detections_brand_extracted / (project.total_detections || 1)) * 100)}% complete
-                </div>
-              </div>
-
-              {/* Price Extracted */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <DollarSign className="w-6 h-6 text-green-600" />
-                  <span className="text-sm font-semibold text-gray-700">Price Extracted</span>
-                </div>
-                <div className="text-3xl font-bold text-green-700 mb-1">
-                  {project.detections_price_extracted}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {Math.round((project.detections_price_extracted / (project.total_detections || 1)) * 100)}% complete
-                </div>
-              </div>
-            </div>
-
             {/* Product Statistics Panel */}
             {productStats && productStats.totalProducts > 0 && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-md p-6 mb-8 border border-indigo-100">
