@@ -101,7 +101,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   
   // FoodGraph options visibility state
   const [showFoodGraphOptions, setShowFoodGraphOptions] = useState(false);
-  const [loadingFoodGraphResults, setLoadingFoodGraphResults] = useState(false);
   
   // Show/hide product IDs on bounding boxes
   const [showProductIds, setShowProductIds] = useState(true);
@@ -911,7 +910,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
   };
 
-  const handleSeeOptions = async () => {
+  const handleSeeOptions = () => {
     if (!selectedDetection) return;
 
     const detection = detections.find(d => d.id === selectedDetection);
@@ -924,22 +923,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
 
     // Show options and set Visual Match as default filter
+    // No API call - users can trigger actions manually if needed
     setShowFoodGraphOptions(true);
     setStageFilter('visual_match');
-
-    // Load FoodGraph results if not already loaded
-    if (foodgraphResults.length === 0 && detection.fully_analyzed) {
-      setLoadingFoodGraphResults(true);
-      try {
-        console.log('📥 Loading FoodGraph results on-demand...');
-        await fetchImage(true);
-      } catch (err) {
-        console.error('Error loading FoodGraph results:', err);
-        setError('Failed to load FoodGraph results');
-      } finally {
-        setLoadingFoodGraphResults(false);
-      }
-    }
   };
 
   const handleExtractInfoAll = async () => {
@@ -2061,20 +2047,10 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       <div className="mb-4">
                         <button
                           onClick={handleSeeOptions}
-                          disabled={loadingFoodGraphResults}
-                          className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold flex items-center justify-center gap-2 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold flex items-center justify-center gap-2 shadow-md"
                         >
-                          {loadingFoodGraphResults ? (
-                            <>
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              Loading options...
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className={`w-5 h-5 transition-transform ${showFoodGraphOptions ? 'rotate-180' : ''}`} />
-                              ⚙️ {showFoodGraphOptions ? 'Hide' : 'See'} Options
-                            </>
-                          )}
+                          <ChevronDown className={`w-5 h-5 transition-transform ${showFoodGraphOptions ? 'rotate-180' : ''}`} />
+                          ⚙️ {showFoodGraphOptions ? 'Hide' : 'See'} Options
                         </button>
                       </div>
 
