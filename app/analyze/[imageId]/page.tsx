@@ -2295,7 +2295,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     <div className="mt-4">
                       <button
                         onClick={() => setShowActions(!showActions)}
-                        className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all font-semibold flex items-center justify-center gap-2 shadow-md"
+                        className="w-full px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all font-semibold flex items-center justify-center gap-2 shadow-md"
                       >
                         <ChevronDown className={`w-5 h-5 transition-transform ${showActions ? 'rotate-180' : ''}`} />
                         ⚙️ Actions
