@@ -948,17 +948,22 @@ export default function ProjectViewPage() {
             <button
               onClick={async () => {
                 try {
+                  console.log('🚀 Starting export for projectId:', projectId);
                   const response = await fetch(`/api/export-matched-products?projectId=${projectId}`, {
                     credentials: 'include',
                   });
                   
+                  console.log('📡 Response status:', response.status, response.statusText);
+                  
                   if (!response.ok) {
                     const error = await response.json();
-                    alert(error.error || 'Failed to export matched products');
+                    console.error('❌ Export error:', error);
+                    alert(`Export failed: ${error.error || 'Unknown error'}\n${error.details || ''}`);
                     return;
                   }
                   
                   // Download the file
+                  console.log('💾 Downloading file...');
                   const blob = await response.blob();
                   const url = window.URL.createObjectURL(blob);
                   const a = document.createElement('a');
@@ -968,9 +973,10 @@ export default function ProjectViewPage() {
                   a.click();
                   window.URL.revokeObjectURL(url);
                   document.body.removeChild(a);
+                  console.log('✅ Export complete!');
                 } catch (error) {
-                  console.error('Error exporting:', error);
-                  alert('Failed to export matched products');
+                  console.error('💥 Export exception:', error);
+                  alert(`Failed to export matched products: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 }
               }}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
