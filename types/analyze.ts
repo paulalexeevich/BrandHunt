@@ -65,6 +65,9 @@ export interface FoodGraphResult {
   is_match?: boolean | null;
   match_confidence?: number | null;
   processing_stage?: 'search' | 'pre_filter' | 'ai_filter' | 'visual_match' | null;
+  match_status?: 'identical' | 'almost_same' | 'not_match' | null;
+  visual_similarity?: number | null;
+  match_reason?: string | null;
   companyBrand?: string | null;
   companyManufacturer?: string | null;
   measures?: string | null;

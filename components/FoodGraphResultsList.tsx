@@ -297,12 +297,12 @@ function ProductCard({
           {filteredCount !== null && (
             <div className="absolute -top-1 -right-1 z-10">
               {matchStatus === 'identical' ? (
-                <span className="px-1.5 py-0.5 bg-green-600 text-white text-[10px] font-bold rounded flex items-center gap-1">
-                  ✓ IDENTICAL
+                <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-[10px] font-bold rounded flex items-center gap-1 shadow-md">
+                  🎯 IDENTICAL
                 </span>
               ) : matchStatus === 'almost_same' ? (
-                <span className="px-1.5 py-0.5 bg-yellow-500 text-white text-[10px] font-bold rounded flex items-center gap-1">
-                  ≈ ALMOST SAME
+                <span className="px-1.5 py-0.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-[10px] font-bold rounded flex items-center gap-1 shadow-md">
+                  🔍 ALMOST SAME
                 </span>
               ) : passedThreshold ? (
                 <span className="px-1.5 py-0.5 bg-green-600 text-white text-[10px] font-bold rounded flex items-center gap-1">
@@ -348,6 +348,22 @@ function ProductCard({
                 <span className="text-[10px] text-gray-500">UPC:</span>
                 <span className="text-[10px] font-mono text-blue-600 font-semibold">
                   {fgGtin}
+                </span>
+              </div>
+            )}
+            
+            {/* Visual Similarity Score */}
+            {(result as any).visual_similarity !== null && (result as any).visual_similarity !== undefined && filteredCount !== null && (
+              <div className="flex items-center gap-1 mt-1">
+                <span className="text-[10px] font-semibold text-indigo-700">
+                  👁️ Visual Similarity:
+                </span>
+                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                  (result as any).visual_similarity >= 0.9 ? 'bg-green-100 text-green-800' :
+                  (result as any).visual_similarity >= 0.7 ? 'bg-blue-100 text-blue-800' :
+                  'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {((result as any).visual_similarity * 100).toFixed(1)}%
                 </span>
               </div>
             )}
