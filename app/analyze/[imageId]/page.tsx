@@ -165,15 +165,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
     }
   }, [image]);
 
-  // Track foodgraphResults state changes
-  useEffect(() => {
-    console.log(`📊 foodgraphResults state changed: ${foodgraphResults.length} results`, {
-      filteredCount,
-      preFilteredCount,
-      selectedDetection
-    });
-  }, [foodgraphResults, filteredCount, preFilteredCount, selectedDetection]);
-
   // Load FoodGraph results when a detection is selected
   useEffect(() => {
     const loadFoodGraphResults = async () => {
