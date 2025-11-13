@@ -224,7 +224,7 @@ Return your analysis in JSON format:
 
 export async function POST(request: NextRequest) {
   try {
-    const { projectId, concurrency = 10 } = await request.json();
+    const { projectId, concurrency = 50 } = await request.json();
 
     if (!projectId) {
       const encoder = new TextEncoder();

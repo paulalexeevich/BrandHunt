@@ -612,7 +612,7 @@ export default function ProjectViewPage() {
       const response = await fetch('/api/batch-contextual-project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, concurrency: 10 }),
+        body: JSON.stringify({ projectId, concurrency: 50 }),
         credentials: 'include'
       });
 
