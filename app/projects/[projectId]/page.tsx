@@ -52,12 +52,13 @@ interface ProjectStats {
 
 interface ProductStatistics {
   totalProducts: number;
+  processed: number;
+  notProcessed: number;
   notProduct: number;
-  detailsNotVisible: number;
-  notIdentified: number;
-  oneMatch: number;
-  noMatch: number;
+  matched: number;
+  notMatched: number;
   multipleMatches: number;
+  incorrect: number;
 }
 
 interface ImageData {
@@ -181,18 +182,31 @@ export default function ProjectViewPage() {
       // Flatten all detections from all images
       const allDetections = data?.flatMap((img: any) => img.branghunt_detections || []) || [];
 
-      // Calculate statistics
+      // Calculate statistics (matching image page logic)
       const stats: ProductStatistics = {
         totalProducts: allDetections.length,
-        notProduct: allDetections.filter((d: any) => d.is_product === false).length,
-        detailsNotVisible: 0, // No longer tracking visibility level
-        notIdentified: allDetections.filter((d: any) => 
-          (d.is_product === true || d.is_product === null) && 
-          !d.brand_name
+        processed: allDetections.filter((d: any) => 
+          (d.is_product === true || d.is_product === null) && d.brand_name
         ).length,
-        oneMatch: allDetections.filter((d: any) => d.fully_analyzed === true).length,
-        noMatch: 0, // Will be calculated from foodgraph results if needed
-        multipleMatches: 0 // Will be calculated from foodgraph results if needed
+        notProcessed: allDetections.filter((d: any) => 
+          (d.is_product === true || d.is_product === null) && !d.brand_name
+        ).length,
+        notProduct: allDetections.filter((d: any) => d.is_product === false).length,
+        matched: allDetections.filter((d: any) => 
+          d.selected_foodgraph_gtin && d.selected_foodgraph_gtin.trim() !== ''
+        ).length,
+        notMatched: allDetections.filter((d: any) => 
+          d.brand_name && 
+          (!d.selected_foodgraph_gtin || d.selected_foodgraph_gtin.trim() === '')
+        ).length,
+        multipleMatches: allDetections.filter((d: any) => 
+          d.brand_name && 
+          !d.fully_analyzed && 
+          !d.selected_foodgraph_gtin &&
+          d.foodgraph_results && 
+          d.foodgraph_results.length >= 2
+        ).length,
+        incorrect: allDetections.filter((d: any) => d.human_validation === false).length
       };
 
       setProductStats(stats);
@@ -1009,12 +1023,24 @@ export default function ProjectViewPage() {
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   📊 Product Statistics
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                   {/* Total Products */}
                   <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-900 ring-2 ring-gray-900">
                     <div className="text-2xl font-bold text-gray-900">{productStats.totalProducts}</div>
                     <div className="text-xs text-gray-600 mt-1">Total Products</div>
                     <div className="text-xs text-gray-900 font-semibold mt-1">● Active</div>
+                  </div>
+
+                  {/* Processed */}
+                  <div className="bg-blue-50 rounded-lg p-4 shadow-sm border border-blue-200">
+                    <div className="text-2xl font-bold text-blue-700">{productStats.processed}</div>
+                    <div className="text-xs text-blue-600 mt-1">Processed</div>
+                  </div>
+
+                  {/* Not Processed */}
+                  <div className="bg-gray-50 rounded-lg p-4 shadow-sm border border-gray-300">
+                    <div className="text-2xl font-bold text-gray-700">{productStats.notProcessed}</div>
+                    <div className="text-xs text-gray-600 mt-1">Not Processed</div>
                   </div>
 
                   {/* Not Product */}
@@ -1023,28 +1049,16 @@ export default function ProjectViewPage() {
                     <div className="text-xs text-red-600 mt-1">Not Product</div>
                   </div>
 
-                  {/* Details Not Visible */}
-                  <div className="bg-orange-50 rounded-lg p-4 shadow-sm border border-orange-200">
-                    <div className="text-2xl font-bold text-orange-700">{productStats.detailsNotVisible}</div>
-                    <div className="text-xs text-orange-600 mt-1">Details Not Visible</div>
-                  </div>
-
-                  {/* Not Identified */}
-                  <div className="bg-gray-50 rounded-lg p-4 shadow-sm border border-gray-300">
-                    <div className="text-2xl font-bold text-gray-700">{productStats.notIdentified}</div>
-                    <div className="text-xs text-gray-600 mt-1">Not Identified</div>
-                  </div>
-
-                  {/* ONE Match */}
+                  {/* Matched */}
                   <div className="bg-green-50 rounded-lg p-4 shadow-sm border border-green-200">
-                    <div className="text-2xl font-bold text-green-700">{productStats.oneMatch}</div>
-                    <div className="text-xs text-green-600 mt-1">✓ ONE Match</div>
+                    <div className="text-2xl font-bold text-green-700">{productStats.matched}</div>
+                    <div className="text-xs text-green-600 mt-1">✓ Matched</div>
                   </div>
 
-                  {/* NO Match */}
+                  {/* Not Matched */}
                   <div className="bg-yellow-50 rounded-lg p-4 shadow-sm border border-yellow-200">
-                    <div className="text-2xl font-bold text-yellow-700">{productStats.noMatch}</div>
-                    <div className="text-xs text-yellow-600 mt-1">NO Match</div>
+                    <div className="text-2xl font-bold text-yellow-700">{productStats.notMatched}</div>
+                    <div className="text-xs text-yellow-600 mt-1">Not Matched</div>
                   </div>
 
                   {/* 2+ Matches */}
@@ -1052,20 +1066,26 @@ export default function ProjectViewPage() {
                     <div className="text-2xl font-bold text-purple-700">{productStats.multipleMatches}</div>
                     <div className="text-xs text-purple-600 mt-1">2+ Matches</div>
                   </div>
+
+                  {/* Incorrect */}
+                  <div className="bg-orange-50 rounded-lg p-4 shadow-sm border border-orange-200">
+                    <div className="text-2xl font-bold text-orange-700">{productStats.incorrect}</div>
+                    <div className="text-xs text-orange-600 mt-1">✗ Incorrect</div>
+                  </div>
                 </div>
 
                 {/* Progress Bar */}
                 <div className="mt-4">
                   <div className="flex justify-between text-xs text-gray-600 mb-1">
                     <span>Processing Progress</span>
-                    <span>{productStats.oneMatch} / {productStats.totalProducts} Completed ({Math.round((productStats.oneMatch / productStats.totalProducts) * 100)}%)</span>
+                    <span>{productStats.matched} / {productStats.totalProducts} Saved ({Math.round((productStats.matched / productStats.totalProducts) * 100)}%)</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                     <div 
                       className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500 ease-out flex items-center justify-end pr-1"
-                      style={{ width: `${(productStats.oneMatch / productStats.totalProducts) * 100}%` }}
+                      style={{ width: `${(productStats.matched / productStats.totalProducts) * 100}%` }}
                     >
-                      {productStats.oneMatch > 0 && (
+                      {productStats.matched > 0 && (
                         <span className="text-[10px] font-bold text-white">✓</span>
                       )}
                     </div>

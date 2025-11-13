@@ -89,7 +89,21 @@ export function ImageStatisticsPanel({
       
       {/* Horizontal Layout: All stats in one row */}
       <div className="bg-white rounded-lg shadow-sm p-3 border border-gray-200">
-        <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
+        <div className="grid grid-cols-3 md:grid-cols-8 gap-3">
+          {/* Total Products */}
+          <button
+            onClick={() => setActiveFilter('all')}
+            className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:scale-105 ${
+              activeFilter === 'all' 
+                ? 'bg-gray-50 border-gray-900 ring-2 ring-gray-900' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <span className="text-3xl font-bold text-gray-900">{totalProducts}</span>
+            <span className="text-[10px] font-medium text-gray-600 mt-1 text-center">Total Products</span>
+            {activeFilter === 'all' && <span className="text-[9px] text-gray-900 font-semibold mt-0.5">● Active</span>}
+          </button>
+          
           {/* Processed */}
           <button
             onClick={() => setActiveFilter('processed')}
