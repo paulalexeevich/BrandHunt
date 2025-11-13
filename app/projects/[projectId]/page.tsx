@@ -1100,18 +1100,18 @@ export default function ProjectViewPage() {
             )}
 
             {/* Project Members */}
-            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Users className="w-6 h-6 text-indigo-600" />
+            <div className="bg-white rounded-xl shadow-lg p-4 mb-8">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-indigo-600" />
                   Project Members ({members.length})
                 </h2>
                 <button
                   onClick={handleShowAddMember}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                   disabled={showAddMember}
                 >
-                  <UserPlus className="w-4 h-4" />
+                  <UserPlus className="w-3.5 h-3.5" />
                   Add Member
                 </button>
               </div>
@@ -1191,11 +1191,11 @@ export default function ProjectViewPage() {
               )}
 
               {/* Members List */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {members.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Users className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <p>No members yet</p>
+                  <div className="text-center py-6 text-gray-500">
+                    <Users className="w-10 h-10 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No members yet</p>
                   </div>
                 ) : (
                   members.map((member) => {
@@ -1205,32 +1205,32 @@ export default function ProjectViewPage() {
                     return (
                       <div
                         key={member.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-full ${
+                        <div className="flex items-center gap-2">
+                          <div className={`p-1.5 rounded-full ${
                             isOwner ? 'bg-yellow-100' :
                             member.role === 'admin' ? 'bg-purple-100' :
                             member.role === 'member' ? 'bg-blue-100' :
                             'bg-gray-100'
                           }`}>
-                            {isOwner ? <Shield className="w-5 h-5 text-yellow-600" /> :
-                             member.role === 'admin' ? <Edit className="w-5 h-5 text-purple-600" /> :
-                             member.role === 'member' ? <Package className="w-5 h-5 text-blue-600" /> :
-                             <Eye className="w-5 h-5 text-gray-600" />}
+                            {isOwner ? <Shield className="w-4 h-4 text-yellow-600" /> :
+                             member.role === 'admin' ? <Edit className="w-4 h-4 text-purple-600" /> :
+                             member.role === 'member' ? <Package className="w-4 h-4 text-blue-600" /> :
+                             <Eye className="w-4 h-4 text-gray-600" />}
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-900">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-medium text-gray-900">
                                 {member.email || `${member.user_id.substring(0, 8)}...`}
                               </span>
                               {isCurrentUser && (
-                                <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                                <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">
                                   You
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-600">
                               <span className={`font-semibold ${
                                 isOwner ? 'text-yellow-600' :
                                 member.role === 'admin' ? 'text-purple-600' :
@@ -1250,10 +1250,10 @@ export default function ProjectViewPage() {
                           <button
                             onClick={() => handleRemoveMember(member.id)}
                             disabled={memberLoading}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                             title="Remove member"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
@@ -1263,9 +1263,9 @@ export default function ProjectViewPage() {
               </div>
 
               {/* Info about roles */}
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900 font-semibold mb-1">About Roles:</p>
-                <ul className="text-xs text-blue-800 space-y-1">
+              <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-900 font-semibold mb-1">About Roles:</p>
+                <ul className="text-[11px] text-blue-800 space-y-0.5">
                   <li><strong>Owner:</strong> Full control, cannot be removed</li>
                   <li><strong>Admin:</strong> Can manage members and edit content</li>
                   <li><strong>Member:</strong> Can edit content and add images</li>
