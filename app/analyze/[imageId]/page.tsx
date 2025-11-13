@@ -117,6 +117,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   const [contextSaveResults, setContextSaveResults] = useState(true);
   const [showBlock2, setShowBlock2] = useState(false);
   const [showProcessingBlocks, setShowProcessingBlocks] = useState(false);
+  const [showActions, setShowActions] = useState(false);
 
   useEffect(() => {
     fetchImage();
@@ -1990,48 +1991,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                     )}
                     
                     {/* Visual Match Button - Shows AFTER AI Filter when there are 2+ candidates */}
-                    {(() => {
-                      // Calculate match counts from actual results (works for both manual and batch processing)
-                      const identicalCount = foodgraphResults.filter(r => (r as any).match_status === 'identical').length;
-                      const almostSameCount = foodgraphResults.filter(r => (r as any).match_status === 'almost_same').length;
-                      const totalCandidates = identicalCount + almostSameCount;
-                      
-                      // Debug logging
-                      console.log('🎯 Visual Match Button Debug:', {
-                        foodgraphResultsCount: foodgraphResults.length,
-                        identicalCount,
-                        almostSameCount,
-                        totalCandidates,
-                        fullyAnalyzed: detection.fully_analyzed,
-                        selectedMatch: detection.selected_foodgraph_result_id,
-                        shouldShow: totalCandidates >= 2 && !detection.selected_foodgraph_result_id
-                      });
-                      
-                      // Show button if we have 2+ candidates AND no match has been selected yet
-                      // (Even if fully_analyzed is true, multiple candidates means it needs visual matching)
-                      return totalCandidates >= 2 && !detection.selected_foodgraph_result_id && (
-                        <button
-                          onClick={handleVisualMatch}
-                          disabled={visualMatching}
-                          className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2 shadow-md"
-                        >
-                          {visualMatching ? (
-                            <>
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              Visual Matching...
-                            </>
-                          ) : (
-                            <>
-                              🎯 Visual Match Selection
-                              <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                                {totalCandidates} candidates
-                              </span>
-                            </>
-                          )}
-                        </button>
-                      );
-                    })()}
-                    
                     </div>
 
                   {/* FoodGraph Results */}
@@ -2101,29 +2060,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                                   {showNoMatch ? '👁️' : ''} No Match: {foodgraphResults.length - matchStatusCounts.identical - matchStatusCounts.almostSame} {!showNoMatch && '(hidden)'}
                                 </span>
                               </div>
-                              
-                              {/* Visual Match Button - Right below the status counts */}
-                              {matchStatusCounts && (matchStatusCounts.identical + matchStatusCounts.almostSame) >= 2 && !detection.selected_foodgraph_result_id && (
-                                <button
-                                  onClick={handleVisualMatch}
-                                  disabled={visualMatching}
-                                  className="w-full mt-3 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2 shadow-md"
-                                >
-                                  {visualMatching ? (
-                                    <>
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                      Visual Matching...
-                                    </>
-                                  ) : (
-                                    <>
-                                      🎯 Run Visual Match Selection
-                                      <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                                        {matchStatusCounts.identical + matchStatusCounts.almostSame} candidates
-                                      </span>
-                                    </>
-                                  )}
-                                </button>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -2265,24 +2201,48 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                   </div>
                 )}
 
-                  {/* Contextual Analysis - Experimental Feature (moved below FoodGraph results) */}
+                  {/* Actions Button - Contains Contextual Analysis, Visual Match, Extract Price */}
                   {detection.brand_name && (
-                    <div className="mt-4 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-lg p-4 shadow-sm">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">🔬</span>
-                          <div>
-                            <h4 className="font-semibold text-orange-900">Contextual Analysis (Experimental)</h4>
-                            <p className="text-xs text-orange-700">Use neighboring products to infer brand & size</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setShowContextAnalysis(!showContextAnalysis)}
-                          className="px-3 py-1 bg-orange-200 hover:bg-orange-300 text-orange-900 rounded text-sm font-medium transition-colors"
-                        >
-                          {showContextAnalysis ? 'Hide' : 'Show'}
-                        </button>
-                      </div>
+                    <div className="mt-4">
+                      <button
+                        onClick={() => setShowActions(!showActions)}
+                        className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all font-semibold flex items-center justify-center gap-2 shadow-md"
+                      >
+                        <ChevronDown className={`w-5 h-5 transition-transform ${showActions ? 'rotate-180' : ''}`} />
+                        ⚙️ Actions
+                        <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                          {[
+                            detection.brand_name ? 'Contextual Analysis' : null,
+                            (() => {
+                              const identicalCount = foodgraphResults.filter(r => (r as any).match_status === 'identical' || r.is_match === true).length;
+                              const almostSameCount = foodgraphResults.filter(r => (r as any).match_status === 'almost_same').length;
+                              const totalCandidates = identicalCount + almostSameCount;
+                              return totalCandidates >= 2 && !detection.selected_foodgraph_result_id ? 'Visual Match' : null;
+                            })(),
+                            (!detection.price || detection.price === 'Unknown') ? 'Extract Price' : null
+                          ].filter(Boolean).length}
+                        </span>
+                      </button>
+                      
+                      {showActions && (
+                        <div className="mt-3 space-y-3">
+                          {/* Contextual Analysis - Experimental Feature */}
+                          <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-lg p-4 shadow-sm">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">🔬</span>
+                                <div>
+                                  <h4 className="font-semibold text-orange-900">Contextual Analysis (Experimental)</h4>
+                                  <p className="text-xs text-orange-700">Use neighboring products to infer brand & size</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => setShowContextAnalysis(!showContextAnalysis)}
+                                className="px-3 py-1 bg-orange-200 hover:bg-orange-300 text-orange-900 rounded text-sm font-medium transition-colors"
+                              >
+                                {showContextAnalysis ? 'Hide' : 'Show'}
+                              </button>
+                            </div>
                       
                       {showContextAnalysis && (
                         <div className="space-y-3">
@@ -2505,26 +2465,74 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                           )}
                         </div>
                       )}
-                    </div>
-                  )}
+                          </div>
 
-                  {/* Extract Price - Moved below Contextual Analysis */}
-                  {detection.brand_name && (!detection.price || detection.price === 'Unknown') && (
-                    <div className="mt-4">
-                      <button
-                        onClick={() => handleExtractPrice(detection.id)}
-                        disabled={extractingPrice}
-                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
-                      >
-                        {extractingPrice ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Extracting Price...
-                          </>
-                        ) : (
-                          '💰 Extract Price'
-                        )}
-                      </button>
+                          {/* Visual Match Selection Button */}
+                          {(() => {
+                            const identicalCount = foodgraphResults.filter(r => (r as any).match_status === 'identical' || r.is_match === true).length;
+                            const almostSameCount = foodgraphResults.filter(r => (r as any).match_status === 'almost_same').length;
+                            const totalCandidates = identicalCount + almostSameCount;
+                            
+                            return totalCandidates >= 2 && !detection.selected_foodgraph_result_id && (
+                              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-300 rounded-lg p-4 shadow-sm">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <span className="text-2xl">🎯</span>
+                                  <div>
+                                    <h4 className="font-semibold text-indigo-900">Visual Match Selection</h4>
+                                    <p className="text-xs text-indigo-700">Automatically select best match from {totalCandidates} candidates</p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={handleVisualMatch}
+                                  disabled={visualMatching}
+                                  className="w-full px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2 shadow-md"
+                                >
+                                  {visualMatching ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      Visual Matching...
+                                    </>
+                                  ) : (
+                                    <>
+                                      🎯 Run Visual Match Selection
+                                      <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                                        {totalCandidates} candidates
+                                      </span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Extract Price */}
+                          {(!detection.price || detection.price === 'Unknown') && (
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-4 shadow-sm">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-2xl">💰</span>
+                                <div>
+                                  <h4 className="font-semibold text-green-900">Extract Price</h4>
+                                  <p className="text-xs text-green-700">Extract price information from product image</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleExtractPrice(detection.id)}
+                                disabled={extractingPrice}
+                                className="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:bg-gray-400 flex items-center justify-center gap-2"
+                              >
+                                {extractingPrice ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Extracting Price...
+                                  </>
+                                ) : (
+                                  '💰 Extract Price'
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
