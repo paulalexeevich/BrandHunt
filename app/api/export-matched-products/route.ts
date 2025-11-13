@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
       
       return {
         'Product GTIN': detection.selected_foodgraph_gtin || '',
-        'Shelf Photo': image?.original_filename || image?.s3_url || 'N/A',
+        'Shelf Photo': image?.s3_url || image?.original_filename || 'N/A',
         'Product # on Image': detection.detection_index + 1, // +1 for human-readable numbering
         'Store Name': image?.store_name || 'N/A',
         'FoodGraph Front Photo': detection.selected_foodgraph_image_url || 'N/A',
