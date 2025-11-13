@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, CheckCircle, Package, Trash2, ChevronDown, Settings, Cpu, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle, Package, Trash2, ChevronDown, Settings, Cpu, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { getImageUrl } from '@/lib/image-utils';
 import { ImageStatisticsPanel } from '@/components/ImageStatisticsPanel';
 import { FoodGraphResultsList } from '@/components/FoodGraphResultsList';
@@ -102,6 +102,9 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
   // FoodGraph options visibility state
   const [showFoodGraphOptions, setShowFoodGraphOptions] = useState(false);
   const [loadingFoodGraphResults, setLoadingFoodGraphResults] = useState(false);
+  
+  // Show/hide product IDs on bounding boxes
+  const [showProductIds, setShowProductIds] = useState(true);
   const [pipelineDetails, setPipelineDetails] = useState<Array<{ detectionIndex: number; product: string; stage: string; message: string }>>([]);
   const [activePipeline, setActivePipeline] = useState<'ai' | 'visual' | null>(null);
   const [detectionMethod, setDetectionMethod] = useState<'gemini' | 'yolo'>('yolo');
@@ -1435,6 +1438,17 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                 Image Processing
               </button>
               <button
+                onClick={() => setShowProductIds(!showProductIds)}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  showProductIds
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-300'
+                }`}
+              >
+                {showProductIds ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                {showProductIds ? 'Hide IDs' : 'Show IDs'}
+              </button>
+              <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={deleting}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400"
@@ -1722,12 +1736,14 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
                       display: imageDimensions ? 'block' : 'none',
                     }}
                   >
-                    {/* Product number badge - hidden */}
-                    {/* <div 
-                      className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${badgeColor}`}
-                    >
-                      #{index + 1}
-                    </div> */}
+                    {/* Product number badge */}
+                    {showProductIds && (
+                      <div 
+                        className={`absolute -top-6 left-0 px-2 py-1 text-xs font-bold text-white rounded ${badgeColor}`}
+                      >
+                        #{index + 1}
+                      </div>
+                    )}
                   </div>
                 );
               }) : null}
@@ -1761,13 +1777,6 @@ export default function AnalyzePage({ params }: { params: Promise<{ imageId: str
               
               return (
                 <div className="space-y-4">
-                  {/* Product ID Badge - Top Right */}
-                  <div className="flex justify-end">
-                    <div className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg shadow-md font-semibold text-sm">
-                      #{detectionIndex + 1}
-                    </div>
-                  </div>
-
                   {/* FoodGraph Match - Show if saved */}
                   {detection.fully_analyzed && detection.selected_foodgraph_image_url && (
                     <div className="bg-white border-2 border-blue-300 rounded-lg p-4 shadow-sm">
