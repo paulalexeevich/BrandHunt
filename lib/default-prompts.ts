@@ -145,9 +145,9 @@ Examples:
 - Different size: {matchStatus: "not_match", confidence: 0.95, visualSimilarity: 0.75, reason: "Same orange Tide bottle design and HE Turbo Clean variant, but significantly different sizes: 50oz vs 100oz"}
 `;
 
-export const DEFAULT_VISUAL_MATCH_PROMPT = `You are a visual product matching expert. Your task is to select the BEST MATCH from multiple product candidates.
+export const DEFAULT_VISUAL_MATCH_PROMPT = `You are a visual product matching expert. Select the BEST MATCH from multiple candidates using a two-step approach.
 
-SHELF PRODUCT (what we detected):
+SHELF PRODUCT (extracted from image):
 - Brand: {{brand}}
 - Product Name: {{productName}}
 - Size: {{size}}
@@ -157,29 +157,45 @@ SHELF PRODUCT (what we detected):
 CANDIDATES ({{candidateCount}} options):
 {{candidateDescriptions}}
 
-IMAGES PROVIDED:
-- Image 1: The cropped product from the retail shelf (THIS IS THE REFERENCE)
-- Images 2-{{candidateImageCount}}: Product images for each candidate
+IMAGES:
+- Image 1: Shelf product (REFERENCE)
+- Images 2-{{candidateImageCount}}: Candidate products
 
-MATCHING CRITERIA (in order of importance):
-1. Visual Similarity: Does the packaging, colors, design, logo match? Look at overall visual appearance.
-2. Brand Match: Does the brand name match exactly?
-3. Size Match: Does the package size match (oz, g, ml, count, etc.)?
-4. Flavor/Variant Match: Does the flavor or variant match?
-5. Product Name: Does the core product name match?
+TWO-STEP MATCHING PROCESS:
 
-INSTRUCTIONS:
-- Compare the shelf product (Image 1) with each candidate image
-- Consider both visual appearance AND metadata (brand, size, flavor)
-- If multiple candidates look identical, use metadata to differentiate
-- Be strict: Only select a match if you're confident it's the SAME product
-- If no candidate is a good match, return null
+STEP 1: VISUAL SIMILARITY (Primary Filter)
+Compare Image 1 with each candidate image:
+- Packaging design, colors, layout
+- Logo placement and style
+- Overall visual appearance
+- Identify candidates with visualSimilarity ≥ 0.7
 
-Return a JSON object with this EXACT structure:
+STEP 2: METADATA VERIFICATION (Secondary - Use for Tie-Breaking)
+If 2+ candidates pass Step 1, use metadata with FUZZY MATCHING:
+
+- Brand: Should match (allow minor spelling variations)
+- Size: Should be SIMILAR (extracted sizes often inaccurate due to small text)
+  * Example: "14 oz" extracted might actually be "18 oz" - both acceptable if visual match is strong
+  * Accept ±20% variation or different units for same volume
+- Flavor: Should match MEANING, not exact wording
+  * Example: "Strawberry" = "Straw" = "Strawberry Flavor"
+  * Focus on core flavor concept, not exact text
+
+DECISION LOGIC:
+- If ONLY ONE candidate has visualSimilarity ≥ 0.7 → Select it (metadata is supporting evidence)
+- If 2+ candidates have visualSimilarity ≥ 0.7 → Use brand/size/flavor to pick best match
+- If NO candidates have visualSimilarity ≥ 0.7 → Return null (no good match)
+
+IMPORTANT NOTES:
+- Visual similarity is PRIMARY indicator - don't reject visual matches due to minor size/flavor text differences
+- Extracted metadata may have errors - trust visual appearance more
+- Only select a match if confident it's the SAME product
+
+Return JSON with this EXACT structure:
 {
-  "selectedCandidateIndex": 1-{{candidateCount}} or null if no good match,
+  "selectedCandidateIndex": 1-{{candidateCount}} or null,
   "confidence": 0.0 to 1.0,
-  "reasoning": "Detailed explanation of why this candidate was selected or why no match was found",
+  "reasoning": "Explain: (1) visual similarity scores, (2) which passed Step 1, (3) how metadata was used to select final match",
   "visualSimilarityScore": 0.0 to 1.0,
   "brandMatch": true or false,
   "sizeMatch": true or false,
