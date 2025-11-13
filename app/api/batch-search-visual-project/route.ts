@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     // Create a map of imageId -> image data for O(1) lookup
     const imageMap = new Map(images.map(img => [img.id, img]));
     
-    const CONCURRENCY_LIMIT = concurrency || 3;
+    const CONCURRENCY_LIMIT = concurrency || 100;
     
     // Preload all image base64 data
     const { getImageBase64ForProcessing } = await import('@/lib/image-processor');
@@ -581,20 +581,54 @@ export async function POST(request: NextRequest) {
           return result;
         };
 
-        // Process detections in batches with concurrency control
-        for (let i = 0; i < detections.length; i += CONCURRENCY_LIMIT) {
-          const batch = detections.slice(i, i + CONCURRENCY_LIMIT);
-          console.log(`\n🔄 Processing batch: products ${i + 1}-${Math.min(i + CONCURRENCY_LIMIT, detections.length)}`);
-          
-          // Start all promises in parallel
-          const promises = batch.map((detection, batchIndex) => 
-            processDetection(detection, i + batchIndex)
-          );
+        // ROLLING WINDOW WITH THROTTLED BATCH ADDING
+        // Max 100 concurrent, add 10 at a time with 2s delay
+        console.log(`\n🔄 Using rolling window concurrency: max ${CONCURRENCY_LIMIT}, adding 10 every 2s`);
+        
+        const activePromises = new Set<Promise<void>>();
+        let nextDetectionIndex = 0;
+        let addedSinceLastPause = 0;
+        const BATCH_ADD_SIZE = 10;
+        const BATCH_ADD_DELAY_MS = 2000;
 
-          // Await sequentially for progress updates
-          for (const promise of promises) {
-            const result = await promise;
-            results.push(result);
+        // Process detections with rolling window + throttled adding
+        while (nextDetectionIndex < detections.length || activePromises.size > 0) {
+          // Fill the pool up to concurrency limit OR batch size
+          let addedThisCycle = 0;
+          
+          while (nextDetectionIndex < detections.length && 
+                 activePromises.size < CONCURRENCY_LIMIT &&
+                 addedThisCycle < BATCH_ADD_SIZE) {
+            const detection = detections[nextDetectionIndex];
+            const globalIndex = nextDetectionIndex;
+            nextDetectionIndex++;
+            addedThisCycle++;
+            addedSinceLastPause++;
+            
+            // Create a promise that processes the detection
+            const promise = (async () => {
+              const result = await processDetection(detection, globalIndex);
+              results.push(result);
+            })();
+
+            activePromises.add(promise);
+            
+            // Remove promise from active set when it completes
+            promise.finally(() => {
+              activePromises.delete(promise);
+            });
+          }
+
+          // If we added a full batch and there are more to process, pause for FoodGraph
+          if (addedThisCycle === BATCH_ADD_SIZE && nextDetectionIndex < detections.length) {
+            console.log(`⏸️  Added batch of ${BATCH_ADD_SIZE}, pausing 2s for FoodGraph... [Active: ${activePromises.size}/${CONCURRENCY_LIMIT}]`);
+            await new Promise(resolve => setTimeout(resolve, BATCH_ADD_DELAY_MS));
+            addedSinceLastPause = 0;
+          }
+
+          // Wait for at least one promise to complete before continuing
+          if (activePromises.size > 0) {
+            await Promise.race(activePromises);
           }
         }
 

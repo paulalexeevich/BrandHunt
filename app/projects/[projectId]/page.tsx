@@ -1520,11 +1520,11 @@ export default function ProjectViewPage() {
                   Search → Pre-filter → <strong className="text-green-700">Visual Match</strong> → Save
                 </p>
                 <button
-                  onClick={() => handleBatchSearchVisual(20)}
+                  onClick={() => handleBatchSearchVisual(100)}
                   disabled={batchMatchingAI || batchMatchingVisual}
                   className="w-full px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
                 >
-                  ⚡⚡⚡ Start Pipeline (20 concurrent)
+                  ⚡⚡⚡ Start Pipeline (100)
                 </button>
               </div>
 
