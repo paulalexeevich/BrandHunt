@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT, DEFAULT_VISUAL_MATCH_PROMPT } from '@/lib/default-prompts';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
 
@@ -702,15 +703,24 @@ export interface VisualMatchCandidate {
   matchStatus: MatchStatus; // From AI filter: 'identical' or 'almost_same'
 }
 
+export interface CandidateScore {
+  candidateIndex: number;
+  candidateId: string;
+  candidateGtin: string;
+  visualSimilarity: number;
+  passedThreshold: boolean;
+}
+
 export interface VisualMatchSelection {
   selectedCandidateId: string | null; // null if no good match found
   selectedGtin: string | null;
   confidence: number; // 0.0-1.0
   reasoning: string; // Explanation of why this was selected
-  visualSimilarityScore: number; // 0.0-1.0
+  visualSimilarityScore: number; // 0.0-1.0 for selected candidate
   brandMatch: boolean;
   sizeMatch: boolean;
   flavorMatch: boolean;
+  candidateScores: CandidateScore[]; // Visual similarity scores for ALL candidates
 }
 
 export async function selectBestMatchFromMultiple(
@@ -742,7 +752,8 @@ export async function selectBestMatchFromMultiple(
       visualSimilarityScore: 0,
       brandMatch: false,
       sizeMatch: false,
-      flavorMatch: false
+      flavorMatch: false,
+      candidateScores: []
     };
   }
 
@@ -756,7 +767,14 @@ export async function selectBestMatchFromMultiple(
       visualSimilarityScore: 0.95,
       brandMatch: true,
       sizeMatch: true,
-      flavorMatch: true
+      flavorMatch: true,
+      candidateScores: [{
+        candidateIndex: 1,
+        candidateId: candidates[0].id,
+        candidateGtin: candidates[0].gtin,
+        visualSimilarity: 0.95,
+        passedThreshold: true
+      }]
     };
   }
 
@@ -794,7 +812,14 @@ export async function selectBestMatchFromMultiple(
       visualSimilarityScore: 0,
       brandMatch: false,
       sizeMatch: false,
-      flavorMatch: false
+      flavorMatch: false,
+      candidateScores: candidates.map((c, idx) => ({
+        candidateIndex: idx + 1,
+        candidateId: c.id,
+        candidateGtin: c.gtin,
+        visualSimilarity: 0,
+        passedThreshold: false
+      }))
     };
   }
 
@@ -865,6 +890,12 @@ ${c.ingredients ? `- Ingredients: ${c.ingredients.substring(0, 200)}...` : ''}`
       brandMatch: boolean;
       sizeMatch: boolean;
       flavorMatch: boolean;
+      candidateScores: Array<{
+        candidateIndex: number;
+        candidateId: string;
+        visualSimilarity: number;
+        passedThreshold: boolean;
+      }>;
     };
 
     // Convert candidate index to candidate ID
@@ -884,6 +915,24 @@ ${c.ingredients ? `- Ingredients: ${c.ingredients.substring(0, 200)}...` : ''}`
       console.log(`❌ No match selected - ${selection.reasoning}`);
     }
 
+    // Enrich candidate scores with GTIN (Gemini doesn't have access to it)
+    const enrichedCandidateScores: CandidateScore[] = selection.candidateScores.map(score => {
+      const candidate = candidates.find(c => c.id === score.candidateId);
+      return {
+        candidateIndex: score.candidateIndex,
+        candidateId: score.candidateId,
+        candidateGtin: candidate?.gtin || 'Unknown',
+        visualSimilarity: score.visualSimilarity,
+        passedThreshold: score.passedThreshold
+      };
+    });
+
+    console.log(`📊 Visual Similarity Scores:`);
+    enrichedCandidateScores.forEach(score => {
+      const passedIcon = score.passedThreshold ? '✅' : '❌';
+      console.log(`   ${passedIcon} Candidate ${score.candidateIndex}: ${(score.visualSimilarity * 100).toFixed(1)}% (${score.candidateGtin})`);
+    });
+
     return {
       selectedCandidateId,
       selectedGtin,
@@ -892,7 +941,8 @@ ${c.ingredients ? `- Ingredients: ${c.ingredients.substring(0, 200)}...` : ''}`
       visualSimilarityScore: selection.visualSimilarityScore,
       brandMatch: selection.brandMatch,
       sizeMatch: selection.sizeMatch,
-      flavorMatch: selection.flavorMatch
+      flavorMatch: selection.flavorMatch,
+      candidateScores: enrichedCandidateScores
     };
 
   } catch (error) {
@@ -905,7 +955,144 @@ ${c.ingredients ? `- Ingredients: ${c.ingredients.substring(0, 200)}...` : ''}`
       visualSimilarityScore: 0,
       brandMatch: false,
       sizeMatch: false,
-      flavorMatch: false
+      flavorMatch: false,
+      candidateScores: candidates.map((c, idx) => ({
+        candidateIndex: idx + 1,
+        candidateId: c.id,
+        candidateGtin: c.gtin,
+        visualSimilarity: 0,
+        passedThreshold: false
+      }))
+    };
+  }
+}
+
+/**
+ * Save visual match results to database
+ * - Saves ALL candidates that passed visual similarity threshold (≥0.7) as 'almost_same'
+ * - Saves the final selected candidate as 'identical' (if selected)
+ * - Stores visual similarity scores for each candidate
+ * 
+ * @param supabase - Authenticated Supabase client
+ * @param detectionId - Detection ID to save results for
+ * @param visualMatchResult - Result from selectBestMatchFromMultiple
+ * @param allCandidates - All candidates that were evaluated
+ * @param searchTerm - Search term used to find candidates
+ * @returns Success status and details
+ */
+export async function saveVisualMatchResults(
+  supabase: SupabaseClient,
+  detectionId: string,
+  visualMatchResult: VisualMatchSelection,
+  allCandidates: VisualMatchCandidate[],
+  searchTerm: string
+): Promise<{ success: boolean; savedCount: number; selectedGtin: string | null; error?: string }> {
+  try {
+    console.log(`💾 Saving visual match results for detection ${detectionId}`);
+    console.log(`   Total candidates: ${visualMatchResult.candidateScores.length}`);
+    console.log(`   Passed threshold: ${visualMatchResult.candidateScores.filter(s => s.passedThreshold).length}`);
+    console.log(`   Selected: ${visualMatchResult.selectedGtin || 'None'}`);
+
+    const resultsToSave: Array<{
+      detection_id: string;
+      search_term: string;
+      result_rank: number;
+      product_gtin: string;
+      product_name: string;
+      brand_name: string;
+      category: string | null;
+      front_image_url: string | null;
+      full_data: Record<string, unknown>;
+      processing_stage: 'visual_match';
+      match_status: 'identical' | 'almost_same';
+      visual_similarity: number;
+      match_reason: string;
+    }> = [];
+
+    // Process each candidate score
+    for (const score of visualMatchResult.candidateScores) {
+      // Find the full candidate info
+      const candidate = allCandidates.find(c => c.id === score.candidateId);
+      if (!candidate) {
+        console.warn(`⚠️ Candidate ${score.candidateId} not found in allCandidates`);
+        continue;
+      }
+
+      // Only save candidates that passed the threshold OR the selected one
+      const isSelected = score.candidateGtin === visualMatchResult.selectedGtin;
+      
+      if (score.passedThreshold || isSelected) {
+        const matchStatus: 'identical' | 'almost_same' = isSelected ? 'identical' : 'almost_same';
+        const reason = isSelected 
+          ? `Selected as best match. ${visualMatchResult.reasoning}`
+          : `Passed visual similarity threshold (${(score.visualSimilarity * 100).toFixed(1)}%)`;
+
+        resultsToSave.push({
+          detection_id: detectionId,
+          search_term: searchTerm,
+          result_rank: score.candidateIndex,
+          product_gtin: candidate.gtin,
+          product_name: candidate.productName,
+          brand_name: candidate.brandName,
+          category: candidate.category || null,
+          front_image_url: candidate.imageUrl,
+          full_data: {
+            size: candidate.size,
+            ingredients: candidate.ingredients,
+            matchStatusFromAI: candidate.matchStatus
+          },
+          processing_stage: 'visual_match',
+          match_status: matchStatus,
+          visual_similarity: score.visualSimilarity,
+          match_reason: reason
+        });
+
+        console.log(`   ${isSelected ? '✅' : '➕'} ${matchStatus.toUpperCase()}: ${candidate.productName} - ${(score.visualSimilarity * 100).toFixed(1)}%`);
+      }
+    }
+
+    if (resultsToSave.length === 0) {
+      console.log(`   ⚠️ No candidates passed threshold - nothing to save`);
+      return {
+        success: true,
+        savedCount: 0,
+        selectedGtin: null
+      };
+    }
+
+    // Use UPSERT to handle duplicates (detection_id, product_gtin)
+    const { error: insertError } = await supabase
+      .from('branghunt_foodgraph_results')
+      .upsert(resultsToSave, {
+        onConflict: 'detection_id,product_gtin',
+        ignoreDuplicates: false
+      });
+
+    if (insertError) {
+      console.error(`❌ Failed to save visual match results:`, insertError);
+      return {
+        success: false,
+        savedCount: 0,
+        selectedGtin: null,
+        error: insertError.message
+      };
+    }
+
+    console.log(`✅ Saved ${resultsToSave.length} visual match results`);
+    
+    return {
+      success: true,
+      savedCount: resultsToSave.length,
+      selectedGtin: visualMatchResult.selectedGtin
+    };
+
+  } catch (error) {
+    console.error(`❌ Error saving visual match results:`, error);
+    return {
+      success: false,
+      savedCount: 0,
+      selectedGtin: null,
+      error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 }

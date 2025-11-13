@@ -624,8 +624,8 @@ export async function POST(request: NextRequest) {
               });
               
               try {
-                // Import visual matching function
-                const { selectBestMatchFromMultiple } = await import('@/lib/gemini');
+                // Import visual matching functions
+                const { selectBestMatchFromMultiple, saveVisualMatchResults } = await import('@/lib/gemini');
                 
                 // Prepare candidates for visual matching
                 const candidates = [...identicalMatches, ...almostSameMatches].map(m => ({
@@ -659,6 +659,25 @@ export async function POST(request: NextRequest) {
                 
                 console.log(`    🎯 Visual matching result: confidence=${Math.round(visualSelection.confidence * 100)}%`);
                 console.log(`    🎯 Reasoning: ${visualSelection.reasoning}`);
+
+                // Save visual match results to database (all candidates with scores)
+                const searchTerm = detection.brand_name && detection.product_name 
+                  ? `${detection.brand_name} ${detection.product_name}`.trim()
+                  : detection.brand_name || detection.product_name || 'Unknown';
+                
+                const saveResult = await saveVisualMatchResults(
+                  supabase,
+                  detection.id,
+                  visualSelection,
+                  candidates,
+                  searchTerm
+                );
+
+                if (saveResult.success) {
+                  console.log(`    ✅ Saved ${saveResult.savedCount} visual match results (${visualSelection.candidateScores.filter(s => s.passedThreshold).length} passed threshold)`);
+                } else {
+                  console.error(`    ⚠️ Failed to save visual match results: ${saveResult.error}`);
+                }
                 
                 // If visual matching selected a match with good confidence
                 if (visualSelection.selectedGtin && visualSelection.confidence >= 0.6) {

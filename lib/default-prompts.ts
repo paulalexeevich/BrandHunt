@@ -168,6 +168,7 @@ Compare Image 1 with each candidate image:
 - Packaging design, colors, layout
 - Logo placement and style
 - Overall visual appearance
+- Calculate visualSimilarity score (0.0-1.0) for EACH candidate
 - Identify candidates with visualSimilarity ≥ 0.7
 
 STEP 2: METADATA VERIFICATION (Secondary - Use for Tie-Breaking)
@@ -195,11 +196,20 @@ Return JSON with this EXACT structure:
 {
   "selectedCandidateIndex": 1-{{candidateCount}} or null,
   "confidence": 0.0 to 1.0,
-  "reasoning": "Explain: (1) visual similarity scores, (2) which passed Step 1, (3) how metadata was used to select final match",
-  "visualSimilarityScore": 0.0 to 1.0,
+  "reasoning": "Explain: (1) visual similarity scores for each candidate, (2) which passed Step 1, (3) how metadata was used to select final match",
+  "visualSimilarityScore": 0.0 to 1.0 (score for the selected candidate),
   "brandMatch": true or false,
   "sizeMatch": true or false,
-  "flavorMatch": true or false
+  "flavorMatch": true or false,
+  "candidateScores": [
+    {
+      "candidateIndex": 1,
+      "candidateId": "{{candidateId}}",
+      "visualSimilarity": 0.0 to 1.0,
+      "passedThreshold": true or false (≥ 0.7)
+    }
+    // ... one entry for each candidate
+  ]
 }
 
 Only return the JSON object, nothing else.`;

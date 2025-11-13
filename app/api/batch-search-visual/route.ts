@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { searchProducts, getFrontImageUrl, preFilterFoodGraphResults } from '@/lib/foodgraph';
-import { cropImageToBoundingBox, selectBestMatchFromMultiple } from '@/lib/gemini';
+import { cropImageToBoundingBox, selectBestMatchFromMultiple, saveVisualMatchResults, type VisualMatchCandidate } from '@/lib/gemini';
 
 interface SearchAndSaveResult {
   detectionId: string;
@@ -428,37 +428,22 @@ export async function POST(request: NextRequest) {
             console.log(`    🎯 Selected: ${visualSelection.selectedGtin || 'none'}`);
             console.log(`    🎯 Reasoning: ${visualSelection.reasoning}`);
 
-            // SAVE STAGE 3: Visual matching results
-            const visualMatchInserts = candidates.map((candidate, index) => ({
-              detection_id: detection.id,
-              search_term: searchTerm || `${detection.brand_name} ${detection.product_name || ''}`.trim(),
-              result_rank: index + 1,
-              product_gtin: candidate.gtin,
-              product_name: candidate.productName,
-              brand_name: candidate.brandName,
-              category: candidate.category,
-              measures: candidate.size,
-              front_image_url: candidate.imageUrl,
-              full_data: preFilteredResults.find(p => (p.product_gtin || p.key) === candidate.gtin),
-              processing_stage: 'visual_match',
-              match_status: candidate.gtin === visualSelection.selectedGtin ? 'identical' : 'not_match',
-              match_confidence: candidate.gtin === visualSelection.selectedGtin ? visualSelection.confidence : 0,
-              visual_similarity: candidate.gtin === visualSelection.selectedGtin ? visualSelection.confidence : 0,
-              match_reason: candidate.gtin === visualSelection.selectedGtin ? visualSelection.reasoning : null,
-            }));
+            // SAVE STAGE 3: Visual matching results with per-candidate scores
+            // Saves all candidates that passed threshold (≥0.7) as 'almost_same'
+            // Saves selected candidate as 'identical'
+            const saveResult = await saveVisualMatchResults(
+              supabase,
+              detection.id,
+              visualSelection,
+              candidates,
+              searchTerm || `${detection.brand_name} ${detection.product_name || ''}`.trim()
+            );
 
-            const { error: visualMatchInsertError } = await supabase
-              .from('branghunt_foodgraph_results')
-              .upsert(visualMatchInserts, {
-                onConflict: 'detection_id,product_gtin',
-                ignoreDuplicates: false
-              });
-
-            if (visualMatchInsertError) {
-              throw new Error(`Failed to save visual match results: ${visualMatchInsertError.message}`);
+            if (!saveResult.success) {
+              throw new Error(`Failed to save visual match results: ${saveResult.error}`);
             }
 
-            console.log(`    ✅ Saved ${visualMatchInserts.length} visual match results`);
+            console.log(`    ✅ Saved ${saveResult.savedCount} visual match results (${visualSelection.candidateScores.filter(s => s.passedThreshold).length} passed threshold)`);
 
             // Check if we got a good match
             let bestMatch = null;
