@@ -8,11 +8,7 @@ import {
   Plus, 
   Loader2, 
   Image as ImageIcon, 
-  CheckCircle,
   AlertCircle,
-  Search,
-  Filter,
-  DollarSign,
   Target,
   Trash2,
   Edit
@@ -302,55 +298,6 @@ export default function ProjectsPage() {
                         <div className="text-xs text-purple-600">
                           {project.detections_fully_analyzed} completed
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Processing Status */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-semibold text-gray-700 mb-2">Processing Status</div>
-                      
-                      {/* Brand Extraction */}
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="w-3 h-3 text-yellow-500" />
-                          <span className="text-gray-600">Brand Extracted</span>
-                        </div>
-                        <span className="font-semibold text-gray-900">
-                          {project.detections_brand_extracted} / {project.total_detections}
-                        </span>
-                      </div>
-
-                      {/* Price Extraction */}
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="w-3 h-3 text-green-500" />
-                          <span className="text-gray-600">Price Extracted</span>
-                        </div>
-                        <span className="font-semibold text-gray-900">
-                          {project.detections_price_extracted} / {project.total_detections}
-                        </span>
-                      </div>
-
-                      {/* FoodGraph Search */}
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <Search className="w-3 h-3 text-blue-500" />
-                          <span className="text-gray-600">FoodGraph Search</span>
-                        </div>
-                        <span className="font-semibold text-gray-900">
-                          {project.detections_foodgraph_searched} / {project.total_detections}
-                        </span>
-                      </div>
-
-                      {/* AI Filtering */}
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <Filter className="w-3 h-3 text-purple-500" />
-                          <span className="text-gray-600">AI Filtered</span>
-                        </div>
-                        <span className="font-semibold text-gray-900">
-                          {project.detections_ai_filtered} / {project.total_detections}
-                        </span>
                       </div>
                     </div>
 
