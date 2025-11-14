@@ -264,19 +264,38 @@ export default function ProjectsPage() {
                 key={project.project_id}
                 className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow"
               >
-                <Link href={`/projects/${project.project_id}`}>
-                  <div className="p-4 cursor-pointer">
-                    {/* Project Header */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold text-gray-900 mb-1">
-                          {project.project_name}
-                        </h3>
+                <div className="relative">
+                  {/* Delete Button - Top Right */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDeleteProject(project.project_id, project.project_name);
+                    }}
+                    className="absolute top-4 right-4 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors z-10"
+                    title="Delete Project"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+
+                  <Link href={`/projects/${project.project_id}`}>
+                    <div className="p-4 cursor-pointer">
+                      {/* Project Header */}
+                      <div className="mb-3">
+                        {/* Project Name with Folder Icon */}
+                        <div className="flex items-center gap-2 mb-1 pr-10">
+                          <FolderOpen className="w-6 h-6 text-indigo-600 flex-shrink-0" />
+                          <h3 className="text-xl font-bold text-gray-900">
+                            {project.project_name}
+                          </h3>
+                        </div>
+                        
                         {project.description && (
                           <p className="text-sm text-gray-600 line-clamp-2 mb-1">
                             {project.description}
                           </p>
                         )}
+                        
                         {/* Owner and Date Combined */}
                         <div className="flex items-center gap-2 text-xs text-gray-500">
                           {project.owner_email && (
@@ -288,8 +307,6 @@ export default function ProjectsPage() {
                           <span>Created {new Date(project.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
-                      <FolderOpen className="w-8 h-8 text-indigo-600 flex-shrink-0" />
-                    </div>
 
                     {/* Stats Grid */}
                     <div className="grid grid-cols-2 gap-2 mb-3">
@@ -373,21 +390,8 @@ export default function ProjectsPage() {
                         </div>
                       </div>
                     )}
-                  </div>
-                </Link>
-
-                {/* Actions */}
-                <div className="px-4 py-2.5 bg-gray-50 rounded-b-xl flex gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleDeleteProject(project.project_id, project.project_name);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
-                  </button>
+                    </div>
+                  </Link>
                 </div>
               </div>
             ))}
