@@ -62,7 +62,7 @@ Open `/Users/pavelp/Desktop/BrangHunt/.env.local` and add:
 GOOGLE_GEMINI_API_KEY=your_existing_key
 
 # NEW: Test API key for token tracking
-GOOGLE_GEMINI_API_KEY_TEST=AIzaSyAg7rb-uADHyoTCYPILQPwlu49xr-FyXuA
+GOOGLE_GEMINI_API_KEY_TEST=AIzaSyBmskmNxJywENV9E1U6Te13Q9DmoNPGQCY
 ```
 
 ### Step 2: Restart Dev Server

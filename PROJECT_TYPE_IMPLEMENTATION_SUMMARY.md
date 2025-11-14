@@ -237,7 +237,7 @@ When regular project is processed:
 
 The user provided this test API key:
 ```
-AIzaSyAg7rb-uADHyoTCYPILQPwlu49xr-FyXuA
+AIzaSyBmskmNxJywENV9E1U6Te13Q9DmoNPGQCY
 ```
 
 This should be added as `GOOGLE_GEMINI_API_KEY_TEST` in `.env.local`.

@@ -14,7 +14,7 @@ Open your `.env.local` file and add the new test API key:
 GOOGLE_GEMINI_API_KEY=your_existing_key_here
 
 # New test API key for token tracking
-GOOGLE_GEMINI_API_KEY_TEST=AIzaSyAg7rb-uADHyoTCYPILQPwlu49xr-FyXuA
+GOOGLE_GEMINI_API_KEY_TEST=AIzaSyBmskmNxJywENV9E1U6Te13Q9DmoNPGQCY
 ```
 
 ### 2. Restart the Development Server
