@@ -145,91 +145,60 @@ Examples:
 - Different size: {matchStatus: "not_match", confidence: 0.95, visualSimilarity: 0.75, reason: "Same orange Tide bottle design and HE Turbo Clean variant, but significantly different sizes: 50oz vs 100oz"}
 `;
 
-export const DEFAULT_VISUAL_MATCH_PROMPT = `You are a visual product matching expert. Select the BEST MATCH from multiple candidates using a two-step approach.
+export const DEFAULT_VISUAL_MATCH_PROMPT = `You are a visual product matching expert. Select the BEST MATCH from candidates.
 
-SHELF PRODUCT (extracted from image):
-- Brand: {{brand}}
-- Product Name: {{productName}}
-- Size: {{size}}
-- Flavor: {{flavor}}
-- Category: {{category}}
+SHELF PRODUCT: Brand={{brand}}, Name={{productName}}, Size={{size}}, Flavor={{flavor}}, Category={{category}}
 
-CANDIDATES ({{candidateCount}} options):
+CANDIDATES: {{candidateCount}} options
 {{candidateDescriptions}}
 
-IMAGES:
-- Image 1: Shelf product (REFERENCE)
-- Images 2-{{candidateImageCount}}: Candidate products
+IMAGES: Image 1=Shelf product (REFERENCE), Images 2-{{candidateImageCount}}=Candidates
 
-TWO-STEP MATCHING PROCESS:
+---
 
-STEP 1: VISUAL SIMILARITY (Primary Filter)
-Compare Image 1 with each candidate image, focusing on these elements:
+STEP 1: MATCH BY UNIQUE VISUAL ELEMENTS (CRITICAL)
 
-1. **UNIQUE VISUAL ELEMENTS** (MOST IMPORTANT - These uniquely identify the product)
-   - Brand logo: exact design, placement, colors, style
-   - Graphics/illustrations: characters, product images, decorative patterns
-   - Visual motifs: stripes, waves, dots, geometric patterns, textures
-   - Icon sets: certification badges, claim symbols, special marks
-   - Distinctive design elements: windows, cutouts, special effects, borders
-   - Look for elements that appear ONLY on this specific product
+Compare Image 1 with each candidate focusing on UNIQUE VISUAL ELEMENTS that identify the product:
+- Brand logo (exact design, placement, colors, style)
+- Graphics/illustrations (characters, product images, patterns)
+- Visual motifs (stripes, waves, dots, geometric patterns)
+- Icon sets (certification badges, claim symbols)
+- Distinctive design elements (windows, cutouts, special effects)
+- Package form, colors, and layout
 
-2. **Package Form & Colors**
-   - Container shape, size, and material (bottle, can, box, pouch)
-   - Primary and secondary color scheme
-   - Color blocking patterns and placement
+Calculate visualSimilarity (0.0-1.0) for EACH candidate based on how well unique visual elements match.
+Threshold: visualSimilarity ≥ 0.7 = strong match
 
-3. **Layout & Typography**
-   - Text positioning and hierarchy
-   - Logo placement
-   - Overall design composition
+DECISION:
+- 0 candidates pass → Return null (no match)
+- 1 candidate passes → Select it immediately
+- 2+ candidates pass → Go to STEP 2
 
-**CRITICAL**: The unique visual elements (logos, graphics, patterns) are the STRONGEST indicators of a match. 
-If Image 1 has distinctive visual elements that EXACTLY match a candidate, that's a strong signal even if colors or text are slightly different due to lighting or angle.
+---
 
-- Calculate visualSimilarity score (0.0-1.0) for EACH candidate
-- Identify candidates with visualSimilarity ≥ 0.7
+STEP 2: TIE-BREAKING (Only if 2+ candidates are visually identical)
 
-STEP 2: METADATA VERIFICATION (Secondary - Use for Tie-Breaking)
-If 2+ candidates pass Step 1, use metadata with FUZZY MATCHING:
+Use metadata to select between visually similar candidates (fuzzy matching):
+- Size: Accept ±20% variation (e.g., "14 oz" vs "18 oz" acceptable)
+- Flavor: Match MEANING not exact text (e.g., "Strawberry"="Straw"="Strawberry Flavor")
 
-- Brand: Should match (allow minor spelling variations)
-- Size: Should be SIMILAR (extracted sizes often inaccurate due to small text)
-  * Example: "14 oz" extracted might actually be "18 oz" - both acceptable if visual match is strong
-  * Accept ±20% variation or different units for same volume
-- Flavor: Should match MEANING, not exact wording
-  * Example: "Strawberry" = "Straw" = "Strawberry Flavor"
-  * Focus on core flavor concept, not exact text
+Select candidate with BEST metadata match.
 
-DECISION LOGIC:
-- If ONLY ONE candidate has visualSimilarity ≥ 0.7 → Select it (metadata is supporting evidence)
-- If 2+ candidates have visualSimilarity ≥ 0.7 → Use brand/size/flavor to pick best match
-- If NO candidates have visualSimilarity ≥ 0.7 → Return null (no good match)
+---
 
-IMPORTANT NOTES:
-- Visual similarity is PRIMARY indicator - don't reject visual matches due to minor size/flavor text differences
-- Extracted metadata may have errors - trust visual appearance more
-- Only select a match if confident it's the SAME product
-
-Return JSON with this EXACT structure:
+Return JSON:
 {
   "selectedCandidateIndex": 1-{{candidateCount}} or null,
   "confidence": 0.0 to 1.0,
-  "reasoning": "Explain: (1) unique visual elements in Image 1 (reference), (2) visual similarity scores for each candidate with focus on unique visual elements match, (3) which candidates passed Step 1, (4) how metadata was used to select final match",
-  "visualSimilarityScore": 0.0 to 1.0 (score for the selected candidate),
-  "brandMatch": true or false,
-  "sizeMatch": true or false,
-  "flavorMatch": true or false,
+  "reasoning": "Brief: (1) key visual elements in Image 1, (2) which candidates matched visually, (3) if tie-breaking used, explain choice",
+  "visualSimilarityScore": 0.0 to 1.0,
+  "brandMatch": true/false,
+  "sizeMatch": true/false,
+  "flavorMatch": true/false,
   "candidateScores": [
-    {
-      "candidateIndex": 1,
-      "candidateId": "candidate-1",
-      "visualSimilarity": 0.0 to 1.0,
-      "passedThreshold": true or false (≥ 0.7)
-    }
-    // ... one entry for each candidate (use candidateIndex for matching)
+    {"candidateIndex": 1, "candidateId": "candidate-1", "visualSimilarity": 0.0-1.0, "passedThreshold": true/false}
   ]
 }
 
-Only return the JSON object, nothing else.`;
+Only return JSON, nothing else.`;
 
