@@ -32,6 +32,7 @@ interface ProjectStats {
   detections_foodgraph_searched: number;
   detections_ai_filtered: number;
   detections_fully_analyzed: number;
+  owner_email?: string;
   stats?: {
     totalProducts: number;
     processed: number;
@@ -271,6 +272,11 @@ export default function ProjectsPage() {
                         <h3 className="text-xl font-bold text-gray-900 mb-1">
                           {project.project_name}
                         </h3>
+                        {project.owner_email && (
+                          <p className="text-xs text-indigo-600 mb-1 flex items-center gap-1">
+                            <span className="font-medium">Owner:</span> {project.owner_email}
+                          </p>
+                        )}
                         {project.description && (
                           <p className="text-sm text-gray-600 line-clamp-2">
                             {project.description}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAuthenticatedSupabaseClient } from '@/lib/auth';
+import { createAuthenticatedSupabaseClient, createServiceRoleClient } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 10;
@@ -22,6 +22,16 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Fetch user emails using service role client
+    const serviceSupabase = createServiceRoleClient();
+    const uniqueUserIds = [...new Set(projects?.map((p) => p.user_id) || [])];
+    const { data: usersData } = await serviceSupabase.auth.admin.listUsers();
+    const userEmailMap = new Map(
+      usersData?.users
+        .filter((u) => uniqueUserIds.includes(u.id))
+        .map((u) => [u.id, u.email || 'Unknown']) || []
+    );
 
     // Fetch product statistics for each project
     const projectsWithStats = await Promise.all(
@@ -69,7 +79,11 @@ export async function GET(request: NextRequest) {
           incorrect: allDetections.filter((d: any) => d.human_validation === false).length
         };
 
-        return { ...project, stats };
+        return { 
+          ...project, 
+          stats,
+          owner_email: userEmailMap.get(project.user_id) || 'Unknown'
+        };
       })
     );
 
