@@ -55,6 +55,7 @@ export default function ProjectsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [newProjectType, setNewProjectType] = useState<'regular' | 'test'>('regular');
   const [creating, setCreating] = useState(false);
   const supabase = createClient();
 
@@ -116,6 +117,7 @@ export default function ProjectsPage() {
         body: JSON.stringify({
           name: newProjectName,
           description: newProjectDescription || null,
+          project_type: newProjectType,
         }),
       });
 
@@ -126,6 +128,7 @@ export default function ProjectsPage() {
       // Reset form and close modal
       setNewProjectName('');
       setNewProjectDescription('');
+      setNewProjectType('regular');
       setShowCreateModal(false);
 
       // Refresh projects list
@@ -288,6 +291,11 @@ export default function ProjectsPage() {
                           <h3 className="text-xl font-bold text-gray-900">
                             {project.project_name}
                           </h3>
+                          {(project as any).project_type === 'test' && (
+                            <span className="px-2 py-0.5 text-xs font-semibold bg-purple-100 text-purple-700 rounded-full border border-purple-300">
+                              🧪 TEST
+                            </span>
+                          )}
                         </div>
                         
                         {project.description && (
@@ -419,6 +427,23 @@ export default function ProjectsPage() {
                   />
                 </div>
 
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Project Type *
+                  </label>
+                  <select
+                    value={newProjectType}
+                    onChange={(e) => setNewProjectType(e.target.value as 'regular' | 'test')}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                  >
+                    <option value="regular">🏢 Regular (Production)</option>
+                    <option value="test">🧪 Test (Token Tracking)</option>
+                  </select>
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    Test projects use a separate API key for token usage tracking and cost analysis
+                  </p>
+                </div>
+
                 <div className="mb-6">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Description (optional)
@@ -439,6 +464,7 @@ export default function ProjectsPage() {
                       setShowCreateModal(false);
                       setNewProjectName('');
                       setNewProjectDescription('');
+                      setNewProjectType('regular');
                     }}
                     className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
                     disabled={creating}

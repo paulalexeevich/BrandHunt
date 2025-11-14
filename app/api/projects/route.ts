@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { name, description } = body;
+    const { name, description, project_type } = body;
 
     // Validate required fields
     if (!name || name.trim().length === 0) {
@@ -123,6 +123,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate project_type if provided
+    const validProjectType = project_type === 'test' ? 'test' : 'regular';
+
     // Insert project
     const { data: project, error } = await supabase
       .from('branghunt_projects')
@@ -130,6 +133,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         name: name.trim(),
         description: description?.trim() || null,
+        project_type: validProjectType,
       })
       .select()
       .single();
