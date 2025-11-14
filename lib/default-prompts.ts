@@ -164,10 +164,29 @@ IMAGES:
 TWO-STEP MATCHING PROCESS:
 
 STEP 1: VISUAL SIMILARITY (Primary Filter)
-Compare Image 1 with each candidate image:
-- Packaging design, colors, layout
-- Logo placement and style
-- Overall visual appearance
+Compare Image 1 with each candidate image, focusing on these elements:
+
+1. **UNIQUE VISUAL ELEMENTS** (MOST IMPORTANT - These uniquely identify the product)
+   - Brand logo: exact design, placement, colors, style
+   - Graphics/illustrations: characters, product images, decorative patterns
+   - Visual motifs: stripes, waves, dots, geometric patterns, textures
+   - Icon sets: certification badges, claim symbols, special marks
+   - Distinctive design elements: windows, cutouts, special effects, borders
+   - Look for elements that appear ONLY on this specific product
+
+2. **Package Form & Colors**
+   - Container shape, size, and material (bottle, can, box, pouch)
+   - Primary and secondary color scheme
+   - Color blocking patterns and placement
+
+3. **Layout & Typography**
+   - Text positioning and hierarchy
+   - Logo placement
+   - Overall design composition
+
+**CRITICAL**: The unique visual elements (logos, graphics, patterns) are the STRONGEST indicators of a match. 
+If Image 1 has distinctive visual elements that EXACTLY match a candidate, that's a strong signal even if colors or text are slightly different due to lighting or angle.
+
 - Calculate visualSimilarity score (0.0-1.0) for EACH candidate
 - Identify candidates with visualSimilarity ≥ 0.7
 
@@ -196,7 +215,7 @@ Return JSON with this EXACT structure:
 {
   "selectedCandidateIndex": 1-{{candidateCount}} or null,
   "confidence": 0.0 to 1.0,
-  "reasoning": "Explain: (1) visual similarity scores for each candidate, (2) which passed Step 1, (3) how metadata was used to select final match",
+  "reasoning": "Explain: (1) unique visual elements in Image 1 (reference), (2) visual similarity scores for each candidate with focus on unique visual elements match, (3) which candidates passed Step 1, (4) how metadata was used to select final match",
   "visualSimilarityScore": 0.0 to 1.0 (score for the selected candidate),
   "brandMatch": true or false,
   "sizeMatch": true or false,
