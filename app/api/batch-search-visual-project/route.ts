@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     // Create a map of imageId -> image data for O(1) lookup
     const imageMap = new Map(images.map(img => [img.id, img]));
     
-    const CONCURRENCY_LIMIT = concurrency || 100;
+    const CONCURRENCY_LIMIT = concurrency || 20; // Reduced from 100 to prevent Supabase 500 errors
     
     // Preload all image base64 data
     const { getImageBase64ForProcessing } = await import('@/lib/image-processor');
