@@ -1,14 +1,15 @@
 # Gemini Model Selection Feature - Implementation Status
 
-## ✅ Completed (60% Done)
+## ✅ Completed (80% Done)
 
 ### 1. Database Schema ✅
 - Created migration `add_gemini_model_selection.sql`
 - Added `extraction_model` column (for info extraction operations)
 - Added `visual_match_model` column (for visual matching/AI filtering)
 - Default: `gemini-2.5-flash` for both
-- Supported models: gemini-2.5-flash, gemini-2.0-flash-exp, gemini-1.5-flash, gemini-1.5-pro
+- **Supported models (simplified):** gemini-2.5-flash, gemini-2.5-flash-lite-preview
 - Applied migration to production database
+- Created second migration `update_gemini_model_constraints.sql` to simplify model options
 
 ### 2. Gemini Library Updates ✅
 - Updated `extractProductInfo()` - accepts `modelName` parameter
@@ -17,104 +18,31 @@
 - Added `getProjectModels()` helper function to fetch model selections from database
 - All functions log which model is being used
 
-### 3. Git Commit ✅
-- Committed changes: `c65946e`
-
-## ⏳ Remaining Tasks (40% Left)
-
-### 1. Update Project Settings UI (PromptSettingsModal)
+### 3. Project Settings UI ✅ **NEW**
 **File:** `components/PromptSettingsModal.tsx`
+- Added "Gemini Model Selection" section at top of modal
+- Two dropdown selectors: Info Extraction Model & Visual Matching Model
+- Each dropdown shows: model name + description (Standard vs Cheaper/Faster)
+- Save Models button with loading state
+- Cost savings information displayed (75% cheaper info)
+- Auto-fetches current models when modal opens
+- Success/error message handling
 
-Add two new dropdown fields:
-
-```typescript
-// Add to state
-const [extractionModel, setExtractionModel] = useState('gemini-2.5-flash');
-const [visualMatchModel, setVisualMatchModel] = useState('gemini-2.5-flash');
-
-// Add to UI (after prompt templates section)
-<div className="mb-6">
-  <h3 className="text-lg font-semibold mb-4">Model Selection</h3>
-  
-  <div className="mb-4">
-    <label className="block text-sm font-medium mb-2">
-      Extraction Model
-      <span className="text-gray-500 text-xs ml-2">
-        (for extractProductInfo, extractPrice, detectProducts)
-      </span>
-    </label>
-    <select
-      value={extractionModel}
-      onChange={(e) => setExtractionModel(e.target.value)}
-      className="w-full px-4 py-2 border rounded-lg"
-    >
-      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Standard)</option>
-      <option value="gemini-2.5-flash-lite-preview">Gemini 2.5 Flash-Lite (75% cheaper, faster)</option>
-    </select>
-    <p className="mt-1 text-xs text-gray-500">
-      Flash-Lite: $0.075 vs Flash: $0.30 per 1M input tokens
-    </p>
-  </div>
-
-  <div className="mb-4">
-    <label className="block text-sm font-medium mb-2">
-      Visual Match Model
-      <span className="text-gray-500 text-xs ml-2">
-        (for compareProductImages, selectBestMatchFromMultiple)
-      </span>
-    </label>
-    <select
-      value={visualMatchModel}
-      onChange={(e) => setVisualMatchModel(e.target.value)}
-      className="w-full px-4 py-2 border rounded-lg"
-    >
-      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Standard)</option>
-      <option value="gemini-2.5-flash-lite-preview">Gemini 2.5 Flash-Lite (75% cheaper, faster)</option>
-    </select>
-    <p className="mt-1 text-xs text-gray-500">
-      Flash-Lite: $0.30 vs Flash: $2.50 per 1M output tokens
-    </p>
-  </div>
-</div>
-
-// Update save function to include models
-const handleSave = async () => {
-  await fetch(`/api/projects/${projectId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      extraction_model: extractionModel,
-      visual_match_model: visualMatchModel,
-      // ... other fields
-    })
-  });
-};
-```
-
-### 2. Update API Route to Save Models
+### 4. API Routes ✅ **NEW**
 **File:** `app/api/projects/[projectId]/route.ts`
+- **GET** endpoint updated to fetch and return `extraction_model` and `visual_match_model`
+- **PATCH** endpoint added for updating model selections
+- Server-side validation of model values (only allows two valid models)
+- Graceful fallback to 'gemini-2.5-flash' defaults
 
-Update PATCH handler to accept and save model selections:
+### 5. Git Commits ✅
+- Initial: `c65946e` (database + lib updates)
+- Constraint update: `3a3b4ed` (simplified to 2 models)
+- UI + API: `fe82afc` (model selection UI and API endpoints)
 
-```typescript
-export async function PATCH(request: NextRequest, { params }: { params: { projectId: string } }) {
-  const { extraction_model, visual_match_model, ...otherFields } = await request.json();
-  
-  const updateData: any = { ...otherFields };
-  if (extraction_model) updateData.extraction_model = extraction_model;
-  if (visual_match_model) updateData.visual_match_model = visual_match_model;
-  
-  const { data, error } = await supabase
-    .from('branghunt_projects')
-    .update(updateData)
-    .eq('id', params.projectId)
-    .select()
-    .single();
-  
-  // ... rest of handler
-}
-```
+## ⏳ Remaining Tasks (20% Left)
 
-### 3. Update API Routes to Use Selected Models
+### 1. Update Processing API Routes to Use Selected Models
 Update these routes to fetch and use project-specific models:
 
 **Key Routes:**
@@ -157,15 +85,18 @@ const comparison = await compareProductImages(
 );
 ```
 
-### 4. Testing Checklist
-- [ ] Open project settings
-- [ ] Verify model dropdowns appear with current values
+### 2. Testing Checklist
+- [ ] Open project settings modal (Settings button on project page)
+- [ ] Verify model dropdowns appear at top with current values
 - [ ] Change extraction model to gemini-2.5-flash-lite-preview
 - [ ] Change visual match model to gemini-2.5-flash-lite-preview
-- [ ] Save settings
+- [ ] Click "Save Models" button
+- [ ] Verify success message appears
+- [ ] Close and reopen modal - verify selections were saved
 - [ ] Run batch extraction - verify console shows selected model
 - [ ] Run visual matching - verify console shows selected model
 - [ ] Check that different projects can have different models
+- [ ] Measure actual cost savings with Flash-Lite
 
 ## Model Descriptions
 
@@ -201,15 +132,28 @@ When operations run, you'll see:
 
 ## Next Steps
 
-1. Update `PromptSettingsModal.tsx` to add model selection dropdowns
-2. Update API route to save model selections
-3. Update 5-6 key API routes to fetch and use selected models
-4. Test with different model combinations
-5. Document performance differences
+1. ✅ ~~Update `PromptSettingsModal.tsx` to add model selection dropdowns~~ **DONE**
+2. ✅ ~~Update API route to save model selections~~ **DONE**
+3. ⏳ Update 5-6 key API routes to fetch and use selected models (IN PROGRESS)
+4. ⏳ Test with different model combinations
+5. ⏳ Document performance differences and actual cost savings
 
 ---
 
-**Status:** 60% Complete  
-**Time Estimate:** 1-2 hours to complete remaining tasks  
-**Complexity:** Low-Medium (following established patterns)
+**Status:** 80% Complete  
+**Time Estimate:** 30-60 minutes to complete remaining tasks  
+**Complexity:** Low (following established patterns)
+
+## How to Test Now
+
+1. Open your project in the UI
+2. Click the **Settings** button (gear icon)
+3. Scroll to the top of the modal
+4. You'll see **"Gemini Model Selection"** section with:
+   - 🔍 Info Extraction Model dropdown
+   - 🎯 Visual Matching Model dropdown
+   - Cost savings information
+5. Select models and click **"Save Models"** button
+6. Success message will appear when saved
+7. Models are now saved to database for that project
 
