@@ -7,9 +7,7 @@ ALTER TABLE branghunt_projects
 ADD COLUMN extraction_model TEXT NOT NULL DEFAULT 'gemini-2.5-flash'
 CHECK (extraction_model IN (
   'gemini-2.5-flash',
-  'gemini-2.0-flash-exp',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro'
+  'gemini-2.5-flash-lite-preview'
 ));
 
 -- Add visual_match_model column for visual matching operations
@@ -17,9 +15,7 @@ ALTER TABLE branghunt_projects
 ADD COLUMN visual_match_model TEXT NOT NULL DEFAULT 'gemini-2.5-flash'
 CHECK (visual_match_model IN (
   'gemini-2.5-flash',
-  'gemini-2.0-flash-exp',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro'
+  'gemini-2.5-flash-lite-preview'
 ));
 
 -- Add indexes for faster filtering

@@ -48,11 +48,12 @@ const [visualMatchModel, setVisualMatchModel] = useState('gemini-2.5-flash');
       onChange={(e) => setExtractionModel(e.target.value)}
       className="w-full px-4 py-2 border rounded-lg"
     >
-      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
-      <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
-      <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-      <option value="gemini-1.5-pro">Gemini 1.5 Pro (Slower, more accurate)</option>
+      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Standard)</option>
+      <option value="gemini-2.5-flash-lite-preview">Gemini 2.5 Flash-Lite (75% cheaper, faster)</option>
     </select>
+    <p className="mt-1 text-xs text-gray-500">
+      Flash-Lite: $0.075 vs Flash: $0.30 per 1M input tokens
+    </p>
   </div>
 
   <div className="mb-4">
@@ -67,11 +68,12 @@ const [visualMatchModel, setVisualMatchModel] = useState('gemini-2.5-flash');
       onChange={(e) => setVisualMatchModel(e.target.value)}
       className="w-full px-4 py-2 border rounded-lg"
     >
-      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
-      <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
-      <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-      <option value="gemini-1.5-pro">Gemini 1.5 Pro (Slower, more accurate)</option>
+      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Standard)</option>
+      <option value="gemini-2.5-flash-lite-preview">Gemini 2.5 Flash-Lite (75% cheaper, faster)</option>
     </select>
+    <p className="mt-1 text-xs text-gray-500">
+      Flash-Lite: $0.30 vs Flash: $2.50 per 1M output tokens
+    </p>
   </div>
 </div>
 
@@ -158,8 +160,8 @@ const comparison = await compareProductImages(
 ### 4. Testing Checklist
 - [ ] Open project settings
 - [ ] Verify model dropdowns appear with current values
-- [ ] Change extraction model to gemini-1.5-pro
-- [ ] Change visual match model to gemini-2.0-flash-exp
+- [ ] Change extraction model to gemini-2.5-flash-lite-preview
+- [ ] Change visual match model to gemini-2.5-flash-lite-preview
 - [ ] Save settings
 - [ ] Run batch extraction - verify console shows selected model
 - [ ] Run visual matching - verify console shows selected model
@@ -167,20 +169,20 @@ const comparison = await compareProductImages(
 
 ## Model Descriptions
 
-| Model | Speed | Quality | Use Case |
-|-------|-------|---------|----------|
-| **gemini-2.5-flash** | ⚡⚡⚡ Fast | ⭐⭐⭐ Good | Recommended default |
-| **gemini-2.0-flash-exp** | ⚡⚡⚡ Fast | ⭐⭐⭐ Good | Experimental features |
-| **gemini-1.5-flash** | ⚡⚡ Moderate | ⭐⭐ OK | Budget option |
-| **gemini-1.5-pro** | ⚡ Slow | ⭐⭐⭐⭐ Excellent | High accuracy needed |
+According to the [official Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite-preview):
+
+| Model | Speed | Cost (Paid Tier) | Use Case |
+|-------|-------|------------------|----------|
+| **gemini-2.5-flash** | ⚡⚡⚡ Fast | $0.30 input / $2.50 output per 1M tokens | Recommended default, balanced performance |
+| **gemini-2.5-flash-lite-preview** | ⚡⚡⚡⚡ Faster | $0.075 input / $0.30 output per 1M tokens | **75% cheaper!** Best for high-volume processing |
 
 ## Benefits
 
+✅ **Massive cost savings** - Flash-Lite is 75% cheaper for high-volume processing  
 ✅ **Per-project customization** - Different projects can use different models  
-✅ **Speed vs accuracy tradeoff** - Choose based on use case  
-✅ **Cost optimization** - Use faster models for testing  
-✅ **Experimentation** - Try new experimental models  
+✅ **Speed optimization** - Flash-Lite is faster than Flash  
 ✅ **Separate concerns** - Different models for extraction vs matching  
+✅ **Simple choice** - Just two options: Standard or Lite  
 
 ## Console Logging
 
