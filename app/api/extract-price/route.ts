@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
         *,
         branghunt_images (
           file_path,
+          s3_url,
+          storage_type,
           mime_type
         )
       `)
