@@ -23,7 +23,57 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ projects });
+    // Fetch product statistics for each project
+    const projectsWithStats = await Promise.all(
+      (projects || []).map(async (project) => {
+        const { data: detectionsData } = await supabase
+          .from('branghunt_images')
+          .select(`
+            branghunt_detections (
+              id,
+              is_product,
+              brand_name,
+              fully_analyzed,
+              selected_foodgraph_gtin,
+              human_validation,
+              branghunt_foodgraph_results (id)
+            )
+          `)
+          .eq('project_id', project.project_id);
+
+        const allDetections = detectionsData?.flatMap((img: any) => img.branghunt_detections || []) || [];
+
+        const stats = {
+          totalProducts: allDetections.length,
+          processed: allDetections.filter((d: any) => 
+            (d.is_product === true || d.is_product === null) && d.brand_name
+          ).length,
+          pending: allDetections.filter((d: any) => 
+            (d.is_product === true || d.is_product === null) && !d.brand_name
+          ).length,
+          notProduct: allDetections.filter((d: any) => d.is_product === false).length,
+          matched: allDetections.filter((d: any) => 
+            d.selected_foodgraph_gtin && d.selected_foodgraph_gtin.trim() !== ''
+          ).length,
+          notMatched: allDetections.filter((d: any) => 
+            d.brand_name && 
+            (!d.selected_foodgraph_gtin || d.selected_foodgraph_gtin.trim() === '')
+          ).length,
+          multipleMatches: allDetections.filter((d: any) => 
+            d.brand_name && 
+            !d.fully_analyzed && 
+            !d.selected_foodgraph_gtin &&
+            d.branghunt_foodgraph_results && 
+            d.branghunt_foodgraph_results.length >= 2
+          ).length,
+          incorrect: allDetections.filter((d: any) => d.human_validation === false).length
+        };
+
+        return { ...project, stats };
+      })
+    );
+
+    return NextResponse.json({ projects: projectsWithStats });
   } catch (error) {
     console.error('Error in GET /api/projects:', error);
     return NextResponse.json(
