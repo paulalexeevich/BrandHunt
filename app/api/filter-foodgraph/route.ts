@@ -15,10 +15,10 @@ export async function POST(request: NextRequest) {
     // Create authenticated Supabase client
     const supabase = await createAuthenticatedSupabaseClient();
 
-    // Fetch detection with image to get project_id
+    // Fetch detection with image to get project_id and project_type
     const { data: detection, error: detectionError } = await supabase
       .from('branghunt_detections')
-      .select('*, image:branghunt_images(project_id)')
+      .select('*, image:branghunt_images(*, project:branghunt_projects(id, project_type))')
       .eq('id', detectionId)
       .single();
 
@@ -29,8 +29,9 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    const projectId = detection.image?.project_id || null;
-    console.log(`🔍 Project ID: ${projectId || 'null (using default prompt)'}`);
+    const projectId = detection.image?.project?.id || null;
+    const projectType = (detection.image?.project?.project_type as 'regular' | 'test') || 'regular';
+    console.log(`🔍 Project ID: ${projectId || 'null (using default prompt)'}, type: ${projectType}`);
 
     // Fetch ONLY the pre-filtered results (if provided), otherwise fallback to top 50
     let foodgraphResults;
@@ -88,7 +89,8 @@ export async function POST(request: NextRequest) {
           croppedImageBase64,
           result.front_image_url,
           true, // Get detailed results with matchStatus, confidence, visualSimilarity, and reason
-          projectId // Use custom prompt if available
+          projectId, // Use custom prompt if available
+          projectType // Use appropriate API key
         );
         console.log(`   ✅ Result ${result.product_name}: ${comparisonDetails.matchStatus.toUpperCase()} (confidence: ${comparisonDetails.confidence}, visual similarity: ${comparisonDetails.visualSimilarity}) - ${comparisonDetails.reason}`);
         return { 
