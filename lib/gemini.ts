@@ -89,6 +89,45 @@ export async function getProjectTypeFromProjectId(projectId: string): Promise<'r
 }
 
 /**
+ * Fetch Gemini model selections from project
+ * @param projectId - The project ID to look up
+ * @returns Object with extraction_model and visual_match_model
+ */
+export async function getProjectModels(projectId: string): Promise<{
+  extractionModel: string;
+  visualMatchModel: string;
+}> {
+  try {
+    const supabase = await createAuthenticatedSupabaseClient();
+    
+    const { data: project, error } = await supabase
+      .from('branghunt_projects')
+      .select('extraction_model, visual_match_model')
+      .eq('id', projectId)
+      .single();
+    
+    if (error || !project) {
+      console.warn(`⚠️ Could not fetch project ${projectId}, using default models`);
+      return {
+        extractionModel: 'gemini-2.5-flash',
+        visualMatchModel: 'gemini-2.5-flash'
+      };
+    }
+    
+    return {
+      extractionModel: project.extraction_model || 'gemini-2.5-flash',
+      visualMatchModel: project.visual_match_model || 'gemini-2.5-flash'
+    };
+  } catch (error) {
+    console.error('❌ Error fetching project models:', error);
+    return {
+      extractionModel: 'gemini-2.5-flash',
+      visualMatchModel: 'gemini-2.5-flash'
+    };
+  }
+}
+
+/**
  * Fetch the active prompt template for a given project and step
  * Returns the custom prompt if found, otherwise returns the default prompt
  */
@@ -284,7 +323,8 @@ export async function extractProductInfo(
   mimeType: string,
   boundingBox: { y0: number; x0: number; y1: number; x1: number },
   projectId?: string | null,
-  projectType: 'regular' | 'test' = 'regular'
+  projectType: 'regular' | 'test' = 'regular',
+  modelName: string = 'gemini-2.5-flash'
 ): Promise<ProductInfo> {
   console.log('🔵 extractProductInfo called - START');
   console.log(`   boundingBox:`, boundingBox);
@@ -292,6 +332,7 @@ export async function extractProductInfo(
   console.log(`   mimeType: ${mimeType}`);
   console.log(`   projectId: ${projectId || 'null (using default prompt)'}`);
   console.log(`   projectType: ${projectType}`);
+  console.log(`   modelName: ${modelName}`);
   
   if (!process.env.GOOGLE_GEMINI_API_KEY) {
     console.error('❌ ❌ ❌ GOOGLE_GEMINI_API_KEY IS NOT SET ❌ ❌ ❌');
@@ -312,8 +353,8 @@ export async function extractProductInfo(
   
   console.log('🔵 Calling Gemini API...');
   
-  const model = getGenAI(projectType).getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
+  const model = getGenAI(projectType).getGenerativeModel({
+    model: modelName,
     generationConfig: {
       temperature: 0,
       responseMimeType: 'application/json',
@@ -673,29 +714,32 @@ export async function compareProductImages(
   foodgraphImageUrl: string,
   returnDetails?: boolean,
   projectId?: string | null,
-  projectType?: 'regular' | 'test'
+  projectType?: 'regular' | 'test',
+  modelName?: string
 ): Promise<boolean>;
 export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string,
   returnDetails: true,
   projectId?: string | null,
-  projectType?: 'regular' | 'test'
+  projectType?: 'regular' | 'test',
+  modelName?: string
 ): Promise<ProductComparisonDetails>;
 export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string,
   returnDetails?: boolean,
   projectId?: string | null,
-  projectType: 'regular' | 'test' = 'regular'
+  projectType: 'regular' | 'test' = 'regular',
+  modelName: string = 'gemini-2.5-flash'
 ): Promise<boolean | ProductComparisonDetails> {
-  console.log(`🔍 compareProductImages called - projectId: ${projectId || 'null (using default prompt)'}, projectType: ${projectType}`);
+  console.log(`🔍 compareProductImages called - projectId: ${projectId || 'null (using default prompt)'}, projectType: ${projectType}, model: ${modelName}`);
   
   // Fetch custom prompt or use default
   const prompt = await getPromptTemplate(projectId || null, 'ai_filter');
   
-  const model = getGenAI(projectType).getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
+  const model = getGenAI(projectType).getGenerativeModel({
+    model: modelName,
     generationConfig: {
       temperature: 0,
       responseMimeType: 'application/json',
@@ -832,11 +876,12 @@ export async function selectBestMatchFromMultiple(
   },
   candidates: VisualMatchCandidate[],
   projectId?: string | null,
-  projectType: 'regular' | 'test' = 'regular'
+  projectType: 'regular' | 'test' = 'regular',
+  modelName: string = 'gemini-2.5-flash'
 ): Promise<VisualMatchSelection> {
   console.log(`🎯 Visual Matching Selection: Analyzing ${candidates.length} candidates for best match`);
   console.log(`   Extracted Info: ${extractedInfo.brand} - ${extractedInfo.productName} (${extractedInfo.size})`);
-  console.log(`   projectType: ${projectType}`);
+  console.log(`   projectType: ${projectType}, model: ${modelName}`);
   
   if (!process.env.GOOGLE_GEMINI_API_KEY) {
     console.error('❌ GOOGLE_GEMINI_API_KEY is not set');
@@ -878,8 +923,8 @@ export async function selectBestMatchFromMultiple(
     };
   }
 
-  const model = getGenAI(projectType).getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
+  const model = getGenAI(projectType).getGenerativeModel({
+    model: modelName,
     generationConfig: {
       temperature: 0,
       responseMimeType: 'application/json',
