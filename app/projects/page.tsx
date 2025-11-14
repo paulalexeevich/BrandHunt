@@ -265,114 +265,119 @@ export default function ProjectsPage() {
                 className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow"
               >
                 <Link href={`/projects/${project.project_id}`}>
-                  <div className="p-6 cursor-pointer">
+                  <div className="p-4 cursor-pointer">
                     {/* Project Header */}
-                    <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <h3 className="text-xl font-bold text-gray-900 mb-1">
                           {project.project_name}
                         </h3>
-                        {project.owner_email && (
-                          <p className="text-xs text-indigo-600 mb-1 flex items-center gap-1">
-                            <span className="font-medium">Owner:</span> {project.owner_email}
-                          </p>
-                        )}
                         {project.description && (
-                          <p className="text-sm text-gray-600 line-clamp-2">
+                          <p className="text-sm text-gray-600 line-clamp-2 mb-1">
                             {project.description}
                           </p>
                         )}
+                        {/* Owner and Date Combined */}
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          {project.owner_email && (
+                            <>
+                              <span className="text-indigo-600 font-medium">{project.owner_email}</span>
+                              <span>•</span>
+                            </>
+                          )}
+                          <span>Created {new Date(project.created_at).toLocaleDateString()}</span>
+                        </div>
                       </div>
                       <FolderOpen className="w-8 h-8 text-indigo-600 flex-shrink-0" />
                     </div>
 
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="grid grid-cols-2 gap-2 mb-3">
                       {/* Total Images */}
-                      <div className="bg-blue-50 rounded-lg p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <ImageIcon className="w-4 h-4 text-blue-600" />
+                      <div className="bg-blue-50 rounded-lg p-2.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
                           <span className="text-xs font-medium text-blue-900">Images</span>
                         </div>
-                        <div className="text-2xl font-bold text-blue-700">
+                        <div className="text-xl font-bold text-blue-700">
                           {project.total_images}
                         </div>
-                        <div className="text-xs text-blue-600">
+                        <div className="text-[10px] text-blue-600">
                           {project.images_with_detection} detected
                         </div>
                       </div>
 
                       {/* Total Products */}
-                      <div className="bg-purple-50 rounded-lg p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Target className="w-4 h-4 text-purple-600" />
+                      <div className="bg-purple-50 rounded-lg p-2.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Target className="w-3.5 h-3.5 text-purple-600" />
                           <span className="text-xs font-medium text-purple-900">Products</span>
                         </div>
-                        <div className="text-2xl font-bold text-purple-700">
+                        <div className="text-xl font-bold text-purple-700">
                           {project.total_detections}
                         </div>
-                        <div className="text-xs text-purple-600">
+                        <div className="text-[10px] text-purple-600">
                           {project.detections_fully_analyzed} completed
                         </div>
                       </div>
                     </div>
 
-                    {/* Product Statistics - Compact List Style */}
+                    {/* Product Statistics - Ultra Compact 2 Lines */}
                     {project.stats && (
-                      <div className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-3 border border-gray-200 mb-3">
-                        <div className="text-xs font-semibold text-gray-700 mb-2">Product Status</div>
-                        <div className="space-y-1.5">
-                          {/* Row 1: Processed & Pending */}
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                              <span className="text-gray-600">Processed</span>
-                            </div>
-                            <span className="font-bold text-blue-700">{project.stats.processed}</span>
+                      <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+                        <div className="space-y-1 text-xs">
+                          {/* Line 1: Processed / Not Product / Pending */}
+                          <div className="flex items-center gap-3">
+                            <span className="text-blue-700">
+                              <span className="font-semibold">{project.stats.processed}</span>
+                              <span className="text-gray-600 ml-1">Processed</span>
+                            </span>
+                            <span className="text-gray-400">/</span>
+                            <span className="text-red-700">
+                              <span className="font-semibold">{project.stats.notProduct}</span>
+                              <span className="text-gray-600 ml-1">Not Product</span>
+                            </span>
+                            <span className="text-gray-400">/</span>
+                            <span className="text-gray-700">
+                              <span className="font-semibold">{project.stats.pending}</span>
+                              <span className="text-gray-600 ml-1">Pending</span>
+                            </span>
                           </div>
                           
-                          {/* Row 2: Matched */}
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                              <span className="text-gray-600">✓ Matched</span>
-                            </div>
-                            <span className="font-bold text-green-700">{project.stats.matched}</span>
-                          </div>
-                          
-                          {/* Row 3: Not Match */}
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
-                              <span className="text-gray-600">Not Match</span>
-                            </div>
-                            <span className="font-bold text-yellow-700">{project.stats.notMatched}</span>
-                          </div>
-                          
-                          {/* Row 4: Additional Info in smaller text */}
-                          <div className="flex items-center gap-3 text-[10px] text-gray-500 pt-1 border-t border-gray-200">
-                            <span>Pending: <strong className="text-gray-700">{project.stats.pending}</strong></span>
-                            <span>2+ Match: <strong className="text-purple-700">{project.stats.multipleMatches}</strong></span>
-                            <span>Not Product: <strong className="text-red-700">{project.stats.notProduct}</strong></span>
+                          {/* Line 2: Matched / Not Matched / 2+ Match */}
+                          <div className="flex items-center gap-3">
+                            <span className="text-green-700">
+                              <span className="font-semibold">{project.stats.matched}</span>
+                              <span className="text-gray-600 ml-1">Matched</span>
+                            </span>
+                            <span className="text-gray-400">/</span>
+                            <span className="text-yellow-700">
+                              <span className="font-semibold">{project.stats.notMatched}</span>
+                              <span className="text-gray-600 ml-1">Not Match</span>
+                            </span>
+                            <span className="text-gray-400">/</span>
+                            <span className="text-purple-700">
+                              <span className="font-semibold">{project.stats.multipleMatches}</span>
+                              <span className="text-gray-600 ml-1">2+ Match</span>
+                            </span>
                             {project.stats.incorrect > 0 && (
-                              <span>✗ Incorrect: <strong className="text-orange-700">{project.stats.incorrect}</strong></span>
+                              <>
+                                <span className="text-gray-400">/</span>
+                                <span className="text-orange-700">
+                                  <span className="font-semibold">{project.stats.incorrect}</span>
+                                  <span className="text-gray-600 ml-1">✗ Incorrect</span>
+                                </span>
+                              </>
                             )}
                           </div>
                         </div>
                       </div>
                     )}
-
-                    {/* Date */}
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <span className="text-xs text-gray-500">
-                        Created {new Date(project.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
                   </div>
                 </Link>
 
                 {/* Actions */}
-                <div className="px-6 py-3 bg-gray-50 rounded-b-xl flex gap-2">
+                <div className="px-4 py-2.5 bg-gray-50 rounded-b-xl flex gap-2">
                   <button
                     onClick={(e) => {
                       e.preventDefault();
