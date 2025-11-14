@@ -19,6 +19,24 @@ interface PromptSettingsModalProps {
   onClose: () => void;
 }
 
+interface ProjectModels {
+  extraction_model: string;
+  visual_match_model: string;
+}
+
+const AVAILABLE_MODELS = [
+  {
+    value: 'gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash',
+    description: 'Standard model - balanced performance',
+  },
+  {
+    value: 'gemini-2.5-flash-lite-preview',
+    label: 'Gemini 2.5 Flash-Lite',
+    description: 'Cheaper & faster - 50% cost savings',
+  },
+];
+
 const STEP_NAMES = {
   extract_info: 'Extract Product Information',
   ai_filter: 'AI Product Matching',
@@ -45,11 +63,19 @@ export default function PromptSettingsModal({ projectId, isOpen, onClose }: Prom
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // Model selection state
+  const [models, setModels] = useState<ProjectModels>({
+    extraction_model: 'gemini-2.5-flash',
+    visual_match_model: 'gemini-2.5-flash',
+  });
+  const [savingModels, setSavingModels] = useState(false);
 
-  // Fetch templates when modal opens
+  // Fetch templates and models when modal opens
   useEffect(() => {
     if (isOpen && projectId) {
       fetchTemplates();
+      fetchModels();
     }
   }, [isOpen, projectId]);
 
@@ -88,6 +114,55 @@ export default function PromptSettingsModal({ projectId, isOpen, onClose }: Prom
       setError(err instanceof Error ? err.message : 'Failed to load prompt templates. The database table may not exist yet.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchModels = async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}`);
+      if (!response.ok) {
+        console.error('Failed to fetch project models');
+        return;
+      }
+      
+      const data = await response.json();
+      if (data.extraction_model && data.visual_match_model) {
+        setModels({
+          extraction_model: data.extraction_model,
+          visual_match_model: data.visual_match_model,
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching models:', err);
+    }
+  };
+
+  const saveModels = async () => {
+    setSavingModels(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          extraction_model: models.extraction_model,
+          visual_match_model: models.visual_match_model,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save model selection');
+      }
+
+      setSuccessMessage('Model selection saved successfully');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Error saving models:', err);
+      setError('Failed to save model selection');
+    } finally {
+      setSavingModels(false);
     }
   };
 
@@ -176,6 +251,91 @@ export default function PromptSettingsModal({ projectId, isOpen, onClose }: Prom
             </div>
           ) : (
             <div className="space-y-6">
+              {/* Model Selection Section */}
+              <div className="border-2 border-indigo-200 rounded-lg p-4 bg-gradient-to-br from-indigo-50 to-purple-50">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                      </svg>
+                      Gemini Model Selection
+                    </h3>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Choose which Gemini models to use for different AI tasks
+                    </p>
+                  </div>
+                  <button
+                    onClick={saveModels}
+                    disabled={savingModels}
+                    className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {savingModels ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Models
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Extraction Model Selection */}
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      🔍 Info Extraction Model
+                    </label>
+                    <p className="text-xs text-gray-600 mb-3">
+                      Used for: Extract Product Info, Extract Price, Detect Products
+                    </p>
+                    <select
+                      value={models.extraction_model}
+                      onChange={(e) => setModels({ ...models, extraction_model: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                    >
+                      {AVAILABLE_MODELS.map((model) => (
+                        <option key={model.value} value={model.value}>
+                          {model.label} - {model.description}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Visual Match Model Selection */}
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      🎯 Visual Matching Model
+                    </label>
+                    <p className="text-xs text-gray-600 mb-3">
+                      Used for: AI Product Matching, Visual Match Selection
+                    </p>
+                    <select
+                      value={models.visual_match_model}
+                      onChange={(e) => setModels({ ...models, visual_match_model: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                    >
+                      {AVAILABLE_MODELS.map((model) => (
+                        <option key={model.value} value={model.value}>
+                          {model.label} - {model.description}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-800">
+                    💡 <span className="font-semibold">Cost Savings:</span> Gemini 2.5 Flash-Lite is ~75% cheaper than standard Flash
+                    ($0.075 vs $0.30 per 1M input tokens). Perfect for high-volume processing!
+                  </p>
+                </div>
+              </div>
+
               {/* Success/Error Messages */}
               {successMessage && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-2">

@@ -28,6 +28,18 @@ export async function GET(
       );
     }
 
+    // Fetch model selections from branghunt_projects table
+    const { data: projectData, error: projectError } = await supabase
+      .from('branghunt_projects')
+      .select('extraction_model, visual_match_model')
+      .eq('id', projectId)
+      .single();
+
+    if (projectError) {
+      console.error('Error fetching project data:', projectError);
+      // Continue without model data if this fails
+    }
+
     // Get page and limit from query params
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get('page') || '1');
@@ -114,7 +126,10 @@ export async function GET(
         total: totalImages,
         totalPages,
         hasMore: page < totalPages
-      }
+      },
+      // Include model selections
+      extraction_model: projectData?.extraction_model || 'gemini-2.5-flash',
+      visual_match_model: projectData?.visual_match_model || 'gemini-2.5-flash'
     });
   } catch (error) {
     console.error('Error in GET /api/projects/[projectId]:', error);
@@ -201,6 +216,74 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in DELETE /api/projects/[projectId]:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH /api/projects/[projectId] - Update model selections
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
+  try {
+    const supabase = await createAuthenticatedSupabaseClient();
+    const { projectId } = await params;
+
+    // Parse request body
+    const body = await request.json();
+    const { extraction_model, visual_match_model } = body;
+
+    // Validate model values
+    const validModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite-preview'];
+    
+    if (extraction_model && !validModels.includes(extraction_model)) {
+      return NextResponse.json(
+        { error: 'Invalid extraction model' },
+        { status: 400 }
+      );
+    }
+
+    if (visual_match_model && !validModels.includes(visual_match_model)) {
+      return NextResponse.json(
+        { error: 'Invalid visual match model' },
+        { status: 400 }
+      );
+    }
+
+    // Build update object dynamically
+    const updates: Record<string, string> = {};
+    if (extraction_model) updates.extraction_model = extraction_model;
+    if (visual_match_model) updates.visual_match_model = visual_match_model;
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json(
+        { error: 'No model fields to update' },
+        { status: 400 }
+      );
+    }
+
+    // Update project models
+    const { data: project, error } = await supabase
+      .from('branghunt_projects')
+      .update(updates)
+      .eq('id', projectId)
+      .select('id, name, extraction_model, visual_match_model')
+      .single();
+
+    if (error) {
+      console.error('Error updating project models:', error);
+      return NextResponse.json(
+        { error: 'Failed to update project models', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ project });
+  } catch (error) {
+    console.error('Error in PATCH /api/projects/[projectId]:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
