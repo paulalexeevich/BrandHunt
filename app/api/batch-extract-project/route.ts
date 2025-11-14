@@ -45,6 +45,16 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createAuthenticatedSupabaseClient();
 
+    // Fetch project type for API key selection
+    const { data: project } = await supabase
+      .from('branghunt_projects')
+      .select('project_type')
+      .eq('id', projectId)
+      .single();
+    
+    const projectType = (project?.project_type as 'regular' | 'test') || 'regular';
+    console.log(`🔑 Project type: ${projectType}`);
+
     // Use utility to fetch detections
     const { detections, imageMap, imageIds } = await fetchDetectionsByProject(
       supabase,
@@ -100,7 +110,7 @@ export async function POST(request: NextRequest) {
 
       // Process all detections
       await processor.process(detections, async (detection) => {
-        return await processDetection(detection, images, supabase, projectId);
+        return await processDetection(detection, images, supabase, projectId, projectType);
       });
 
       // Send completion
@@ -137,7 +147,8 @@ async function processDetection(
   detection: any,
   imageMap: Map<string, any>,
   supabase: any,
-  projectId: string
+  projectId: string,
+  projectType: 'regular' | 'test'
 ): Promise<DetectionResult> {
   const result: DetectionResult = {
     success: false,
@@ -161,7 +172,8 @@ async function processDetection(
       imageBase64,
       mimeType,
       detection.bounding_box,
-      projectId
+      projectId,
+      projectType
     );
 
     // Save to database

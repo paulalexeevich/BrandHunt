@@ -4,7 +4,89 @@ import { createAuthenticatedSupabaseClient } from '@/lib/auth';
 import { DEFAULT_EXTRACT_INFO_PROMPT, DEFAULT_AI_FILTER_PROMPT, DEFAULT_VISUAL_MATCH_PROMPT } from '@/lib/default-prompts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+// Initialize both API keys
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
+const genAITest = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY_TEST!);
+
+/**
+ * Get the appropriate Google Generative AI instance based on project type
+ * @param projectType - 'regular' or 'test'
+ * @returns GoogleGenerativeAI instance with the appropriate API key
+ */
+export function getGenAI(projectType: 'regular' | 'test' = 'regular'): GoogleGenerativeAI {
+  if (projectType === 'test') {
+    console.log('🧪 Using TEST Gemini API key for token tracking');
+    return genAITest;
+  }
+  return genAI;
+}
+
+/**
+ * Fetch project type from database using image ID
+ * @param imageId - The image ID to look up
+ * @returns Project type ('regular' or 'test'), defaults to 'regular' on error
+ */
+export async function getProjectTypeFromImageId(imageId: string): Promise<'regular' | 'test'> {
+  try {
+    const supabase = await createAuthenticatedSupabaseClient();
+    
+    // Fetch image to get project_id
+    const { data: image, error: imageError } = await supabase
+      .from('branghunt_images')
+      .select('project_id')
+      .eq('id', imageId)
+      .single();
+    
+    if (imageError || !image) {
+      console.warn(`⚠️ Could not fetch image ${imageId}, defaulting to 'regular' project type`);
+      return 'regular';
+    }
+    
+    // Fetch project to get project_type
+    const { data: project, error: projectError } = await supabase
+      .from('branghunt_projects')
+      .select('project_type')
+      .eq('id', image.project_id)
+      .single();
+    
+    if (projectError || !project) {
+      console.warn(`⚠️ Could not fetch project ${image.project_id}, defaulting to 'regular' project type`);
+      return 'regular';
+    }
+    
+    return (project.project_type as 'regular' | 'test') || 'regular';
+  } catch (error) {
+    console.error('❌ Error fetching project type:', error);
+    return 'regular';
+  }
+}
+
+/**
+ * Fetch project type directly from project ID
+ * @param projectId - The project ID to look up
+ * @returns Project type ('regular' or 'test'), defaults to 'regular' on error
+ */
+export async function getProjectTypeFromProjectId(projectId: string): Promise<'regular' | 'test'> {
+  try {
+    const supabase = await createAuthenticatedSupabaseClient();
+    
+    const { data: project, error } = await supabase
+      .from('branghunt_projects')
+      .select('project_type')
+      .eq('id', projectId)
+      .single();
+    
+    if (error || !project) {
+      console.warn(`⚠️ Could not fetch project ${projectId}, defaulting to 'regular' project type`);
+      return 'regular';
+    }
+    
+    return (project.project_type as 'regular' | 'test') || 'regular';
+  } catch (error) {
+    console.error('❌ Error fetching project type:', error);
+    return 'regular';
+  }
+}
 
 /**
  * Fetch the active prompt template for a given project and step
@@ -85,8 +167,13 @@ export interface ProductInfo {
  * Detect products in an image using Gemini 2.5 Flash
  * Returns bounding boxes and labels for detected products
  */
-export async function detectProducts(imageBase64: string, mimeType: string): Promise<DetectedProduct[]> {
-  const model = genAI.getGenerativeModel({ 
+export async function detectProducts(
+  imageBase64: string, 
+  mimeType: string, 
+  projectType: 'regular' | 'test' = 'regular'
+): Promise<DetectedProduct[]> {
+  console.log(`🔍 detectProducts called - projectType: ${projectType}`);
+  const model = getGenAI(projectType).getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0,  // Set to 0 for more deterministic bounding boxes
@@ -196,13 +283,15 @@ export async function extractProductInfo(
   imageBase64: string, 
   mimeType: string,
   boundingBox: { y0: number; x0: number; y1: number; x1: number },
-  projectId?: string | null
+  projectId?: string | null,
+  projectType: 'regular' | 'test' = 'regular'
 ): Promise<ProductInfo> {
   console.log('🔵 extractProductInfo called - START');
   console.log(`   boundingBox:`, boundingBox);
   console.log(`   imageBase64 length: ${imageBase64.length}`);
   console.log(`   mimeType: ${mimeType}`);
   console.log(`   projectId: ${projectId || 'null (using default prompt)'}`);
+  console.log(`   projectType: ${projectType}`);
   
   if (!process.env.GOOGLE_GEMINI_API_KEY) {
     console.error('❌ ❌ ❌ GOOGLE_GEMINI_API_KEY IS NOT SET ❌ ❌ ❌');
@@ -223,7 +312,7 @@ export async function extractProductInfo(
   
   console.log('🔵 Calling Gemini API...');
   
-  const model = genAI.getGenerativeModel({ 
+  const model = getGenAI(projectType).getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0,
@@ -311,12 +400,15 @@ export async function extractPrice(
   imageBase64: string,
   mimeType: string,
   boundingBox: { y0: number; x0: number; y1: number; x1: number },
-  productInfo: { brand?: string; productName?: string; label?: string }
+  productInfo: { brand?: string; productName?: string; label?: string },
+  projectType: 'regular' | 'test' = 'regular'
 ): Promise<{ price: string; currency: string; confidence: number }> {
   if (!process.env.GOOGLE_GEMINI_API_KEY) {
     console.error('❌ GOOGLE_GEMINI_API_KEY is not set');
     throw new Error('Gemini API key is not configured');
   }
+
+  console.log(`🏷️ extractPrice called - projectType: ${projectType}`);
 
   // Expand the bounding box to include the area below the product
   // We'll expand downward by 30% of the product height to capture price tags
@@ -335,7 +427,7 @@ export async function extractPrice(
   
   console.log(`✂️ Cropped image to ${width}x${height}px for price extraction`);
 
-  const model = genAI.getGenerativeModel({ 
+  const model = getGenAI(projectType).getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0,
@@ -432,7 +524,8 @@ Only return the JSON object, nothing else.
  */
 export async function validateImageQuality(
   imageBase64: string,
-  mimeType: string
+  mimeType: string,
+  projectType: 'regular' | 'test' = 'regular'
 ): Promise<{
   isBlurry: boolean;
   blurConfidence: number;
@@ -446,7 +539,9 @@ export async function validateImageQuality(
     throw new Error('Gemini API key is not configured');
   }
 
-  const model = genAI.getGenerativeModel({ 
+  console.log(`✅ validateImageQuality called - projectType: ${projectType}`);
+
+  const model = getGenAI(projectType).getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0,
@@ -577,26 +672,29 @@ export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string,
   returnDetails?: boolean,
-  projectId?: string | null
+  projectId?: string | null,
+  projectType?: 'regular' | 'test'
 ): Promise<boolean>;
 export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string,
   returnDetails: true,
-  projectId?: string | null
+  projectId?: string | null,
+  projectType?: 'regular' | 'test'
 ): Promise<ProductComparisonDetails>;
 export async function compareProductImages(
   originalImageBase64: string,
   foodgraphImageUrl: string,
   returnDetails?: boolean,
-  projectId?: string | null
+  projectId?: string | null,
+  projectType: 'regular' | 'test' = 'regular'
 ): Promise<boolean | ProductComparisonDetails> {
-  console.log(`🔍 compareProductImages called - projectId: ${projectId || 'null (using default prompt)'}`);
+  console.log(`🔍 compareProductImages called - projectId: ${projectId || 'null (using default prompt)'}, projectType: ${projectType}`);
   
   // Fetch custom prompt or use default
   const prompt = await getPromptTemplate(projectId || null, 'ai_filter');
   
-  const model = genAI.getGenerativeModel({ 
+  const model = getGenAI(projectType).getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0,
@@ -733,10 +831,12 @@ export async function selectBestMatchFromMultiple(
     category: string;
   },
   candidates: VisualMatchCandidate[],
-  projectId?: string | null
+  projectId?: string | null,
+  projectType: 'regular' | 'test' = 'regular'
 ): Promise<VisualMatchSelection> {
   console.log(`🎯 Visual Matching Selection: Analyzing ${candidates.length} candidates for best match`);
   console.log(`   Extracted Info: ${extractedInfo.brand} - ${extractedInfo.productName} (${extractedInfo.size})`);
+  console.log(`   projectType: ${projectType}`);
   
   if (!process.env.GOOGLE_GEMINI_API_KEY) {
     console.error('❌ GOOGLE_GEMINI_API_KEY is not set');
@@ -778,7 +878,7 @@ export async function selectBestMatchFromMultiple(
     };
   }
 
-  const model = genAI.getGenerativeModel({ 
+  const model = getGenAI(projectType).getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0,

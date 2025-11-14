@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     // Fetch detection and associated image with project info
     const { data: detection, error: detectionError } = await supabase
       .from('branghunt_detections')
-      .select('*, image:branghunt_images(*, project_id)')
+      .select('*, image:branghunt_images(*, project:branghunt_projects(id, project_type))')
       .eq('id', detectionId)
       .single();
 
@@ -25,7 +25,10 @@ export async function POST(request: NextRequest) {
     }
 
     const image = detection.image;
-    const projectId = image?.project_id || null;
+    const projectId = image?.project?.id || null;
+    const projectType = (image?.project?.project_type as 'regular' | 'test') || 'regular';
+    
+    console.log(`🔍 extract-brand: project ${projectId}, type: ${projectType}`);
     
     // Get image data (handles both S3 URLs and base64 storage)
     const { getImageBase64ForProcessing, getImageMimeType } = await import('@/lib/image-processor');
@@ -36,7 +39,7 @@ export async function POST(request: NextRequest) {
     // Extract brand name and category using Gemini (with custom prompt if available)
     let productInfo;
     try {
-      productInfo = await extractProductInfo(imageBase64, mimeType, boundingBox, projectId);
+      productInfo = await extractProductInfo(imageBase64, mimeType, boundingBox, projectId, projectType);
     } catch (error) {
       console.error(`Failed to extract product info:`, error);
       throw error;
