@@ -204,8 +204,8 @@ export default function ProjectsPage() {
         {/* Header with Auth Nav */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900">BrangHunt Projects</h1>
-            <p className="text-gray-600 mt-2">Organize your shelf images into projects</p>
+            <h1 className="text-4xl font-bold text-gray-900">Brand Hunt Projects</h1>
+            <p className="text-gray-600 mt-2">AI-powered image annotation</p>
           </div>
           <AuthNav />
         </div>
