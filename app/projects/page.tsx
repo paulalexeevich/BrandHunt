@@ -317,55 +317,47 @@ export default function ProjectsPage() {
                       </div>
                     </div>
 
-                    {/* Compact Product Statistics */}
+                    {/* Product Statistics - Compact List Style */}
                     {project.stats && (
-                      <div className="grid grid-cols-4 gap-1 mb-3">
-                        {/* Processed */}
-                        <div className="bg-blue-50 rounded px-2 py-1.5 text-center border border-blue-200">
-                          <div className="text-xs font-bold text-blue-700">{project.stats.processed}</div>
-                          <div className="text-[9px] text-blue-600">Processed</div>
-                        </div>
-                        
-                        {/* Pending */}
-                        <div className="bg-gray-50 rounded px-2 py-1.5 text-center border border-gray-200">
-                          <div className="text-xs font-bold text-gray-700">{project.stats.pending}</div>
-                          <div className="text-[9px] text-gray-600">Pending</div>
-                        </div>
-                        
-                        {/* Not Product */}
-                        <div className="bg-red-50 rounded px-2 py-1.5 text-center border border-red-200">
-                          <div className="text-xs font-bold text-red-700">{project.stats.notProduct}</div>
-                          <div className="text-[9px] text-red-600">Not Product</div>
-                        </div>
-                        
-                        {/* Matched */}
-                        <div className="bg-green-50 rounded px-2 py-1.5 text-center border border-green-200">
-                          <div className="text-xs font-bold text-green-700">{project.stats.matched}</div>
-                          <div className="text-[9px] text-green-600">Matched</div>
-                        </div>
-                        
-                        {/* Not Match */}
-                        <div className="bg-yellow-50 rounded px-2 py-1.5 text-center border border-yellow-200">
-                          <div className="text-xs font-bold text-yellow-700">{project.stats.notMatched}</div>
-                          <div className="text-[9px] text-yellow-600">Not Match</div>
-                        </div>
-                        
-                        {/* 2+ Match */}
-                        <div className="bg-purple-50 rounded px-2 py-1.5 text-center border border-purple-200">
-                          <div className="text-xs font-bold text-purple-700">{project.stats.multipleMatches}</div>
-                          <div className="text-[9px] text-purple-600">2+ Match</div>
-                        </div>
-                        
-                        {/* Incorrect */}
-                        <div className="bg-orange-50 rounded px-2 py-1.5 text-center border border-orange-200">
-                          <div className="text-xs font-bold text-orange-700">{project.stats.incorrect}</div>
-                          <div className="text-[9px] text-orange-600">✗ Incorrect</div>
-                        </div>
-                        
-                        {/* Total (for reference) */}
-                        <div className="bg-gray-900 rounded px-2 py-1.5 text-center border-2 border-gray-900">
-                          <div className="text-xs font-bold text-white">{project.stats.totalProducts}</div>
-                          <div className="text-[9px] text-gray-200">Total</div>
+                      <div className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-3 border border-gray-200 mb-3">
+                        <div className="text-xs font-semibold text-gray-700 mb-2">Product Status</div>
+                        <div className="space-y-1.5">
+                          {/* Row 1: Processed & Pending */}
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                              <span className="text-gray-600">Processed</span>
+                            </div>
+                            <span className="font-bold text-blue-700">{project.stats.processed}</span>
+                          </div>
+                          
+                          {/* Row 2: Matched */}
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                              <span className="text-gray-600">✓ Matched</span>
+                            </div>
+                            <span className="font-bold text-green-700">{project.stats.matched}</span>
+                          </div>
+                          
+                          {/* Row 3: Not Match */}
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
+                              <span className="text-gray-600">Not Match</span>
+                            </div>
+                            <span className="font-bold text-yellow-700">{project.stats.notMatched}</span>
+                          </div>
+                          
+                          {/* Row 4: Additional Info in smaller text */}
+                          <div className="flex items-center gap-3 text-[10px] text-gray-500 pt-1 border-t border-gray-200">
+                            <span>Pending: <strong className="text-gray-700">{project.stats.pending}</strong></span>
+                            <span>2+ Match: <strong className="text-purple-700">{project.stats.multipleMatches}</strong></span>
+                            <span>Not Product: <strong className="text-red-700">{project.stats.notProduct}</strong></span>
+                            {project.stats.incorrect > 0 && (
+                              <span>✗ Incorrect: <strong className="text-orange-700">{project.stats.incorrect}</strong></span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
